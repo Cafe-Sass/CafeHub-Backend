@@ -426,3 +426,12 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# CafeHub local exclusions
+/Docs/
+.idea/
+TestResults/
+coverage/
+coveragereport/
+.env
+.env.*
