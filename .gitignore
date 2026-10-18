@@ -435,3 +435,5 @@ coverage/
 coveragereport/
 .env
 .env.*
+appsettings.*.local.json
+*.local.json
