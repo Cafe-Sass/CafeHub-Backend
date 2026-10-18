@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [development]
+  push:
+    branches: [development]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore CafeHub.Backend.sln
+
+      - name: Build
+        run: dotnet build CafeHub.Backend.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test tests/CafeHub.UnitTests/CafeHub.UnitTests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=unit-tests.trx" --results-directory TestResults
+
+      - name: Append unit test totals to the run summary
+        if: always()
+        run: |
+          trx=TestResults/unit-tests.trx
+          echo "## Unit test results" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$trx" ]; then
+            counters=$(grep -m1 '<Counters' "$trx" | sed 's/.*<Counters //; s|/.*||')
+            printf '| Total | Passed | Failed |\n|---|---|---|\n| %s | %s | %s |\n' \
+              "$(sed -n 's/.*total="\([0-9]*\)".*/\1/p' <<< "$counters")" \
+              "$(sed -n 's/.*passed="\([0-9]*\)".*/\1/p' <<< "$counters")" \
+              "$(sed -n 's/.*failed="\([0-9]*\)".*/\1/p' <<< "$counters")" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "TRX file not found; unit tests produced no results." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: TestResults/
