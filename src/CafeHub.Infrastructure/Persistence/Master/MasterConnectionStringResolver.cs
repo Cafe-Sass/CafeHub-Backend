@@ -1,19 +1,20 @@
 using Microsoft.Extensions.Configuration;
 
-namespace CafeHub.Infrastructure.Persistence.Master;
-
-public sealed class MasterConnectionStringResolver(IConfiguration configuration)
+namespace CafeHub.Infrastructure.Persistence.Master
 {
-    public string Resolve()
+    public sealed class MasterConnectionStringResolver(IConfiguration configuration)
     {
-        var connectionString = configuration[ConfigurationKeys.MasterConnectionString];
-
-        if (string.IsNullOrWhiteSpace(connectionString))
+        public string Resolve()
         {
-            throw new MasterDatabaseNotConfiguredException(
-                $"The master database connection string is not configured. Set it with User Secrets as \"{ConfigurationKeys.MasterConnectionString}\" or with the environment variable \"{ConfigurationKeys.MasterConnectionStringEnvironmentVariable}\".");
-        }
+            var connectionString = configuration[ConfigurationKeys.MasterConnectionString];
 
-        return connectionString;
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new MasterDatabaseNotConfiguredException(
+                    $"The master database connection string is not configured. Set it with User Secrets as \"{ConfigurationKeys.MasterConnectionString}\" or with the environment variable \"{ConfigurationKeys.MasterConnectionStringEnvironmentVariable}\".");
+            }
+
+            return connectionString;
+        }
     }
 }
