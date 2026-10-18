@@ -65,3 +65,14 @@ No entity, DbContext, or migration passes through this sub-task; this document i
   `dotnet ef migrations add <Name> --context MasterDbContext --project src/CafeHub.Infrastructure --startup-project src/CafeHub.WebApi --output-dir Persistence/Master/Migrations`
 - The connection for design-time tooling comes from the developer environment only: User Secrets (`ConnectionStrings:Master`) or the environment variable `ConnectionStrings__Master`. No connection string is ever committed.
 - No migration exists today because no entity has been approved for the Master/Registry database (see the TBD register and isolated-tenant work above); the first approved entity starts the first migration.
+
+## Migrations — Tenant
+
+- Migration source of truth: `src/CafeHub.Infrastructure` under `Persistence/Tenant/Migrations`.
+- Example command (run from the repository root):
+
+  `dotnet ef migrations add <Name> --context TenantDbContext --project src/CafeHub.Infrastructure --startup-project src/CafeHub.WebApi --output-dir Persistence/Tenant/Migrations`
+- Tenant design-time tooling reads only the developer environment variable `ConnectionStrings__TenantDesignTime`; it targets a local developer database only and is never used at runtime. At runtime each tenant's connection is resolved through the validated tenant context and the `TenantConnections:<SecretReference>` setting convention, never through the design-time variable.
+- Every connection resolves fail-closed: a missing tenant context, an inactive tenant, or an unconfigured `TenantConnections:<SecretReference>` setting stops with a safe error and never falls back to the Master connection, another tenant's connection, or a default value.
+- Each Cafe has its own database, so tenant tables carry no `TenantId` discriminator. Master/Retention registry and subscription metadata do not belong in tenant tables; tenant tables never store a raw connection secret, only the identifier-independent data of one cafe.
+- No tenant entity and no tenant migration exists yet; the first approved tenant entity starts the first tenant migration. All `TenantConnections` values in configuration stay out of source control.
