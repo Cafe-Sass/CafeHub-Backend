@@ -58,6 +58,28 @@ Organizational baseline for the CafeHub backend, derived from the CafeHub PRD (C
 | `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, build workflows | Build & DevEx owner | TBD |
 | `architecture/*.md` decision records | Architecture owner | TBD |
 
+## Local configuration
+
+The WebApi reads real credentials locally through User Secrets or environment variables; no credential is committed to Git.
+
+- Required setting keys (names equal the constants in `CafeHub.Infrastructure.ConfigurationKeys`):
+  - `ConnectionStrings:Master`
+  - `ConnectionStrings:TenantDesignTime`
+  - `TenantConnections:<SecretReference>` — one connection string per tenant secret reference
+- Set locally with User Secrets (placeholders in `<>`; replace with real local values, never committing them):
+
+  ```text
+  dotnet user-secrets set "ConnectionStrings:Master" "<master-connection-string>" --project src/CafeHub.WebApi
+  dotnet user-secrets set "ConnectionStrings:TenantDesignTime" "<tenant-design-time-connection-string>" --project src/CafeHub.WebApi
+  dotnet user-secrets set "TenantConnections:<SecretReference>" "<tenant-connection-string>" --project src/CafeHub.WebApi
+  ```
+
+- Equivalent environment variable names (`__` is the multi-level separator):
+  - `ConnectionStrings__Master`
+  - `ConnectionStrings__TenantDesignTime`
+  - `TenantConnections__<SecretReference>`
+- `src/CafeHub.WebApi/appsettings.template.json` lists every key the implementation expects with placeholders; the file name is not loaded by ASP.NET Core automatically. Design-time migrations additionally require the `ConnectionStrings__TenantDesignTime` environment variable (see TenantDbContextFactory). The full onboarding README arrives with CFMD-218.
+
 ## Open decisions
 
 - Tenant identifier source (host, header, or path) — required before tenant resolution middleware; PRD has no TBD number for it.
