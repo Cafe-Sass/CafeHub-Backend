@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\CafeHub.Application\CafeHub.Application.csproj" />
+    <ProjectReference Include="..\CafeHub.Domain\CafeHub.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
