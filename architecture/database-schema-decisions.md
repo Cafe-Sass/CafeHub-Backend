@@ -56,3 +56,12 @@ Baseline for how CafeHub persistence is organized, derived from the CafeHub PRD 
 | — | Tenant identifier source (QR-resolved context, host, header, or path); no PRD TBD number exists for it, and it is not decided |
 
 No entity, DbContext, or migration passes through this sub-task; this document is the decision baseline the later sub-tasks reference.
+
+## Migrations — Master
+
+- Migration source of truth: `src/CafeHub.Infrastructure` under `Persistence/Master/Migrations`.
+- Example command (run from the repository root):
+
+  `dotnet ef migrations add <Name> --context MasterDbContext --project src/CafeHub.Infrastructure --startup-project src/CafeHub.WebApi --output-dir Persistence/Master/Migrations`
+- The connection for design-time tooling comes from the developer environment only: User Secrets (`ConnectionStrings:Master`) or the environment variable `ConnectionStrings__Master`. No connection string is ever committed.
+- No migration exists today because no entity has been approved for the Master/Registry database (see the TBD register and isolated-tenant work above); the first approved entity starts the first migration.
