@@ -29,6 +29,9 @@ jobs:
       - name: Restore
         run: dotnet restore CafeHub.Backend.sln
 
+      - name: Verify formatting
+        run: dotnet format CafeHub.Backend.sln --verify-no-changes --no-restore
+
       - name: Build
         run: dotnet build CafeHub.Backend.sln --no-restore --configuration Release
 
