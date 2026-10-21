@@ -51,6 +51,7 @@ namespace CafeHub.WebApi.Errors
                 ErrorType.Forbidden => MapStandard(error, traceIdentifier, StatusCodes.Status403Forbidden),
                 ErrorType.NotFound => MapStandard(error, traceIdentifier, StatusCodes.Status404NotFound),
                 ErrorType.Conflict => MapStandard(error, traceIdentifier, StatusCodes.Status409Conflict),
+                ErrorType.Validation => MapStandard(error, traceIdentifier, StatusCodes.Status400BadRequest),
                 _ => MapStandard(error, traceIdentifier, StatusCodes.Status500InternalServerError),
             };
         }
