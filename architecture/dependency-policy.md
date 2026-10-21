@@ -23,6 +23,9 @@ The table below is generated from the real `Directory.Packages.props` and must b
 
 | Package | Version | Purpose |
 |---|---|---|
+| FluentValidation | 12.2.0 | Request validation framework for Application use cases |
+| FluentValidation.DependencyInjectionExtensions | 12.2.0 | Registers FluentValidation validators from an assembly in `AddApplication` |
+| MediatR | 12.5.0 | CQRS command and query contracts with `IMediator` dispatching |
 | Microsoft.EntityFrameworkCore | 10.0.13 | EF Core runtime for MasterDbContext and TenantDbContext |
 | Microsoft.EntityFrameworkCore.Design | 10.0.13 | EF Core design-time tooling for migrations (WebApi host) |
 | Microsoft.Extensions.Configuration | 10.0.13 | Configuration building exercised in unit tests |
@@ -34,14 +37,10 @@ The table below is generated from the real `Directory.Packages.props` and must b
 | xunit | 2.9.3 | Unit test framework |
 | xunit.runner.visualstudio | 3.1.4 | xUnit Visual Studio test adapter |
 
-## Approved, not yet installed
-
-- **MediatR — exactly 12.5.0.** Version 12.5.0 is the last Apache-2.0 licensed release; from version 13 on, MediatR moved to a commercial license, so **version 13 and above are prohibited**. Floating version ranges such as `12.*` or `*` are prohibited too. MediatR is installed by the Sprint 2 Application Core work (CQRS behaviors), not before.
-- **FluentValidation.** Approved for the Sprint 2 validation behaviors; not installed in Sprint 1.
-
 ## Prohibited
 
 - SQL Server providers: `Microsoft.Data.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, and any other SQL Server package. PostgreSQL via Npgsql is the only approved database stack (see `architecture/database-schema-decisions.md`).
+- MediatR 13 and above, floating version ranges, and wildcard versions: 12.5.0 is the last Apache-2.0 licensed release; from version 13 on, MediatR moved to a commercial license, so version 13 and above are prohibited, as are floating ranges such as `12.*` or `*`.
 
 ## Not approved without a documented requirement
 

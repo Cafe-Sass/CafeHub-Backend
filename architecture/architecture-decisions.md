@@ -43,7 +43,7 @@ Organizational baseline for the CafeHub backend, derived from the CafeHub PRD (C
 
 ## CQRS and validation
 
-- The backend plans CQRS with MediatR pinned to exactly 12.5.0 (last Apache-2.0 release; 13 or later is forbidden) plus FluentValidation. Both are approved; neither is installed yet. They arrive with the first real use cases in Sprint 2, not in foundation scaffolding.
+- The backend uses CQRS with MediatR pinned to exactly 12.5.0 (last Apache-2.0 release; 13 or later is forbidden) plus FluentValidation, both installed through `Directory.Packages.props` (versions and approval rules live in the dependency policy). Command and query contracts with their handler contracts live in `CafeHub.Application.Abstractions.Messaging`, and every request returns `Result` or `Result<T>`.
 - Maps (AutoMapper/Mapster) and generic repository wrappers stay out of scope here per Stage 1 constraints.
 
 ## Error codes
