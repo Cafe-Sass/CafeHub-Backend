@@ -55,6 +55,24 @@ Every use case returns a typed `Result` from the namespace `CafeHub.Application.
 - Error messages are safe for clients: they never contain secrets, connection strings, stack traces, or raw exception text.
 - Validation failures use `ValidationError` with the code `Validation.Failed`; it carries one `FieldError` (field name plus message) per invalid field.
 
+## Error responses to clients
+
+Every failed `Result` reaches clients in one RFC 9457 ProblemDetails shape. The mapper `ErrorProblemDetailsMapper` in `src/CafeHub.WebApi/Errors` is the single mapping place (CFMD-246); controllers use the helper `Result.ToProblemResult(HttpContext)` and never build error JSON by hand.
+
+| ErrorType | Status | Title | `type` link |
+|---|---|---|---|
+| Validation | 400 | Bad Request | `https://tools.ietf.org/html/rfc9110#section-15.5.1` |
+| Unauthorized | 401 | Unauthorized | `https://tools.ietf.org/html/rfc9110#section-15.5.2` |
+| Forbidden | 403 | Forbidden | `https://tools.ietf.org/html/rfc9110#section-15.5.4` |
+| NotFound | 404 | Not Found | `https://tools.ietf.org/html/rfc9110#section-15.5.5` |
+| Conflict | 409 | Conflict | `https://tools.ietf.org/html/rfc9110#section-15.5.10` |
+| Failure | 500 | Internal Server Error | `https://tools.ietf.org/html/rfc9110#section-15.6.1` |
+
+- The table is mirrored in the mapper's XML summary; the two must stay identical.
+- Every ProblemDetails carries the machine-readable `code` extension (the `Error.Code`) and a `traceId` extension (`Activity.Current?.Id ?? HttpContext.TraceIdentifier`); a correlation identifier is a later story.
+- Validation responses use `ValidationProblemDetails`: the `Errors` dictionary lists every field-level message in validator order.
+- Titles and `type` links mirror the RFC 9110 defaults of ASP.NET Core (`ProblemDetailsDefaults`), so standard ASP.NET Core client-error links stay consistent.
+
 ## Testing
 
 - The repository has exactly one test project, `tests/CafeHub.UnitTests`, using xUnit v2 with hand-written fakes. No Integration tests, no Architecture tests, no Testcontainers, no in-memory/SQLite database providers, no mocking library, and nothing that requires a running database or network at Stage 1.
