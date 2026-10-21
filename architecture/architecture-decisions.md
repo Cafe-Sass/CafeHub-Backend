@@ -46,6 +46,15 @@ Organizational baseline for the CafeHub backend, derived from the CafeHub PRD (C
 - The backend plans CQRS with MediatR pinned to exactly 12.5.0 (last Apache-2.0 release; 13 or later is forbidden) plus FluentValidation. Both are approved; neither is installed yet. They arrive with the first real use cases in Sprint 2, not in foundation scaffolding.
 - Maps (AutoMapper/Mapster) and generic repository wrappers stay out of scope here per Stage 1 constraints.
 
+## Error codes
+
+Every use case returns a typed `Result` from the namespace `CafeHub.Application.Abstractions.Results` instead of using exceptions for expected failures. A success carries no error; a failure carries exactly one `Error` with a stable machine-readable `Code`, a human-readable `Message`, and an `ErrorType` (`Failure`, `Validation`, `NotFound`, `Conflict`, `Unauthorized`, `Forbidden`).
+
+- Error codes follow the convention `<Module>.<Reason>`, for example `Tenant.NotFound`.
+- A module declares its errors in exactly one static class named `<Module>Errors` inside the module folder. That class exposes ready-made `Error` factories or values so every call site reuses the same codes.
+- Error messages are safe for clients: they never contain secrets, connection strings, stack traces, or raw exception text.
+- Validation failures use `ValidationError` with the code `Validation.Failed`; it carries one `FieldError` (field name plus message) per invalid field.
+
 ## Testing
 
 - The repository has exactly one test project, `tests/CafeHub.UnitTests`, using xUnit v2 with hand-written fakes. No Integration tests, no Architecture tests, no Testcontainers, no in-memory/SQLite database providers, no mocking library, and nothing that requires a running database or network at Stage 1.
@@ -82,6 +91,7 @@ The WebApi reads real credentials locally through User Secrets or environment va
 
 ## Open decisions
 
+- Result/Error model placement — the model lives in Application (CFMD-241); Domain cannot reference it until a later decision.
 - Tenant identifier source (host, header, or path) — required before tenant resolution middleware; PRD has no TBD number for it.
 - API versioning style — required before first business endpoint (PRD section 10.4).
 - Notification provider/channels — PRD TBD-09.
