@@ -1,3 +1,4 @@
+using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Tenant;
@@ -29,6 +30,8 @@ namespace CafeHub.Infrastructure
                 var tenantConnectionResolver = serviceProvider.GetRequiredService<ITenantConnectionResolver>();
                 options.UseNpgsql(tenantConnectionResolver.Resolve(tenantContextAccessor.GetRequired()));
             });
+            services.AddScoped<IMasterUnitOfWork, MasterUnitOfWork>();
+            services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();
 
             return services;
         }
