@@ -1,3 +1,4 @@
+using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure;
 using CafeHub.Infrastructure.Persistence.Master;
@@ -45,6 +46,28 @@ namespace CafeHub.UnitTests
                 setter => setter.Set(TenantContext.Create(Guid.NewGuid(), "cafe-alpha", false)));
 
             var exception = Record.Exception(() => serviceProvider.GetRequiredService<TenantDbContext>());
+
+            Assert.IsType<TenantInactiveException>(exception);
+        }
+
+        [Fact]
+        public void ResolvingTenantUnitOfWork_Throws_WhenNoTenantContextIsSet()
+        {
+            using var serviceProvider = BuildProvider(new Dictionary<string, string?>());
+
+            var exception = Record.Exception(() => serviceProvider.GetRequiredService<ITenantUnitOfWork>());
+
+            Assert.IsType<TenantContextMissingException>(exception);
+        }
+
+        [Fact]
+        public void ResolvingTenantUnitOfWork_Throws_WhenTenantIsInactive()
+        {
+            using var serviceProvider = BuildProvider(
+                new Dictionary<string, string?> { ["TenantConnections:cafe-alpha"] = "Host=localhost;Port=5432;Database=cafehub_tenant_alpha" },
+                setter => setter.Set(TenantContext.Create(Guid.NewGuid(), "cafe-alpha", false)));
+
+            var exception = Record.Exception(() => serviceProvider.GetRequiredService<ITenantUnitOfWork>());
 
             Assert.IsType<TenantInactiveException>(exception);
         }
