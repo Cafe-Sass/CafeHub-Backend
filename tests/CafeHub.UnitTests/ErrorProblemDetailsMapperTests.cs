@@ -57,6 +57,21 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public void Map_PlainValidationErrorWithoutFieldErrors_Produces400_AsAStandardProblemDetails()
+        {
+            var error = Error.Validation("Example.InvalidRequest", "A human readable message.");
+
+            var problemDetails = ErrorProblemDetailsMapper.Map(error, "trace-plain-1");
+
+            Assert.IsNotType<ValidationProblemDetails>(problemDetails);
+            Assert.Equal(StatusCodes.Status400BadRequest, problemDetails.Status);
+            Assert.Equal("Bad Request", problemDetails.Title);
+            Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.1", problemDetails.Type);
+            Assert.Equal("Example.InvalidRequest", problemDetails.Extensions["code"]);
+            Assert.Equal("trace-plain-1", problemDetails.Extensions["traceId"]);
+        }
+
+        [Fact]
         public void Map_TwoDifferentErrorsWithSameType_MapToTheSameStatus_WithDifferentCodes()
         {
             var first = Error.NotFound("Example.NotFound", "The example does not exist.");

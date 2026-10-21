@@ -70,8 +70,25 @@ Every failed `Result` reaches clients in one RFC 9457 ProblemDetails shape. The 
 
 - The table is mirrored in the mapper's XML summary; the two must stay identical.
 - Every ProblemDetails carries the machine-readable `code` extension (the `Error.Code`) and a `traceId` extension (`Activity.Current?.Id ?? HttpContext.TraceIdentifier`); a correlation identifier is a later story.
-- Validation responses use `ValidationProblemDetails`: the `Errors` dictionary lists every field-level message in validator order.
+- Validation responses use `ValidationProblemDetails`: the `Errors` dictionary lists every field-level message in validator order. A validation `Error` without field errors maps to the same 400 as a standard ProblemDetails.
 - Titles and `type` links mirror the RFC 9110 defaults of ASP.NET Core (`ProblemDetailsDefaults`), so standard ASP.NET Core client-error links stay consistent.
+- ProblemDetails extension members (`code`, `traceId`) are serialized as top-level JSON members, exactly as RFC 9457 requires ("extension members appear in the same namespace as other members").
+
+## Exception responses (proposed, pending owner confirmation)
+
+Unhandled exceptions leave `GlobalExceptionHandler` (`src/CafeHub.WebApi/Errors`) in `GlobalExceptionHandler`, registered with `AddExceptionHandler` and `app.UseExceptionHandler()` in `Program.cs` together with `AddProblemDetails()`. The handler reuses `ErrorProblemDetailsMapper` for every response.
+
+| Thrown exception | Status | `code` | Response body |
+|---|---|---|---|
+| Any unhandled exception | 500 | `Server.Unexpected` | Fixed generic detail, no exception message, no stack trace, no internals |
+| `TenantContextMissingException` | 400 | `Tenant.ContextInvalid` | Fixed generic detail |
+| `InvalidTenantContextException` | 400 | `Tenant.ContextInvalid` | Same body as missing context |
+| `TenantInactiveException` | 404 | `Tenant.Unavailable` | Fixed generic detail |
+| `TenantConnectionNotConfiguredException` | 404 | `Tenant.Unavailable` | Same body as inactive tenant |
+
+- The two 404 rows use one identical body so a caller cannot tell whether a tenant exists, is inactive, or has an unconfigured connection (fail closed).
+- Responses never contain tenant identifiers, setting names or values, or connection strings. The server log records the exception object, the exception type name, and the safe trace identifier, at Error level, exactly once per request, and never request bodies or secret values.
+- Any other `TenantIsolationException` subtype added later falls back to the `Tenant.ContextInvalid` 400 row (fail closed) until it is mapped explicitly.
 
 ## Testing
 
