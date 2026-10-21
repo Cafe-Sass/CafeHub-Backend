@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Behaviors;
+using CafeHub.Application.Abstractions.Persistence;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,8 +32,12 @@ namespace CafeHub.Application
         private static void AddPipelineBehaviors(IServiceCollection services, MediatRServiceConfiguration configuration)
         {
             services.TryAddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+            services.TryAddScoped<IMasterUnitOfWork, MissingMasterUnitOfWork>();
+            services.TryAddScoped<ITenantUnitOfWork, MissingTenantUnitOfWork>();
             configuration.AddOpenBehavior(typeof(LoggingBehavior<,>));
             configuration.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            configuration.AddOpenBehavior(typeof(MasterTransactionBehavior<,>));
+            configuration.AddOpenBehavior(typeof(TenantTransactionBehavior<,>));
         }
     }
 }
