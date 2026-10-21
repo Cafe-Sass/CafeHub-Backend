@@ -32,6 +32,7 @@ The table below is generated from the real `Directory.Packages.props` and must b
 | Microsoft.Extensions.Configuration.Abstractions | 10.0.13 | `IConfiguration` consumption in Infrastructure |
 | Microsoft.Extensions.DependencyInjection | 10.0.13 | DI container exercised in unit tests |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.13 | `IServiceCollection` registration surface (Application, Infrastructure) |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.13 | `ILogger` abstractions for the request pipeline logging behavior (Application) |
 | Microsoft.NET.Test.Sdk | 17.14.1 | xUnit test runner platform |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL database provider for EF Core |
 | xunit | 2.9.3 | Unit test framework |
