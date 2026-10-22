@@ -10,6 +10,7 @@ erDiagram
         uuid id PK
         text normalized_user_name UK
         text password_hash
+        boolean lockout_enabled
         timestamptz deleted_at
         text concurrency_stamp
     }
@@ -102,7 +103,7 @@ erDiagram
         uuid id PK
         uuid subscription_id FK
         uuid plan_version_id FK
-        text proposed_price
+        numeric proposed_price
         text proposed_currency_code
         text status
         timestamptz requested_at
@@ -230,12 +231,12 @@ Purpose: Super Admin user identity in the Master database (platform-side identit
 - `id uuid NOT NULL` — entity identity; `pk_platform_admins` (Identity keyed by GUID; the default string key is intentionally not used because all other identities are UUIDv7).
 - `user_name text NOT NULL` (CHECK length 1..256, `ck_platform_admins_user_name_length`).
 - `normalized_user_name text NOT NULL` (CHECK length 1..256) — `uq_platform_admins_normalized_user_name` unique index; the mechanism's own case-normalized column.
-- `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — indexed (`ix_platform_admins_normalized_email`), not unique: an owner and an admin may share one mailbox; the normalization style follows the mechanism.
+- `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — the normalization style follows the mechanism. **Proposed, pending owner confirmation**: uniqueness for real mailboxes moves to a partial unique index `uq_platform_admins_normalized_email ON platform_admins (normalized_email) WHERE normalized_email IS NOT NULL`, replacing the existing non-unique `ix_platform_admins_normalized_email`. Rationale: this table holds the platform's admin identities; owners are never rows here (owner identity lives in the Tenant database, registration emails live on onboarding requests), so no legitimate workflow gives two admins one normalized mailbox — and a duplicate mailbox would make password resets and audit attribution ambiguous. The partial form states the mail-scoped intent explicitly and can never be falsified by how PostgreSQL mixes NULLs in unique indexes. The rejected alternative is keeping the plain non-unique index: it leaves two admins able to share one mailbox with no integrity signal, which was only ever justified by the wrong rationale that an owner and an admin may share one mailbox — owners are not in this table.
 - `email_confirmed boolean NOT NULL` default `false`.
 - `password_hash text NOT NULL` (CHECK length 1..512) — set and verified only by the mechanism's hasher.
 - `phone_number text NULL` (CHECK length 1..64), `phone_number_confirmed boolean NOT NULL` default `false`.
 - `two_factor_enabled boolean NOT NULL` default `false` (the framework's flag; persisting second-factor data would require the excluded token tables and is designed explicitly if two-factor support is enabled later).
-- `lockout_enabled boolean NOT NULL` default `false`; `lockout_end_at timestamptz NULL`; `access_failed_count integer NOT NULL` default `0` (all three belong to the mechanism's lockout functionality).
+- `lockout_enabled boolean NOT NULL` default `true` — the Identity framework's default: lockout protection is active from account creation, so the highest-value target in the platform (a Super Admin account) is protected against password guessing from the start instead of relying on per-account opt-in (PRD section 11.1); the framework decides when a lockout applies, per its default behavior. `lockout_end_at timestamptz NULL`; `access_failed_count integer NOT NULL` default `0` (all three belong to the mechanism's lockout functionality).
 - `security_stamp text NOT NULL` (CHECK length 1..64) and `concurrency_stamp text NOT NULL` (CHECK length 1..64) — the mechanism's own stamp columns; the framework updates `concurrency_stamp` per save, so these identity tables intentionally keep the mechanism's stamp-based concurrency instead of the general `xmin` rule (documented as the main exception to it).
 - `deleted_at timestamptz NULL`, `deleted_by uuid NULL FK platform_admins.id` — the generic logical-deletion marker of the confirmed deletion policy: a deactivated admin keeps the row (so audit actor references, `reviewed_by`, and `created_by` FKs never dangle) while every authorization check treats a non-null `deleted_at` as unauthorized; the stamp rotation at deactivation is standard framework usage, not custom behavior. `deleted_by` references another admin acting on this account.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK platform_admins.id`, `updated_by uuid NULL FK platform_admins.id` (Bootstrap of the first Super Admin account happens outside a user action; `created_by` is NULL there).
