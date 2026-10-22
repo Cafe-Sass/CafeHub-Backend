@@ -11,6 +11,7 @@ erDiagram
     tenant_users {
         uuid id PK
         text user_kind
+        text full_name
         text normalized_user_name UK
         text password_hash
         boolean lockout_enabled
@@ -101,6 +102,7 @@ Purpose: owner and staff authentication and authorization subjects in this cafe'
 - `id uuid NOT NULL` — entity identity; `pk_tenant_users` (Identity keyed by GUID; the default string key is intentionally not used because all identities are UUIDv7).
 - `user_kind text NOT NULL` — `ck_tenant_users_kind` over `('Owner', 'Staff')` (Proposed): the seeded cafe owner versus staff accounts; role claims stay the authoritative authorization input (FR-IAM-002). Owner versus staff matters for audit derivation (see `tenant_audit_records`); it is not duplicated into audit rows.
 - `user_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_user_name_length`); `normalized_user_name text NOT NULL` (CHECK length 1..256) with `uq_tenant_users_normalized_user_name` — the mechanism's own case-normalized column and the uniqueness enforcement.
+- `full_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_full_name_length`) — **Proposed, pending owner confirmation**: every account holder (the Owner now, staff later) is a person whose name audit display and staff screens need (FR-IAM-005 audit attribution, FR-IAM-003 staff views). The rejected alternative is a nullable column: accounts could exist with no human-readable name, and both audit records and staff screens would need fallback rules instead. The Owner seed fills it from the onboarding request's `owner_full_name` (see the seeding section above).
 - `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — `ix_tenant_users_normalized_email`, not unique: staff addresses are not identity-critical in the MVP; the normalization style follows the mechanism.
 - `email_confirmed boolean NOT NULL` default `false`; `phone_number text NULL` (CHECK length 1..64), `phone_number_confirmed boolean NOT NULL` default `false`.
 - `password_hash text NOT NULL` (CHECK length 1..512) — set and verified only by the mechanism's hasher (PRD section 11.1); the seeded owner's hash arrives with the provisioning copy (see the seeding section above).
