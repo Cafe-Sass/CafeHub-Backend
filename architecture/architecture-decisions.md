@@ -124,6 +124,14 @@ The WebApi reads real credentials locally through User Secrets or environment va
   - `TenantConnections__<SecretReference>`
 - `src/CafeHub.WebApi/appsettings.template.json` lists every key the implementation expects with placeholders; the file name is not loaded by ASP.NET Core automatically. Design-time migrations additionally require the `ConnectionStrings__TenantDesignTime` environment variable (see TenantDbContextFactory). The full onboarding README arrives with CFMD-218.
 
+## Registration data and the password hash retained in the Master (Confirmed, owner decision, 2026-10-21)
+
+- Decision: the onboarding request in the Master database captures the registration data a new Tenant database needs — the owner's full name, email, phone number when present, cafe name, and the owner's password hash — and provisioning copies it when seeding the new Tenant database (`architecture/erd-master.md` documents the per-field mapping). The Master keeps its own copy, including the password hash, permanently for now, on every request: `Approved`, `Rejected`, and `Cancelled` alike.
+- Risk: the Master thereby holds password hashes for all registrants — approved or rejected — which makes it a high-value target, and a Master copy goes stale the moment an owner changes the password in the Tenant Application; it must never be treated as an authentication source.
+- Compensating controls: the sensitive-column rules recorded in `architecture/erd-master.md` (hasher-produced value only; written once at registration; read only by the provisioning seed; never returned by views or review queries; never serialized into audit snapshots; never used for Master authentication); least-privilege access to the Master database with provisioning as the only workflow that reads the column; backup and encryption specifics for the Master database remain open under PRD TBD-19 and are not decided by this document.
+- Revisit option: a later decision may clear the hash column after provisioning succeeded, keeping the record itself — clearing a column is not a record deletion and stays consistent with the logical-deletion policy (PRD section 9, rule 23). Clearing is not scheduled now; it is recorded as an explicit option so the retention is a reversible choice rather than a permanent necessity.
+- Rejected alternative: keeping no registration data on the Master (provisioning would consume transiently-passed values with no durable, auditable source, losing the traceability and retry safety the seed needs); retaining it in plaintext (never — the database only ever sees a hasher-produced value, PRD section 11.1).
+
 ## Open decisions
 
 - Result/Error model placement — the model lives in Application (CFMD-241); Domain cannot reference it until a later decision.
@@ -131,5 +139,6 @@ The WebApi reads real credentials locally through User Secrets or environment va
 - API versioning style — required before first business endpoint (PRD section 10.4).
 - Notification provider/channels — PRD TBD-09.
 - Payment provider(s) — PRD TBD-02.
+- First access for Support-created onboarding requests — such requests carry no owner password hash by design; how the owner first signs in to that tenant (for example an invite/set-password flow) is undecided and was deliberately not designed in CFMD-258.
 
 None of these may be invented during scaffolding; each is decided by its PRD owner with a recorded decision.

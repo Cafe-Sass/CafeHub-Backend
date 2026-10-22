@@ -10,6 +10,7 @@ erDiagram
         uuid id PK
         text normalized_user_name UK
         text password_hash
+        boolean lockout_enabled
         timestamptz deleted_at
         text concurrency_stamp
     }
@@ -56,7 +57,11 @@ erDiagram
     onboarding_requests {
         uuid id PK
         uuid plan_version_id FK
+        text owner_full_name
         text owner_email
+        text owner_phone_number
+        text cafe_name
+        text owner_password_hash
         text tenant_slug
         text created_via
         uuid created_by FK
@@ -98,7 +103,7 @@ erDiagram
         uuid id PK
         uuid subscription_id FK
         uuid plan_version_id FK
-        text proposed_price
+        numeric proposed_price
         text proposed_currency_code
         text status
         timestamptz requested_at
@@ -196,6 +201,27 @@ A successful initial payment is never treated as Admin approval, and approval is
 - Intentionally excluded because the MVP does not use them: external-login storage (no external login provider is approved, so no `user_logins` table) and default token storage (the password-based admin flows persist no tokens, so no `user_tokens` table; token issuance belongs to later Auth work and any needed tables are added explicitly then). These exclusions are design statements only — no entity or migration change is made here.
 - Platform admin rows are logically deleted (deactivated), never physically deleted: `deleted_at`/`deleted_by` per the deletion convention, authorization treats a deactivated admin as unauthorized, and every foreign key into `platform_admins` (audit actor, `reviewed_by`, `created_by`) stays valid precisely because the row survives. Role-membership and claim-assignment rows are removable assignment state as documented in the conventions.
 
+## Registration data and the provisioning seed
+
+When provisioning seeds a new Tenant database (FR-ONB-006), the registration data captured on the approved onboarding request is the source for the tenant's initial Owner account and cafe profile row. This section is the contract between the two designs: it states what is copied, where it lands (using the real column names of `architecture/erd-tenant.md`), and what is deliberately not copied. No foreign key or reference crosses the database boundary in either direction (conventions), and the Master keeps its own copy of the registration data — on every request, terminal states included — permanently for now (owner decision, 2026-10-21; see `architecture/architecture-decisions.md`).
+
+| Master source (`onboarding_requests`) | Tenant target (`architecture/erd-tenant.md`) | Note |
+|---|---|---|
+| `cafe_name` | `cafe_settings.cafe_name` | Copied as-is, so the tenant profile row starts with its real name (FR-CAF-001). The cafe contact columns on `cafe_settings` (`contact_phone`, `contact_email`, `contact_address`) have no source in this contract — they have no registration-time data and start NULL for the owner to configure later. The tenant ERD's seeding paragraph currently describes contact data as copied from the onboarding request; this table is the newer, narrower contract, and the disagreement is reported (not fixed there) because `erd-tenant.md` is outside this sub-task's edit scope. |
+| `owner_full_name` | — (pending Tenant ERD column) | `tenant_users` has no name/display column today, so a copied value would have no tenant-side home. The tenant-side column decision belongs to the Tenant ERD's follow-up and is not designed here; provisioning must not invent a mapping (reported as an open item). |
+| `owner_email` | `tenant_users.email` + `tenant_users.normalized_email` | Copied as-is; the mechanism normalizes on the tenant side. **Proposed, pending owner confirmation**: the same value also seeds the account's `user_name`/`normalized_user_name`, so the first login has a username; the rejected alternative is a separate username-selection step, which invents a flow the PRD does not describe. Tenant-side `uq_tenant_users_normalized_user_name` guards the account. |
+| `owner_phone_number` | `tenant_users.phone_number` | Copied when present; NULL when the owner did not enter one (see the Proposed nullability above). |
+| `owner_password_hash` | `tenant_users.password_hash` | Copied as-is — a hasher-produced value, never plaintext and never transformed. First authentication happens in the Tenant Application (FR-ONB-001, FR-IAM-001); afterwards the owner's password changes make this Master copy stale by design and it is never refreshed. |
+| `tenant_slug` | — (not copied) | The slug is resolved and owned by the Master (`tenants.slug` is carried from the request at approval); the Tenant database never receives it, so the tenant URL scheme stays a Master/platform concern. |
+| (no Master source) | `tenant_users.user_kind = 'Owner'` | Set by the seed; the account is the cafe's owner, and later staff accounts are separate stories. |
+| (no Master source) | seeded Owner role (`tenant_roles`) and its membership row (`tenant_user_roles`) | Both rows are created by the seed, so the first login is authorized without manual setup (the tenant ERD's seeding section). |
+| (no Master source) | `security_stamp`/`concurrency_stamp` on the seeded account (and other generated columns) | Generated at seed time — mechanism state, not copied registration data. |
+| (no Master source) | first `tenant_audit_records` row | Written by the system (`actor_kind = 'System'`, actor NULL), capturing that the database was provisioned and seeded. |
+
+- The copy executes as a single transaction in the Tenant Database — the initial rows land all together or not at all — and stays idempotent under provisioning retries (FR-ONB-007): a resumed attempt must not duplicate seeded rows or reset owner-configured state. The tenant-side `uq_tenant_users_normalized_user_name` makes a duplicated owner account structurally impossible instead of merely discouraged, which is what makes the retry safe.
+- The mapping is a provisioning behavior documented here, not a schema construct: no cross-database foreign key, join, or trigger expresses it (conventions), and the tenant's first System audit record is the trace that the seed ran.
+- The Master retains its own copy of the registration data — including the credential hash, and including rows whose request ended in `Rejected` or `Cancelled` — per the retention decision recorded in `architecture/architecture-decisions.md`; that document also records the revisit option (clearing the hash column after successful provisioning) and the byte-level protections still to be decided (backup/encryption specifics under PRD TBD-19).
+
 ## Table dictionary
 
 ### platform_admins
@@ -205,12 +231,12 @@ Purpose: Super Admin user identity in the Master database (platform-side identit
 - `id uuid NOT NULL` — entity identity; `pk_platform_admins` (Identity keyed by GUID; the default string key is intentionally not used because all other identities are UUIDv7).
 - `user_name text NOT NULL` (CHECK length 1..256, `ck_platform_admins_user_name_length`).
 - `normalized_user_name text NOT NULL` (CHECK length 1..256) — `uq_platform_admins_normalized_user_name` unique index; the mechanism's own case-normalized column.
-- `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — indexed (`ix_platform_admins_normalized_email`), not unique: an owner and an admin may share one mailbox; the normalization style follows the mechanism.
+- `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — the normalization style follows the mechanism. **Proposed, pending owner confirmation**: uniqueness for real mailboxes moves to a partial unique index `uq_platform_admins_normalized_email ON platform_admins (normalized_email) WHERE normalized_email IS NOT NULL`, replacing the existing non-unique `ix_platform_admins_normalized_email`. Rationale: this table holds the platform's admin identities; owners are never rows here (owner identity lives in the Tenant database, registration emails live on onboarding requests), so no legitimate workflow gives two admins one normalized mailbox — and a duplicate mailbox would make password resets and audit attribution ambiguous. The partial form states the mail-scoped intent explicitly and can never be falsified by how PostgreSQL mixes NULLs in unique indexes. The rejected alternative is keeping the plain non-unique index: it leaves two admins able to share one mailbox with no integrity signal, which was only ever justified by the wrong rationale that an owner and an admin may share one mailbox — owners are not in this table.
 - `email_confirmed boolean NOT NULL` default `false`.
 - `password_hash text NOT NULL` (CHECK length 1..512) — set and verified only by the mechanism's hasher.
 - `phone_number text NULL` (CHECK length 1..64), `phone_number_confirmed boolean NOT NULL` default `false`.
 - `two_factor_enabled boolean NOT NULL` default `false` (the framework's flag; persisting second-factor data would require the excluded token tables and is designed explicitly if two-factor support is enabled later).
-- `lockout_enabled boolean NOT NULL` default `false`; `lockout_end_at timestamptz NULL`; `access_failed_count integer NOT NULL` default `0` (all three belong to the mechanism's lockout functionality).
+- `lockout_enabled boolean NOT NULL` default `true` — the Identity framework's default: lockout protection is active from account creation, so the highest-value target in the platform (a Super Admin account) is protected against password guessing from the start instead of relying on per-account opt-in (PRD section 11.1); the framework decides when a lockout applies, per its default behavior. `lockout_end_at timestamptz NULL`; `access_failed_count integer NOT NULL` default `0` (all three belong to the mechanism's lockout functionality).
 - `security_stamp text NOT NULL` (CHECK length 1..64) and `concurrency_stamp text NOT NULL` (CHECK length 1..64) — the mechanism's own stamp columns; the framework updates `concurrency_stamp` per save, so these identity tables intentionally keep the mechanism's stamp-based concurrency instead of the general `xmin` rule (documented as the main exception to it).
 - `deleted_at timestamptz NULL`, `deleted_by uuid NULL FK platform_admins.id` — the generic logical-deletion marker of the confirmed deletion policy: a deactivated admin keeps the row (so audit actor references, `reviewed_by`, and `created_by` FKs never dangle) while every authorization check treats a non-null `deleted_at` as unauthorized; the stamp rotation at deactivation is standard framework usage, not custom behavior. `deleted_by` references another admin acting on this account.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK platform_admins.id`, `updated_by uuid NULL FK platform_admins.id` (Bootstrap of the first Super Admin account happens outside a user action; `created_by` is NULL there).
@@ -305,19 +331,34 @@ Purpose: entitlement values as data (FR-PLT-004: configurable, never hard-coded 
 
 ### onboarding_requests
 
-Purpose: the owner's application for a new cafe environment, through plan selection, initial payment, review, approval, and provisioning handoff (FR-ONB-001 through FR-ONB-005). The row exists **standalone**: under the owner-approved provisioning sequence no `tenants` row or Tenant Database exists before Admin approval (FR-ONB-005), so the request carries no tenant foreign key — the relationship is reversed via `tenants.onboarding_request_id` (zero-or-one tenant per request; see `tenants` above). A Support-created request for an additional cafe is also stored here, distinguished by `created_via` (FR-ONB-004).
+Purpose: the owner's application for a new cafe environment, through plan selection, initial payment, review, approval, and provisioning handoff (FR-ONB-001 through FR-ONB-005). The row exists **standalone**: under the owner-approved provisioning sequence no `tenants` row or Tenant Database exists before Admin approval (FR-ONB-005), so the request carries no tenant foreign key — the relationship is reversed via `tenants.onboarding_request_id` (zero-or-one tenant per request; see `tenants` above). A Support-created request for an additional cafe is also stored here, distinguished by `created_via` (FR-ONB-004). The registration data captured on the request — the owner's full name, email, phone number where present, cafe name, and the credential hash — is copied into the new Tenant database by the provisioning seed (see `Registration data and the provisioning seed` below) and is never edited by application workflows once the request has left its non-terminal states.
 
 - `id uuid NOT NULL` — `pk_onboarding_requests`.
 - `created_via text NOT NULL` — `ck_onboarding_requests_created_via` over `('PublicRegistration', 'Support')` (Proposed): the creation path is explicit data, so the permanent public-registration duplicate guard and the auditable Support exception are separable at the schema level (FR-ONB-004).
 - `created_by uuid NULL FK platform_admins.id` — the responsible Support actor; required when `created_via = 'Support'` (proposed CHECK `ck_onboarding_requests_support_actor CHECK (created_via = 'PublicRegistration' OR created_by IS NOT NULL)`) and NULL for public registration, where the owner has no identity yet. Each Support-created row is additionally audited in `platform_audit_records` (FR-ONB-004).
 - `plan_version_id uuid NOT NULL FK plan_versions.id` — required by FR-ONB-002: a request is never reviewable without the selected plan recorded (the selected version must be an `Active` offering at selection; application validation enforces FK data plus version currency).
 - `owner_email text NOT NULL` (CHECK length 1..320) — the registering owner's contact address stored as typed for any later display; case-insensitive duplicate protection comes from the partial index below.
+- `owner_full_name text NOT NULL` (CHECK length 1..256, `ck_onboarding_requests_owner_full_name_length`) — the owner's full name as entered on the public registration page (Confirmed owner decision, 2026-10-21: the page collects full name, email, phone, cafe name, and password); copied to the Tenant database at seeding so the tenant Owner account can carry the owner's display data.
+- `owner_phone_number text NULL` (CHECK length 1..64 when present, `ck_onboarding_requests_owner_phone_number_length`) — **Proposed, pending owner confirmation**: kept nullable because the PRD does not require a phone number at registration; the rejected alternative was making it `NOT NULL`, which invents a requirement the PRD does not set and blocks a minimal legitimate registration. When present it is copied to the tenant Owner account's phone.
+- `cafe_name text NOT NULL` (CHECK length 1..256, `ck_onboarding_requests_cafe_name_length`) — the cafe name entered at registration (Confirmed owner decision, 2026-10-21); copied to the tenant profile row at seeding so the environment starts with its own name instead of a placeholder.
+- `owner_password_hash text NULL` (CHECK length 1..512 when present, `ck_onboarding_requests_owner_password_hash_length`) — the owner credential hash produced by the framework's password hasher at registration (PRD section 11.1); NULL only where no credential applies (see the CHECK below). It is consumed by the provisioning seed and never used for authentication in this database — full rules in `Sensitive-column rules` below.
+- `ck_onboarding_requests_owner_credential CHECK (created_via = 'Support' OR owner_password_hash IS NOT NULL)` — required by the sub-task acceptance criteria: every public-registration request carries its owner credential, and a Support-created request may omit it. How an owner first signs in to a tenant whose request was created by Support is a recorded open decision deliberately left to a later story (see `architecture/architecture-decisions.md`).
 - `tenant_slug text NOT NULL` — the slug requested for the future tenant; same CHECK set as `tenants` (`ck_onboarding_requests_slug_format`, `ck_onboarding_requests_slug_lowercase`, `ck_onboarding_requests_slug_reserved`); revisable while the request is non-terminal (nothing external references it yet); carried over to `tenants.slug` at approval. Claim protection among live requests is `uq_onboarding_requests_slug` above.
 - `onboarding_status text NOT NULL` — `ck_onboarding_requests_status` over the Proposed set `('AwaitingPayment', 'PaymentFailed', 'PaidAwaitingReview', 'Approved', 'Rejected', 'Cancelled')`: FR-ONB-002 requires the payment attempt state to be recorded before admin review and failure to be represented without false activation; a failed initial payment and its retries stay on the same request row (FR-ONB-004); FR-ONB-005 provides approval and rejection; transitions are validated in application code.
 - `reviewed_by uuid NULL FK platform_admins.id` — set with (and only with) the approval or rejection decision (FR-ONB-005); `reviewed_at timestamptz NULL` — decision time; `rejection_reason text NULL` (CHECK length 0..1024 when present) — reason where provided.
 - `uq_onboarding_requests_public_owner_email` (Proposed, pending owner confirmation — the owner-approved permanent guard supersedes the earlier status-scoped index): a **partial unique expression index** `CREATE UNIQUE INDEX ... ON onboarding_requests (lower(owner_email)) WHERE created_via = 'PublicRegistration'`. The `lower()` expression covers mixed-case email input, and the filter is the creation path — not a status subset — because the owner-approved rule is permanent: one email can never use public registration for a second request, even after an earlier request reached `Approved`, `Rejected`, or `Cancelled`, so a rejected or cancelled request does not grant a bypass (FR-ONB-004). The Support path is deliberately outside the index so authorized Support can still create a legitimate additional-cafe request for the same email, with `created_by` and an audit record making the exception traceable. Honest edge: the index guarantees that no two public rows share the email; the complete rule — that public registration must not create a row when the email already has *any* request or an existing cafe — needs the application's duplicate lookup before insert (the neighbor cafe association lives in the Tenant database, where no same-database constraint can reach, and cross-database foreign keys are forbidden by the conventions). FR-ONB-004's required database-plus-application enforcement is exactly this pair.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL` as above, `updated_by uuid NULL FK platform_admins.id` (set by the reviewing admin).
 - Requests are never physically deleted (logical-deletion policy): terminal states are `Approved`, `Rejected`, `Cancelled`, and every historical request keeps its payment and review trail.
+
+**Sensitive-column rules (`owner_password_hash`):**
+
+- Provenance: the value is produced only by the framework's password hasher in the API layer at registration — the same hasher used by the confirmed Identity mechanism in both databases (PRD section 11.1). A plaintext password never reaches the Master database.
+- One write, one read: written once at registration on the public-registration path and read only by the provisioning seed when it creates the tenant Owner account (FR-ONB-006); no application workflow edits or re-reads the column afterwards.
+- Never exposed through views or review queries, and never serialized into audit snapshots: an audit row that references an onboarding request (`platform_audit_records.before_state`/`after_state`) must exclude this column — a snapshot carrying it would ship the hash outside its intended storage (where FR-AUD-001 allows snapshots "where applicable", this rule narrows them).
+- Never used for authentication in the Master database: platform administrators authenticate through `platform_admins` with its own hasher, and the owner's login exists only in the Tenant Application after the environment is ready (FR-ONB-001, FR-IAM-001) — the Master's copy of the credential is provisioning input, not a platform-wide owner identity.
+- Stale by design: after the tenant is live, a password change in the Tenant Application makes the Master's copy stale, and it is not refreshed — the Master stores the registration-time hash, not a live owner credential, because the tenant database owns the owner's identity (FR-IAM-001).
+- Retained on every request (owner decision, 2026-10-21): the hash stays on `Approved`, `Rejected`, and `Cancelled` requests alike; requests are never physically deleted, so this retention is a recorded decision with a revisit option — clearing the column after successful provisioning would be a later, separate decision, and clearing a column is not a record deletion, so it stays consistent with the logical-deletion policy (recorded in `architecture/architecture-decisions.md`).
+- Access surface: the table is reachable only through the least-privilege Master role, and reads outside the provisioning workflow are exactly what reviews must look for — this is the compensating control recorded together with the retention decision.
 
 ### subscriptions
 
