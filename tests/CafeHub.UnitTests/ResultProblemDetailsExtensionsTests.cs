@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.WebApi.Errors;
 using Microsoft.AspNetCore.Http;
@@ -56,6 +57,44 @@ namespace CafeHub.UnitTests
             {
                 Activity.Current = previousActivity;
             }
+        }
+
+        [Fact]
+        public void ToProblemResult_IncludesTheAccessorCorrelationId_InTheProblemDetails()
+        {
+            Activity? previousActivity = null;
+            try
+            {
+                previousActivity = Activity.Current;
+                Activity.Current = null;
+                var httpContext = new DefaultHttpContext();
+                httpContext.TraceIdentifier = "ctx-trace-1";
+                var result = Result.Failure(Error.NotFound("Example.NotFound", "The example does not exist."));
+
+                var actionResult = result.ToProblemResult(httpContext, new FixedCorrelationIdAccessor("corr-from-accessor"));
+
+                var problemDetails = Assert.IsType<ProblemDetails>(actionResult.Value);
+                Assert.Equal("corr-from-accessor", problemDetails.Extensions["correlationId"]);
+                Assert.Equal("ctx-trace-1", problemDetails.Extensions["traceId"]);
+            }
+            finally
+            {
+                Activity.Current = previousActivity;
+            }
+        }
+
+        [Fact]
+        public void ToProblemResult_OmitsTheCorrelationId_WhenTheAccessorHasNone()
+        {
+            var httpContext = new DefaultHttpContext();
+            httpContext.TraceIdentifier = "ctx-trace-1";
+            var result = Result.Failure(Error.NotFound("Example.NotFound", "The example does not exist."));
+
+            var actionResult = result.ToProblemResult(httpContext, new FixedCorrelationIdAccessor(null));
+
+            var problemDetails = Assert.IsType<ProblemDetails>(actionResult.Value);
+            Assert.False(problemDetails.Extensions.ContainsKey("correlationId"));
+            Assert.Equal("ctx-trace-1", problemDetails.Extensions["traceId"]);
         }
 
         [Fact]
