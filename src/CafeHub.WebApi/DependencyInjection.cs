@@ -43,7 +43,10 @@ namespace CafeHub.WebApi
             }
 
             services.AddSingleton<OpenApiExposurePolicy>();
-            services.AddOpenApi();
+            services.AddOpenApi(options =>
+            {
+                options.AddDocumentTransformer(new ProblemDetailsDocumentTransformer());
+            });
 
             return services;
         }
