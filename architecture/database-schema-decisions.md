@@ -53,7 +53,7 @@ Baseline for how CafeHub persistence is organized, derived from the CafeHub PRD 
 | TBD-19 | Backup retention, frequency, RPO, and RTO |
 | TBD-20 | Audit log retention and tamper-resistance requirements |
 | TBD-22 | AI provider, model, approved context, and failure behavior |
-| — | Tenant identifier source (QR-resolved context, host, header, or path); no PRD TBD number exists for it, and it is not decided |
+| — | Tenant identifier source (host, header, or path); no PRD TBD number exists. Decision recorded 2026-10-23: the MVP tenant identifier source is the URL path prefix /t/{slug} (owner decision of 2026-10-19, recorded as Proposed, pending owner confirmation in the PR conversation — see architecture/architecture-decisions.md). Customer QR resolution remains a separate, undecided topic and stays open |
 
 No entity, DbContext, or migration passes through this sub-task; this document is the decision baseline the later sub-tasks reference.
 
