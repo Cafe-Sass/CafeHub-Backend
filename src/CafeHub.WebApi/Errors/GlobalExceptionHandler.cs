@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Tenancy;
 using Microsoft.AspNetCore.Diagnostics;
@@ -23,10 +24,12 @@ namespace CafeHub.WebApi.Errors
         private static readonly string ProblemJsonContentType = "application/problem+json";
 
         private readonly ILogger<GlobalExceptionHandler> logger;
+        private readonly ICorrelationIdAccessor? correlationIdAccessor;
 
-        public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
+        public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, ICorrelationIdAccessor? correlationIdAccessor = null)
         {
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            this.correlationIdAccessor = correlationIdAccessor;
         }
 
         public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
@@ -42,7 +45,7 @@ namespace CafeHub.WebApi.Errors
             }
 
             var traceIdentifier = Activity.Current?.Id ?? httpContext.TraceIdentifier;
-            var problemDetails = CreateProblemDetails(exception, traceIdentifier);
+            var problemDetails = CreateProblemDetails(exception, traceIdentifier, correlationIdAccessor?.CorrelationId);
 
             logger.LogError(exception, "Request {TraceId} failed with {ExceptionType}", traceIdentifier, exception.GetType().Name);
 
@@ -53,16 +56,16 @@ namespace CafeHub.WebApi.Errors
             return true;
         }
 
-        private static ProblemDetails CreateProblemDetails(Exception exception, string traceIdentifier)
+        private static ProblemDetails CreateProblemDetails(Exception exception, string traceIdentifier, string? correlationId)
         {
             return exception switch
             {
                 TenantInactiveException or TenantConnectionNotConfiguredException =>
-                    ErrorProblemDetailsMapper.Map(Error.NotFound(TenantUnavailableCode, TenantUnavailableMessage), traceIdentifier),
+                    ErrorProblemDetailsMapper.Map(Error.NotFound(TenantUnavailableCode, TenantUnavailableMessage), traceIdentifier, correlationId),
                 TenantIsolationException =>
-                    ErrorProblemDetailsMapper.Map(Error.Validation(TenantContextInvalidCode, TenantContextInvalidMessage), traceIdentifier),
+                    ErrorProblemDetailsMapper.Map(Error.Validation(TenantContextInvalidCode, TenantContextInvalidMessage), traceIdentifier, correlationId),
                 _ =>
-                    ErrorProblemDetailsMapper.Map(Error.Failure(UnexpectedCode, UnexpectedMessage), traceIdentifier),
+                    ErrorProblemDetailsMapper.Map(Error.Failure(UnexpectedCode, UnexpectedMessage), traceIdentifier, correlationId),
             };
         }
     }

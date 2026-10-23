@@ -9,7 +9,9 @@ namespace CafeHub.WebApi.Errors
     /// source of truth for error responses: ErrorType.Validation to 400, ErrorType.Unauthorized to 401,
     /// ErrorType.Forbidden to 403, ErrorType.NotFound to 404, ErrorType.Conflict to 409, ErrorType.Failure to 500.
     /// Each body carries the machine-readable "code" extension (the Error.Code) and a "traceId" extension;
-    /// validation failures become a ValidationProblemDetails whose Errors dictionary lists the field-level messages.
+    /// a "correlationId" extension is added when the caller passes the request's correlation identifier and is
+    /// omitted when none exists; validation failures become a ValidationProblemDetails whose Errors dictionary
+    /// lists the field-level messages.
     /// Titles and "type" links mirror the RFC 9110 defaults of ASP.NET Core (ProblemDetailsDefaults).
     /// </summary>
     public static class ErrorProblemDetailsMapper
@@ -28,7 +30,7 @@ namespace CafeHub.WebApi.Errors
         private const string ConflictTitle = "Conflict";
         private const string InternalServerErrorTitle = "Internal Server Error";
 
-        public static ProblemDetails Map(Error error, string traceIdentifier)
+        public static ProblemDetails Map(Error error, string traceIdentifier, string? correlationId = null)
         {
             if (error is null)
             {
@@ -42,21 +44,21 @@ namespace CafeHub.WebApi.Errors
 
             if (error is ValidationError validationError)
             {
-                return MapValidation(validationError, traceIdentifier);
+                return MapValidation(validationError, traceIdentifier, correlationId);
             }
 
             return error.Type switch
             {
-                ErrorType.Unauthorized => MapStandard(error, traceIdentifier, StatusCodes.Status401Unauthorized),
-                ErrorType.Forbidden => MapStandard(error, traceIdentifier, StatusCodes.Status403Forbidden),
-                ErrorType.NotFound => MapStandard(error, traceIdentifier, StatusCodes.Status404NotFound),
-                ErrorType.Conflict => MapStandard(error, traceIdentifier, StatusCodes.Status409Conflict),
-                ErrorType.Validation => MapStandard(error, traceIdentifier, StatusCodes.Status400BadRequest),
-                _ => MapStandard(error, traceIdentifier, StatusCodes.Status500InternalServerError),
+                ErrorType.Unauthorized => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status401Unauthorized),
+                ErrorType.Forbidden => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status403Forbidden),
+                ErrorType.NotFound => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status404NotFound),
+                ErrorType.Conflict => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status409Conflict),
+                ErrorType.Validation => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status400BadRequest),
+                _ => MapStandard(error, traceIdentifier, correlationId, StatusCodes.Status500InternalServerError),
             };
         }
 
-        private static ProblemDetails MapValidation(ValidationError error, string traceIdentifier)
+        private static ProblemDetails MapValidation(ValidationError error, string traceIdentifier, string? correlationId)
         {
             var fieldMessages = new Dictionary<string, List<string>>();
             foreach (var fieldError in error.Errors)
@@ -85,11 +87,12 @@ namespace CafeHub.WebApi.Errors
             };
             problemDetails.Extensions["code"] = error.Code;
             problemDetails.Extensions["traceId"] = traceIdentifier;
+            AddCorrelationId(problemDetails.Extensions, correlationId);
 
             return problemDetails;
         }
 
-        private static ProblemDetails MapStandard(Error error, string traceIdentifier, int statusCode)
+        private static ProblemDetails MapStandard(Error error, string traceIdentifier, string? correlationId, int statusCode)
         {
             var (type, title) = StatusCodeDescription(statusCode);
 
@@ -102,8 +105,17 @@ namespace CafeHub.WebApi.Errors
             };
             problemDetails.Extensions["code"] = error.Code;
             problemDetails.Extensions["traceId"] = traceIdentifier;
+            AddCorrelationId(problemDetails.Extensions, correlationId);
 
             return problemDetails;
+        }
+
+        private static void AddCorrelationId(IDictionary<string, object?> extensions, string? correlationId)
+        {
+            if (!string.IsNullOrWhiteSpace(correlationId))
+            {
+                extensions["correlationId"] = correlationId;
+            }
         }
 
         private static (string Type, string Title) StatusCodeDescription(int statusCode)

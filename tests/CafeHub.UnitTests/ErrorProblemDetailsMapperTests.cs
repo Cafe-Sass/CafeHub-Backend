@@ -93,6 +93,46 @@ namespace CafeHub.UnitTests
             Assert.Throws<ArgumentNullException>(() => ErrorProblemDetailsMapper.Map(Error.Failure("Example.Unexpected", "A human readable message."), null!));
         }
 
+        [Fact]
+        public void Map_IncludesTheCorrelationIdExtension_WhenOneIsProvided()
+        {
+            var error = Error.NotFound("Example.NotFound", "The example does not exist.");
+
+            var problemDetails = ErrorProblemDetailsMapper.Map(error, "trace-correlation-1", "corr-from-accessor");
+
+            Assert.Equal("corr-from-accessor", problemDetails.Extensions["correlationId"]);
+            Assert.Equal("trace-correlation-1", problemDetails.Extensions["traceId"]);
+        }
+
+        [Fact]
+        public void Map_ValidationError_IncludesTheCorrelationIdExtension_WhenOneIsProvided()
+        {
+            var error = ValidationError.Create(new[]
+            {
+                new FieldError("Address", "The address is required."),
+            });
+
+            var problemDetails = ErrorProblemDetailsMapper.Map(error, "trace-correlation-2", "corr-from-accessor");
+
+            var validation = Assert.IsType<ValidationProblemDetails>(problemDetails);
+            Assert.Equal("corr-from-accessor", validation.Extensions["correlationId"]);
+            Assert.Equal("trace-correlation-2", validation.Extensions["traceId"]);
+        }
+
+        [Fact]
+        public void Map_OmitsTheCorrelationIdExtension_WhenNoCorrelationIdIsAvailable()
+        {
+            var error = Error.NotFound("Example.NotFound", "The example does not exist.");
+
+            var withoutParameter = ErrorProblemDetailsMapper.Map(error, "trace-correlation-3");
+            var withNullParameter = ErrorProblemDetailsMapper.Map(error, "trace-correlation-3", null);
+            var withWhitespaceParameter = ErrorProblemDetailsMapper.Map(error, "trace-correlation-3", "   ");
+
+            Assert.False(withoutParameter.Extensions.ContainsKey("correlationId"));
+            Assert.False(withNullParameter.Extensions.ContainsKey("correlationId"));
+            Assert.False(withWhitespaceParameter.Extensions.ContainsKey("correlationId"));
+        }
+
         private static Error CreateError(ErrorType errorType)
         {
             return errorType switch

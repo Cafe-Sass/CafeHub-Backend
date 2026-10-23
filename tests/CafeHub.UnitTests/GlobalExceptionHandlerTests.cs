@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Tenancy;
 using CafeHub.WebApi.Errors;
 using Microsoft.AspNetCore.Http;
@@ -121,6 +122,37 @@ namespace CafeHub.UnitTests
             await Assert.ThrowsAsync<ArgumentNullException>(async () => await handler.TryHandleAsync(CreateHttpContext("ctx-trace-guard"), exception: null!, CancellationToken.None));
         }
 
+        [Fact]
+        public async Task TryHandleAsync_IncludesTheAccessorCorrelationId_InTheProblemDetails()
+        {
+            var httpContext = CreateHttpContext("ctx-trace-correlation");
+            var handler = new GlobalExceptionHandler(new ListLogger(), new FixedCorrelationIdAccessor("corr-from-accessor"));
+
+            var handled = await handler.TryHandleAsync(httpContext, new InvalidOperationException("internal boom detail about the request state"), CancellationToken.None);
+
+            Assert.True(handled);
+            var body = await ReadBody(httpContext);
+            using var json = JsonDocument.Parse(body);
+            Assert.Equal("corr-from-accessor", json.RootElement.GetProperty("correlationId").GetString());
+            Assert.Equal("ctx-trace-correlation", json.RootElement.GetProperty("traceId").GetString());
+            Assert.DoesNotContain("internal boom detail", body, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task TryHandleAsync_OmitsTheCorrelationId_WhenTheAccessorHasNone()
+        {
+            var httpContext = CreateHttpContext("ctx-trace-omitted");
+            var handler = new GlobalExceptionHandler(new ListLogger(), new FixedCorrelationIdAccessor(null));
+
+            var handled = await handler.TryHandleAsync(httpContext, new InvalidOperationException("internal boom detail about the request state"), CancellationToken.None);
+
+            Assert.True(handled);
+            var body = await ReadBody(httpContext);
+            using var json = JsonDocument.Parse(body);
+            Assert.False(json.RootElement.TryGetProperty("correlationId", out _));
+            Assert.Equal("ctx-trace-omitted", json.RootElement.GetProperty("traceId").GetString());
+        }
+
         private static DefaultHttpContext CreateHttpContext(string traceIdentifier)
         {
             var httpContext = new DefaultHttpContext();
@@ -167,5 +199,15 @@ namespace CafeHub.UnitTests
                 Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
             }
         }
+    }
+
+    public sealed class FixedCorrelationIdAccessor : ICorrelationIdAccessor
+    {
+        public FixedCorrelationIdAccessor(string? correlationId)
+        {
+            CorrelationId = correlationId;
+        }
+
+        public string? CorrelationId { get; }
     }
 }

@@ -132,9 +132,14 @@ namespace CafeHub.UnitTests
     {
         public List<FakeLogEntry> Entries { get; } = [];
 
+        public List<FakeLogScope> Scopes { get; } = [];
+
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
-            return null;
+            var scope = new FakeLogScope(state);
+            Scopes.Add(scope);
+
+            return scope;
         }
 
         public bool IsEnabled(LogLevel logLevel)
@@ -149,6 +154,23 @@ namespace CafeHub.UnitTests
     }
 
     public sealed record FakeLogEntry(LogLevel Level, string Message, Exception? Exception, object? State);
+
+    public sealed class FakeLogScope : IDisposable
+    {
+        public FakeLogScope(object? state)
+        {
+            State = state;
+        }
+
+        public object? State { get; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
 
     public sealed record TestSecretCommand(string AccessToken) : ICommand
     {
