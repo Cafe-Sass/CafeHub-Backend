@@ -26,6 +26,7 @@ The table below is generated from the real `Directory.Packages.props` and must b
 | FluentValidation | 12.2.0 | Request validation framework for Application use cases |
 | FluentValidation.DependencyInjectionExtensions | 12.2.0 | Registers FluentValidation validators from an assembly in `AddApplication` |
 | MediatR | 12.5.0 | CQRS command and query contracts with `IMediator` dispatching |
+| Microsoft.AspNetCore.OpenApi | 10.0.13 | Built-in OpenAPI document generation for the Development-only document endpoint |
 | Microsoft.EntityFrameworkCore | 10.0.13 | EF Core runtime for MasterDbContext and TenantDbContext |
 | Microsoft.EntityFrameworkCore.Design | 10.0.13 | EF Core design-time tooling for migrations (WebApi host) |
 | Microsoft.Extensions.Configuration | 10.0.13 | Configuration building exercised in unit tests |
