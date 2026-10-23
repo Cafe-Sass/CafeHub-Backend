@@ -104,6 +104,29 @@ Unhandled exceptions leave `GlobalExceptionHandler` (`src/CafeHub.WebApi/Errors`
 - This entry does **not** claim the risk is accepted: under PRD section 14's exception rule the acceptance decision — after reviewing the compensating controls — belongs to the owner, who records it below.
 - Owner: ______________________  Date: ______________
 
+## MVP tenant identifier source: the URL path prefix /t/{slug} (Proposed, pending owner confirmation)
+
+- Decision: the MVP tenant identifier source is the URL path prefix `/t/{slug}` — tenant-scoped
+  routes carry the tenant prefix `/t/{slug}` before the version segment, e.g.
+  `/t/{slug}/api/v1/{resource}`; platform routes carry no tenant prefix. The owner decision
+  dates from 2026-10-19; this recording of it is proposed and waits for the owner's confirmation
+  in the PR conversation (Feature/250_SA_ApiVersioningAndRouteConventions). The route template,
+  examples, reserved-prefix rule, version rules, and rejected alternatives are documented in
+  `architecture/route-conventions.md`.
+- Customer QR resolution: remains a separate, undecided topic. FR-CAF-004 (Table QR generation
+  and resolution) will get its own future design decision; this entry does not decide it and
+  route conventions here do not describe it.
+- Why the path prefix: keeping the tenant identifier in the URL makes tenant scope visible and
+  shareable, works without wildcard TLS or custom domains, and matches the fail-closed rules in
+  `architecture/database-schema-decisions.md` (the slug stays an untrusted value until validated;
+  PRD section 10.2: a caller-supplied tenant identifier alone is never proof of authorization).
+- Not residents of this decision: header-based and subdomain tenant identification — both are
+  described only as "not chosen for the MVP by owner decision of 2026-10-19" in
+  `architecture/route-conventions.md`; the owner made that call, this document merely records it.
+- PRD anchors (verified by grep against the local PRD on 2026-10-23): PRD section 10.4 "API
+  Behavior" (the API contract must define tenant and branch resolution behavior and a versioning
+  strategy before production sign-off, and the PRD does not lock the final endpoint route naming).
+
 ## Ownership
 
 | Item | Owner role | Named assignee |
@@ -144,8 +167,8 @@ The WebApi reads real credentials locally through User Secrets or environment va
 ## Open decisions
 
 - Result/Error model placement — the model lives in Application (CFMD-241); Domain cannot reference it until a later decision.
-- Tenant identifier source (host, header, or path) — required before tenant resolution middleware; PRD has no TBD number for it.
-- API versioning style — required before first business endpoint (PRD section 10.4).
+- Tenant identifier source — the URL path prefix `/t/{slug}` was chosen by the owner on 2026-10-19 (recorded above as Proposed, pending owner confirmation of the recording); tenant resolution middleware stays a future story, and customer QR resolution remains a separate, undecided topic.
+- API versioning style — required before first business endpoint (PRD section 10.4); the path-segment `v1` proposal is documented in `architecture/route-conventions.md` and stays open until the owner confirms it.
 - Notification provider/channels — PRD TBD-09.
 - Payment provider(s) — PRD TBD-02.
 - First access for Support-created onboarding requests — such requests carry no owner password hash by design; how the owner first signs in to that tenant (for example an invite/set-password flow) is undecided and was deliberately not designed in CFMD-258.
