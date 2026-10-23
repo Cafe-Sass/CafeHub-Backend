@@ -48,6 +48,7 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             builder.Ignore(u => u.IsActive);
 
             builder.HasIndex(u => u.NormalizedUserName).IsUnique().HasDatabaseName("uq_platform_admins_normalized_user_name");
+            builder.HasIndex(u => u.NormalizedEmail).IsUnique().HasFilter("normalized_email IS NOT NULL").HasDatabaseName("uq_platform_admins_normalized_email");
 
             builder.HasOne<PlatformAdminUser>()
                 .WithMany()
