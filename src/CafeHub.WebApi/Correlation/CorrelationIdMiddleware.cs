@@ -29,6 +29,7 @@ namespace CafeHub.WebApi.Correlation
             var correlationId = isReused ? incoming : generator.Generate();
 
             httpContext.Items[CorrelationIdConstants.ItemKey] = correlationId;
+            httpContext.Response.Headers[CorrelationIdConstants.HeaderName] = correlationId;
             httpContext.Response.OnStarting(() =>
             {
                 httpContext.Response.Headers[CorrelationIdConstants.HeaderName] = correlationId;
