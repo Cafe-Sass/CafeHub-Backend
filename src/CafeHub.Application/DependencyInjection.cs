@@ -1,7 +1,9 @@
 using CafeHub.Application.Abstractions.Behaviors;
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Pagination;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -11,8 +13,10 @@ namespace CafeHub.Application
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddApplication(this IServiceCollection services)
+        public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration? configuration = null)
         {
+            services.AddSingleton(PaginationOptionsBinder.Bind(configuration));
+
             var applicationAssembly = typeof(DependencyInjection).Assembly;
 
             services.AddMediatR(configuration =>
