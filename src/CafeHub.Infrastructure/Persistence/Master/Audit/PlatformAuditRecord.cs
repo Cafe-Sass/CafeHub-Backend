@@ -16,6 +16,10 @@ namespace CafeHub.Infrastructure.Persistence.Master.Audit
 
         public Guid? SubjectId { get; set; }
 
+        public string? CorrelationId { get; set; }
+
+        public string? ReasonCode { get; set; }
+
         public string? BeforeState { get; set; }
 
         public string? AfterState { get; set; }

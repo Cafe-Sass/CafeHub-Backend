@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Identity;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 
@@ -12,17 +13,23 @@ namespace CafeHub.Infrastructure.Audit
         private const int MaxReasonLength = 64;
 
         private static readonly Regex ActionCodePattern = new("^[a-z0-9]+(\\.[a-z0-9]+)+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
-        private static readonly Regex ReasonCodePattern = new("^[a-z0-9_]{1,64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ReasonCodePattern = new("^[a-z][a-z0-9_]{0,63}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private readonly ICurrentUser currentUser;
         private readonly TimeProvider timeProvider;
         private readonly IPlatformAuditRecordStore store;
+        private readonly ICorrelationIdAccessor? correlationIdAccessor;
 
-        public PlatformAuditWriter(ICurrentUser currentUser, TimeProvider timeProvider, IPlatformAuditRecordStore store)
+        public PlatformAuditWriter(
+            ICurrentUser currentUser,
+            TimeProvider timeProvider,
+            IPlatformAuditRecordStore store,
+            ICorrelationIdAccessor? correlationIdAccessor = null)
         {
             this.currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
             this.store = store ?? throw new ArgumentNullException(nameof(store));
+            this.correlationIdAccessor = correlationIdAccessor;
         }
 
         public void Write(PlatformAuditEntry entry)
@@ -31,7 +38,7 @@ namespace CafeHub.Infrastructure.Audit
 
             var actionCode = ValidateActionCode(entry);
             var subjectType = ValidateSubjectType(entry.TargetType);
-            ValidateReason(entry.Reason);
+            var reasonCode = ValidateReason(entry.Reason);
             var actorId = ResolveActorId(entry.ActorKind);
 
             store.Add(new PlatformAuditRecord
@@ -43,6 +50,8 @@ namespace CafeHub.Infrastructure.Audit
                 ActionCode = actionCode,
                 SubjectType = subjectType,
                 SubjectId = entry.TargetId,
+                CorrelationId = correlationIdAccessor?.CorrelationId,
+                ReasonCode = reasonCode,
             });
         }
 
@@ -87,17 +96,19 @@ namespace CafeHub.Infrastructure.Audit
             return subjectType;
         }
 
-        private static void ValidateReason(string? reason)
+        private static string? ValidateReason(string? reason)
         {
             if (reason is null)
             {
-                return;
+                return null;
             }
 
             if (reason.Length > MaxReasonLength || !ReasonCodePattern.IsMatch(reason))
             {
                 throw new ArgumentException("The audit reason must be a short machine code, never free text.", nameof(reason));
             }
+
+            return reason;
         }
 
         private static string ActorKindLabel(PlatformAuditActorKind actorKind)
