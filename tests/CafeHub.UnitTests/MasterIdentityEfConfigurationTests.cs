@@ -22,7 +22,7 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
-        public void Model_ContainsExactlyTheIdentityTablesAndRefreshTokens_AndNoExtraTables()
+        public void Model_ContainsExactlyTheIdentityTablesRefreshTokensAndAuditRecords_AndNoExtraTables()
         {
             var model = CreateModel();
             var entityTypes = model.GetEntityTypes().ToList();
@@ -39,6 +39,7 @@ namespace CafeHub.UnitTests
                 "platform_admin_user_claims",
                 "platform_admin_user_roles",
                 "platform_admins",
+                "platform_audit_records",
                 "refresh_tokens",
             }.OrderBy(t => t).ToList();
 
