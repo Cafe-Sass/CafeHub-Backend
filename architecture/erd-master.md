@@ -33,6 +33,18 @@ erDiagram
         uuid role_id FK
         text claim_type
     }
+    refresh_tokens {
+        uuid id PK
+        uuid admin_id FK
+        uuid family_id
+        text token_hash UK
+        timestamptz issued_at
+        timestamptz expires_at
+        timestamptz rotated_at
+        uuid replaced_by_id FK
+        timestamptz revoked_at
+        text revoked_reason
+    }
     plans {
         uuid id PK
         text code UK
@@ -145,6 +157,7 @@ erDiagram
     platform_admin_roles ||--o{ platform_admin_user_roles : "membership"
     platform_admins ||--o{ platform_admin_user_claims : "user claim"
     platform_admin_roles ||--o{ platform_admin_role_claims : "role claim"
+    platform_admins ||--o{ refresh_tokens : "sessions"
     platform_admins |o--o{ onboarding_requests : "created by"
     platform_admins |o--o{ onboarding_requests : "reviewed by"
     onboarding_requests ||--o| tenants : "approval"
@@ -198,8 +211,22 @@ A successful initial payment is never treated as Admin approval, and approval is
 
 - Mechanism: **ASP.NET Core Identity with explicitly customized GUID-keyed entities** for platform admin identity. "Customized" means the key type (UUID instead of the framework default string key), snake_case table and column names, and the repository's explicit EF configuration; the account behavior — password hashing through the framework's hasher, lockout, and the stamp columns — stays the framework's default. No custom password-hashing or authentication behavior is introduced.
 - Included for platform admin authentication needs: users (`platform_admins`), roles (`platform_admin_roles`), user-role memberships (`platform_admin_user_roles`), per-user claims (`platform_admin_user_claims`), and per-role claims (`platform_admin_role_claims`).
-- Intentionally excluded because the MVP does not use them: external-login storage (no external login provider is approved, so no `user_logins` table) and default token storage (the password-based admin flows persist no tokens, so no `user_tokens` table; token issuance belongs to later Auth work and any needed tables are added explicitly then). These exclusions are design statements only — no entity or migration change is made here.
+- Intentionally excluded because the MVP does not use them: external-login storage (no external login provider is approved, so no `user_logins` table) and default token storage (the password-based admin flows persist no tokens, so no `user_tokens` table; token issuance belongs to later Auth work and any needed tables are added explicitly then — the `refresh_tokens` table below is that explicit addition, owner-confirmed 2026-10-23). These exclusions are design statements only — no entity or migration change is made here.
 - Platform admin rows are logically deleted (deactivated), never physically deleted: `deleted_at`/`deleted_by` per the deletion convention, authorization treats a deactivated admin as unauthorized, and every foreign key into `platform_admins` (audit actor, `reviewed_by`, `created_by`) stays valid precisely because the row survives. Role-membership and claim-assignment rows are removable assignment state as documented in the conventions.
+
+## Refresh token sessions (Confirmed, owner decision, 2026-10-23)
+
+Long-lived refresh tokens keep a platform administrator signed in without long-lived access tokens (FR-IAM-001: valid credentials establish the configured authenticated session/token; the access token itself is short-lived by the JWT work of CFMD-267/268). The `refresh_tokens` table below is the explicit token-storage addition the Identity model documentation reserved for the Auth work — the Identity `user_tokens` table stays excluded as before, and reusing it was the recorded rejected alternative.
+
+- One token family per sign-in: issuing a refresh token opens a family (`family_id`); every token the family ever contains belongs to that one sign-in session.
+- Rotation on every use (owner-confirmed): using a refresh token marks it rotated (`rotated_at`, `replaced_by_id`) and issues a fresh token in the same family. Rejected alternative: non-rotating long-lived tokens (a single stolen token would be usable indefinitely).
+- Reuse detection (owner-confirmed): presenting an already-rotated token revokes every token of the family with reason `reuse_detected` and returns the same safe rejection as any other invalid token.
+- Storage is hash-only (owner-confirmed): the raw token value is never persisted, logged, or returned after issuance; the table stores the lowercase hex SHA-256 of the raw value and looks tokens up through its unique index. Rejected alternative: storing the raw value (any read of the table would be a session takeover).
+- Raw token format (documented here, implemented by the later rotation service, not in this story): 32 random bytes from a cryptographically secure generator, base64url-encoded, returned to the client exactly once at issuance and at each rotation.
+- Default lifetime 7 days (owner-confirmed); the concrete lifetime is a validated service option (1..90 days), never a schema constant, so the CHECK only enforces internal consistency (`expires_at > issued_at`).
+- Placement in the Master database: refresh tokens authenticate platform administrators, whose identity lives in the Master (FR-PLT-001); cross-database references are forbidden by the conventions, and owner/staff refresh sessions are a separate Tenant-side concern not modeled here.
+- Enforcement split: the schema guarantees hash uniqueness and the integrity of rotation/revocation state through the CHECK constraints; reuse detection, expiry, family-wide revocation, and idempotent revocation are service behaviors of the later rotation-service sub-task, because a family update is a cross-row application transaction, not a constraint.
+
 
 ## Registration data and the provisioning seed
 
@@ -271,6 +298,22 @@ Purpose: claims granted to every holder of a role. Same assignment-state treatme
 
 - `id uuid NOT NULL` — `pk_platform_admin_role_claims`; `role_id uuid NOT NULL FK platform_admin_roles.id`; `claim_type text NOT NULL` (CHECK length 1..512); `claim_value text NULL` (CHECK length 0..1024 when present).
 - `created_at timestamptz NOT NULL`.
+
+### refresh_tokens
+
+Purpose: long-lived refresh-token sessions for platform administrators (FR-IAM-001; the session model and the owner-confirmed rules live in `Refresh token sessions` above): one row per issued token, one family per sign-in, rotation on every use, family-wide revocation on reuse. Only a hash is stored, never the raw token value.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_refresh_tokens`.
+- `admin_id uuid NOT NULL FK platform_admins.id` (`fk_refresh_tokens_admin_id`, `ON DELETE RESTRICT`) — the owning administrator; one admin holds one family per sign-in and a family spans many rows over its rotations. `ix_refresh_tokens_admin_id` supports per-admin lookups (revocation, inspection). A deactivated admin keeps the row under the logical-deletion policy; treating that admin's tokens as unauthorized is a service-layer check consistent with FR-IAM-002.
+- `family_id uuid NOT NULL` — the sign-in family identifier shared by every token of one session. Deliberately no foreign key: the family has no row of its own — it is the grouping key of these rows. `ix_refresh_tokens_family_id` supports family-wide revocation.
+- `token_hash text NOT NULL` (CHECK length 64 and format `^[0-9a-f]{64}$`, `ck_refresh_tokens_token_hash_format`) — the lowercase hex SHA-256 of the raw token; `uq_refresh_tokens_token_hash` is the unique lookup key for every use, which also closes the concurrent double-use race at the data boundary (only one rotation can insert against a given successor state).
+- `issued_at timestamptz NOT NULL`; `expires_at timestamptz NOT NULL` with `ck_refresh_tokens_expiry_after_issue CHECK (expires_at > issued_at)`.
+- `rotated_at timestamptz NULL` — set exactly once at rotation; a set value marks the token rotated and any further presentation of it as reuse.
+- `replaced_by_id uuid NULL` self foreign key to `refresh_tokens.id` (`fk_refresh_tokens_replaced_by_id`, `ON DELETE RESTRICT`) — set together with `rotated_at`, pointing at the successor token of the same family. **Proposed, pending owner confirmation**: `uq_refresh_tokens_replaced_by_id` — rotation always issues a fresh row, so each token is the successor of at most one predecessor, and the unique index turns that invariant into data integrity (and doubles as the replacement-chain lookup). Rejected alternative: leaving it non-unique (two rotated tokens could claim the same successor with no integrity signal).
+- `revoked_at timestamptz NULL`; `revoked_reason text NULL` (CHECK length 1..64 when present) — `ck_refresh_tokens_revoked_reason_labels` limits the reason to the proposed closed list `('logout', 'reuse_detected', 'admin_revoked')`. **Proposed, pending owner confirmation**: `ck_refresh_tokens_revocation_pair CHECK ((revoked_at IS NULL AND revoked_reason IS NULL) OR (revoked_at IS NOT NULL AND revoked_reason IS NOT NULL))` — the required rule is that a reason is present whenever `revoked_at` is set; the symmetric form additionally forbids a dangling reason without a revocation time. Rejected alternative: the one-directional CHECK only.
+- State model: a token is active while `rotated_at IS NULL AND revoked_at IS NULL AND expires_at > <current time>`; active, rotated, revoked, and expired are derivable from these columns, so no separate status column exists. Rejected alternative: a redundant status text column duplicating derivable state.
+- Audit columns (Proposed, pending owner confirmation): `issued_at` doubles as the creation timestamp and every mutation carries its own semantic timestamp (`rotated_at`, `revoked_at`), so generic `created_at`/`updated_at` are not duplicated here (same reasoning as `platform_audit_records.recorded_at` and the immutable `plan_entitlements` rows); `created_by`/`updated_by` are omitted because rows are system-written during the owning administrator's own session — the actor is `admin_id` — and sensitive revocations are additionally captured in `platform_audit_records`. Rejected alternative: duplicating the generic audit columns beside the semantic ones (two timestamps for one fact).
+- Retention: rows are never physically deleted by ordinary application workflows (logical-deletion policy, PRD section 9 rule 23); rotation and revocation history is security state, and cleanup of expired families is explicitly later work.
 
 ### tenants
 
@@ -461,7 +504,7 @@ Purpose: append-only record of sensitive platform actions (FR-PLT-005: authorize
 - Owner/staff identity: tenant-side identity tables (FR-IAM-001) belong to `architecture/erd-tenant.md`, not here.
 - Payment-provider specifics and refund flows (PRD TBD-02, TBD-03); the final renewal/upgrade lifecycle policy stays with TBD-04 (the approval-gate structure is modeled above, the commercial policy is not).
 - Provisioning infrastructure internals (database creation tooling, secrets-store integration) — infrastructure implementation, not schema.
-- Identity token/refresh-token storage — deferred to the Auth work (not modeled per the story).
+- Identity token storage other than refresh-token sessions (two-factor devices, external-login tokens, one-time codes) — deferred; the `refresh_tokens` table is designed above, other token kinds stay unmodeled until their feature arrives.
 
 ## TBD register
 
