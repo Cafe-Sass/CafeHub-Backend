@@ -22,7 +22,7 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
-        public void Model_ContainsExactlyTheFiveIdentityTables_AndNoExtraTables()
+        public void Model_ContainsExactlyTheIdentityTablesAndRefreshTokens_AndNoExtraTables()
         {
             var model = CreateModel();
             var entityTypes = model.GetEntityTypes().ToList();
@@ -39,10 +39,12 @@ namespace CafeHub.UnitTests
                 "platform_admin_user_claims",
                 "platform_admin_user_roles",
                 "platform_admins",
+                "refresh_tokens",
             }.OrderBy(t => t).ToList();
 
             Assert.Equal(expectedTables, tableNames);
-            Assert.DoesNotContain(tableNames, t => t != null && (t.Contains("login") || t.Contains("token") || t.Contains("tenant")));
+            Assert.DoesNotContain(tableNames, t => t != null && t != "refresh_tokens" && (t.Contains("login") || t.Contains("token")));
+            Assert.DoesNotContain(tableNames, t => t != null && t.Contains("tenant"));
         }
 
         [Fact]
