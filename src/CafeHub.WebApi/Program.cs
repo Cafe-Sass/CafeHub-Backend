@@ -11,12 +11,15 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCorrelationId();
+builder.Services.AddPlatformAuthentication();
 builder.Services.AddApiDocumentation();
 
 var app = builder.Build();
 
 app.UseCorrelationId();
 app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapApiDocumentation();
 app.MapControllers();
