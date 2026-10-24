@@ -49,6 +49,9 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
 
             builder.HasIndex(u => u.NormalizedUserName).IsUnique().HasDatabaseName("uq_platform_admins_normalized_user_name");
             builder.HasIndex(u => u.NormalizedEmail).IsUnique().HasFilter("normalized_email IS NOT NULL").HasDatabaseName("uq_platform_admins_normalized_email");
+            builder.HasIndex(u => u.CreatedBy).HasDatabaseName("ix_platform_admins_created_by");
+            builder.HasIndex(u => u.UpdatedBy).HasDatabaseName("ix_platform_admins_updated_by");
+            builder.HasIndex(u => u.DeletedBy).HasDatabaseName("ix_platform_admins_deleted_by");
 
             builder.HasOne<PlatformAdminUser>()
                 .WithMany()

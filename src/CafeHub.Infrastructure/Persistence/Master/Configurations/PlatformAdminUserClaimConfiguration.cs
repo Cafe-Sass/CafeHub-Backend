@@ -22,6 +22,8 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             builder.Property(uc => uc.ClaimValue).HasColumnName("claim_value").HasColumnType("text").IsRequired(false);
             builder.Property(uc => uc.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
 
+            builder.HasIndex(uc => uc.UserId).HasDatabaseName("ix_platform_admin_user_claims_platform_admin_id");
+
             builder.HasOne<PlatformAdminUser>()
                 .WithMany()
                 .HasForeignKey(uc => uc.UserId)
