@@ -6,6 +6,10 @@ namespace CafeHub.WebApi.Authentication
 {
     internal static class PlatformTokenValidationParameters
     {
+        public const string NameClaimType = "sub";
+
+        public const string RoleClaimType = "role";
+
         public static TokenValidationParameters Create(JwtOptions jwtOptions)
         {
             ArgumentNullException.ThrowIfNull(jwtOptions);
@@ -22,6 +26,8 @@ namespace CafeHub.WebApi.Authentication
                 RequireExpirationTime = true,
                 ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
                 ClockSkew = TimeSpan.FromSeconds(jwtOptions.ClockSkewSeconds),
+                NameClaimType = NameClaimType,
+                RoleClaimType = RoleClaimType,
             };
         }
     }

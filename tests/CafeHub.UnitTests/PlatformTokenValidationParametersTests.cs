@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CafeHub.Application.Identity;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.WebApi.Authentication;
@@ -63,6 +64,30 @@ namespace CafeHub.UnitTests
             var parameters = PlatformTokenValidationParameters.Create(options);
 
             Assert.Equal(TimeSpan.FromSeconds(45), parameters.ClockSkew);
+        }
+
+        [Fact]
+        public void Create_SetsTheWireClaimNamesForNameAndRole()
+        {
+            var parameters = PlatformTokenValidationParameters.Create(CreateOptions());
+
+            Assert.Equal("sub", parameters.NameClaimType);
+            Assert.Equal("role", parameters.RoleClaimType);
+        }
+
+        [Fact]
+        public async Task Create_ParametersExposeTheWireRoleClaim_OnTheAuthenticatedPrincipal()
+        {
+            var options = CreateOptions();
+            var accessToken = new JwtAccessTokenIssuer(options, TimeProvider.System).Issue(CreateRequest());
+
+            var result = await new JsonWebTokenHandler().ValidateTokenAsync(accessToken.Value, PlatformTokenValidationParameters.Create(options));
+
+            Assert.True(result.IsValid);
+            var identity = result.ClaimsIdentity;
+            Assert.NotNull(identity);
+            Assert.Equal("role", identity.RoleClaimType);
+            Assert.True(new ClaimsPrincipal(identity).IsInRole("SuperAdmin"));
         }
 
         [Fact]
