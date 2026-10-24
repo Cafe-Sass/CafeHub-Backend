@@ -1,6 +1,8 @@
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Tenancy;
+using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Tenant;
@@ -44,6 +46,9 @@ namespace CafeHub.Infrastructure
             services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
             services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
             services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
+            services.AddScoped<IPlatformAuditRecordStore, PlatformAuditRecordStore>();
+            services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
 
             return services;
         }
