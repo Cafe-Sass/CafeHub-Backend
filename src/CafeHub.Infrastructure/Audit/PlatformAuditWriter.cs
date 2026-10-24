@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
-using CafeHub.Application.Audit;
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 
