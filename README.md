@@ -41,6 +41,9 @@ User secrets (run from the repository root; `<...>` are placeholders):
 dotnet user-secrets set "ConnectionStrings:Master" "<master-connection-string>" --project src/CafeHub.WebApi
 dotnet user-secrets set "ConnectionStrings:TenantDesignTime" "<tenant-design-time-connection-string>" --project src/CafeHub.WebApi
 dotnet user-secrets set "TenantConnections:<SecretReference>" "<tenant-connection-string>" --project src/CafeHub.WebApi
+dotnet user-secrets set "Jwt:Issuer" "<jwt-issuer>" --project src/CafeHub.WebApi
+dotnet user-secrets set "Jwt:Audience" "<jwt-audience>" --project src/CafeHub.WebApi
+dotnet user-secrets set "Jwt:SigningKey" "<jwt-signing-key>" --project src/CafeHub.WebApi
 ```
 
 Equivalent environment variables (`__` is the level separator):
@@ -49,9 +52,14 @@ Equivalent environment variables (`__` is the level separator):
 ConnectionStrings__Master
 ConnectionStrings__TenantDesignTime
 TenantConnections__<SecretReference>
+Jwt__Issuer
+Jwt__Audience
+Jwt__SigningKey
 ```
 
 One `TenantConnections:<SecretReference>` entry is required per tenant secret reference; the registry stores the reference, never the raw connection string.
+
+The `Jwt:SigningKey` must be at least 32 bytes when UTF-8 encoded. It comes from User Secrets locally and from an environment variable in deployed environments; it is never written to a tracked file, logged, or returned. Issuer, audience, and lifetime are validated at startup and the host refuses to start when they are missing or weak.
 
 ## Verify (identical to CI)
 
