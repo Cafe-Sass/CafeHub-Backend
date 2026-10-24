@@ -33,6 +33,17 @@ Baseline for how CafeHub persistence is organized, derived from the CafeHub PRD 
 - Customer accounts from older drafts are rejected for the MVP; ordering is guest-only (FR-IAM-004).
 - Payment success implying provisioning is rejected; subscription state and approval/provisioning state are separate records (FR-ONB-003).
 
+## Refresh token sessions (Confirmed, owner decision, 2026-10-23)
+
+Platform administrators stay signed in through long-lived refresh tokens that rotate on every use, while access tokens stay short-lived (FR-IAM-001: valid credentials establish the configured authenticated session/token). The full table design lives in `architecture/erd-master.md` (`refresh_tokens`); this section records the decisions that shape it:
+
+- **Hash only, never the raw value.** The table stores the lowercase hex SHA-256 of the raw token and its unique index is the lookup key. A raw token is 32 random bytes, base64url-encoded, returned to the client exactly once at issuance and at each rotation. Rejected alternative: storing the raw token (a database read would be a session takeover).
+- **Default lifetime 7 days.** The concrete lifetime is a validated service option (1..90 days) of the later rotation service, never a schema constant; the schema CHECK only enforces `expires_at > issued_at`.
+- **Rotation on every use.** Presenting a valid active token marks it rotated (`rotated_at`, `replaced_by_id`) and issues a fresh token in the same family. Rejected alternative: non-rotating long-lived tokens (a stolen token would stay usable indefinitely).
+- **Family revocation on reuse.** Presenting an already-rotated token revokes every token of its family with reason `reuse_detected` and returns the same safe rejection as any other invalid token — nothing reveals whether a token was expired, revoked, or unknown. Rejected alternative: revoking only the presented token (an attacker replaying a captured token would silently invalidate the victim's session one token at a time while keeping the family alive).
+- **Master database placement.** Refresh tokens authenticate platform administrators, whose identity lives in the Master (FR-PLT-001); cross-database references are forbidden by the conventions, and tenant-side owner/staff refresh sessions are a separate future concern of `architecture/erd-tenant.md`.
+- **Rejected mechanism: the Identity `user_tokens` table.** It is explicitly excluded from the Master identity model (see `architecture/erd-master.md`, `Identity model documentation`); refresh-token sessions are security state with their own lifecycle (families, rotation, revocation reasons), not framework token plumbing, so the dedicated `refresh_tokens` table is the explicit addition the ERD reserved for the Auth work.
+
 ## TBD register (persistence-relevant)
 
 | PRD ID | Neutral title |
