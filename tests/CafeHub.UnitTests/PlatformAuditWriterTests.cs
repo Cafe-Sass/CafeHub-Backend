@@ -1,4 +1,5 @@
 using System.Reflection;
+using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
@@ -11,7 +12,9 @@ namespace CafeHub.UnitTests
     {
         private static readonly DateTimeOffset FixedNow = new(2026, 10, 25, 12, 0, 0, TimeSpan.Zero);
 
-        private static (PlatformAuditWriter Writer, FakeAuditStore Store, FakeAuditUnitOfWork UnitOfWork) CreateWriter(FakeCurrentUser? currentUser = null)
+        private static (PlatformAuditWriter Writer, FakeAuditStore Store, FakeAuditUnitOfWork UnitOfWork) CreateWriter(
+            FakeCurrentUser? currentUser = null,
+            ICorrelationIdAccessor? correlationIdAccessor = null)
         {
             var store = new FakeAuditStore();
             var unitOfWork = new FakeAuditUnitOfWork();
@@ -19,7 +22,8 @@ namespace CafeHub.UnitTests
             var writer = new PlatformAuditWriter(
                 currentUser ?? new FakeCurrentUser { IsAuthenticated = true, AdminId = Guid.NewGuid() },
                 new MutableTimeProvider { UtcNow = FixedNow },
-                store);
+                store,
+                correlationIdAccessor);
 
             return (writer, store, unitOfWork);
         }
@@ -84,6 +88,36 @@ namespace CafeHub.UnitTests
             writer.Write(CreateEntry());
 
             Assert.Equal(FixedNow, Assert.Single(store.Records).RecordedAt);
+        }
+
+        [Fact]
+        public void Write_CopiesTheCorrelationId_WhenTheAccessorHasOne()
+        {
+            var (writer, store, _) = CreateWriter(new FakeCurrentUser { IsAuthenticated = true, AdminId = Guid.NewGuid() }, new FixedCorrelationIdAccessor("corr-audit-123"));
+
+            writer.Write(CreateEntry());
+
+            Assert.Equal("corr-audit-123", Assert.Single(store.Records).CorrelationId);
+        }
+
+        [Fact]
+        public void Write_LeavesTheCorrelationIdEmpty_WhenTheAccessorHasNone()
+        {
+            var (writer, store, _) = CreateWriter(new FakeCurrentUser { IsAuthenticated = true, AdminId = Guid.NewGuid() }, new FixedCorrelationIdAccessor(null));
+
+            writer.Write(CreateEntry());
+
+            Assert.Null(Assert.Single(store.Records).CorrelationId);
+        }
+
+        [Fact]
+        public void Write_PersistsTheReasonCode_WhenTheEntryCarriesOne()
+        {
+            var (writer, store, _) = CreateWriter();
+
+            writer.Write(WithReason(CreateEntry(PlatformAuditActorKind.System), "lockout_active"));
+
+            Assert.Equal("lockout_active", Assert.Single(store.Records).ReasonCode);
         }
 
         [Fact]
