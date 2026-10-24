@@ -44,6 +44,7 @@ namespace CafeHub.Infrastructure.Authentication
                 Issuer = options.Issuer,
                 Audience = options.Audience,
                 IssuedAt = issuedAt.UtcDateTime,
+                NotBefore = issuedAt.UtcDateTime,
                 Expires = expiresAt.UtcDateTime,
                 SigningCredentials = signingCredentials,
                 Subject = new ClaimsIdentity(claims, authenticationType: "JwtAccessTokenIssuer")
