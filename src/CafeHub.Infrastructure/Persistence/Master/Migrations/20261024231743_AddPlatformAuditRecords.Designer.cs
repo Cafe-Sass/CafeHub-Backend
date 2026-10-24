@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CafeHub.Infrastructure.Persistence.Master.Migrations
 {
     [DbContext(typeof(MasterDbContext))]
-    [Migration("20261024224430_AddPlatformAuditRecords")]
+    [Migration("20261024231743_AddPlatformAuditRecords")]
     partial class AddPlatformAuditRecords
     {
         /// <inheritdoc />
@@ -133,6 +133,14 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("before_state");
 
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("ReasonCode")
+                        .HasColumnType("text")
+                        .HasColumnName("reason_code");
+
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("timestamptz")
                         .HasColumnName("recorded_at");
@@ -156,7 +164,11 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         {
                             t.HasCheckConstraint("ck_platform_audit_records_action_code_length", "length(action_code) >= 1 AND length(action_code) <= 128");
 
+                            t.HasCheckConstraint("ck_platform_audit_records_correlation_id_format", "correlation_id IS NULL OR correlation_id ~ '^[A-Za-z0-9._:-]{1,64}$'");
+
                             t.HasCheckConstraint("ck_platform_audit_records_kind", "actor_kind IN ('PlatformAdmin', 'System')");
+
+                            t.HasCheckConstraint("ck_platform_audit_records_reason_code_format", "reason_code IS NULL OR reason_code ~ '^[a-z][a-z0-9_]{0,63}$'");
 
                             t.HasCheckConstraint("ck_platform_audit_records_subject_type_length", "length(subject_type) >= 1 AND length(subject_type) <= 64");
                         });
