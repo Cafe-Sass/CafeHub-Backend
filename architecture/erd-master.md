@@ -150,6 +150,8 @@ erDiagram
         text action_code
         text subject_type
         uuid subject_id
+        text correlation_id
+        text reason_code
         jsonb before_state
         jsonb after_state
     }
@@ -489,9 +491,11 @@ Purpose: append-only record of sensitive platform actions (FR-PLT-005: authorize
 
 - `id uuid NOT NULL` — `pk_platform_audit_records`.
 - `recorded_at timestamptz NOT NULL` — the universal time of the event (append-only; no `updated_at`).
-- `actor_platform_admin_id uuid NULL FK platform_admins.id` — set when an authenticated Super Admin acts; `actor_kind text NOT NULL` — `ck_platform_audit_records_kind` over `('PlatformAdmin', 'System')` (Proposed) distinguishes automated work (provisioning) from verified acting users even when the FK is NULL.
-- `action_code text NOT NULL` (CHECK length 1..128) — a stable, snippet-friendly code following the `<Module>.<Reason>` style of application error codes (Proposed). Support-created onboarding requests record their responsible actor here (FR-ONB-004).
+- `actor_platform_admin_id uuid NULL FK platform_admins.id` — set when an authenticated Super Admin acts; `actor_kind text NOT NULL` — `ck_platform_audit_records_kind` over `('PlatformAdmin', 'System')` (Confirmed, owner decision, 2026-10-25) distinguishes automated work (provisioning) from verified acting users even when the FK is NULL.
+- `action_code text NOT NULL` (CHECK length 1..128) — a stable, snippet-friendly code following the `<Module>.<Reason>` style of application error codes (Proposed). Support-created onboarding requests record their responsible actor here (FR-ONB-004). The outcome of the action is captured inside this code, which ends with its lowercase outcome label (`succeeded`, `failed`, `denied`; owner decision, 2026-10-25).
 - `subject_type text NOT NULL` (CHECK length 1..64) and `subject_id uuid NULL` — generic target pointer retained without a foreign key (append-only, Proposed).
+- `correlation_id text NULL` (CHECK length 1..64 and safe characters, `ck_platform_audit_records_correlation_id_format`) — the request's correlation identifier from the correlation middleware, captured when the writer runs inside a request that carries one and NULL otherwise; no index (owner decision, 2026-10-25).
+- `reason_code text NULL` (CHECK format `^[a-z][a-z0-9_]{0,63}$`, `ck_platform_audit_records_reason_code_format`) — an optional short machine reason, never free text from a user (owner decision, 2026-10-25); no index.
 - `before_state jsonb NULL`, `after_state jsonb NULL` — structured old/new snapshots where applicable (FR-AUD-001). Both follow the `jsonb` rule: they are never filtered, joined, or constrained; queries run on `recorded_at`, `action_code`, and actor columns (indexed in CFMD-79's indexing story).
 - Append-only: rows are inserted once, and ordinary application workflows can neither update nor delete them (`architecture/database-conventions.md`); the retention and tamper-resistance design is its own topic (PRD TBD-20).
 
