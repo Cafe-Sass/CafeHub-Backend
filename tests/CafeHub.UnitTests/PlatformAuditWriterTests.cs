@@ -1,6 +1,6 @@
 using System.Reflection;
-using CafeHub.Application.Audit;
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
