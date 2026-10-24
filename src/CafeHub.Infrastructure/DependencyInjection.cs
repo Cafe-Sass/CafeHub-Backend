@@ -1,5 +1,7 @@
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Identity;
 using CafeHub.Application.Tenancy;
+using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Tenancy;
@@ -32,6 +34,10 @@ namespace CafeHub.Infrastructure
             });
             services.AddScoped<IMasterUnitOfWork, MasterUnitOfWork>();
             services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();
+
+            services.AddSingleton(_ => JwtOptionsBinder.Bind(configuration));
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
 
             return services;
         }
