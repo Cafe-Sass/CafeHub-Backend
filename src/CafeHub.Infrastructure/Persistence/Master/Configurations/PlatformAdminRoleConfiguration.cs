@@ -28,6 +28,8 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             builder.Property(r => r.UpdatedBy).HasColumnName("updated_by").HasColumnType("uuid").IsRequired(false);
 
             builder.HasIndex(r => r.NormalizedName).IsUnique().HasDatabaseName("uq_platform_admin_roles_normalized_name");
+            builder.HasIndex(r => r.CreatedBy).HasDatabaseName("ix_platform_admin_roles_created_by");
+            builder.HasIndex(r => r.UpdatedBy).HasDatabaseName("ix_platform_admin_roles_updated_by");
 
             builder.HasOne<PlatformAdminUser>()
                 .WithMany()

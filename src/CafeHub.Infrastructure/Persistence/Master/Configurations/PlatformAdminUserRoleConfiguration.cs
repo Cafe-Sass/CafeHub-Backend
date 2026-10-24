@@ -21,6 +21,8 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
                 .IsUnique()
                 .HasDatabaseName("uq_platform_admin_user_roles_user_role");
 
+            builder.HasIndex(ur => ur.RoleId).HasDatabaseName("ix_platform_admin_user_roles_role_id");
+
             builder.HasOne<PlatformAdminUser>()
                 .WithMany()
                 .HasForeignKey(ur => ur.UserId)
