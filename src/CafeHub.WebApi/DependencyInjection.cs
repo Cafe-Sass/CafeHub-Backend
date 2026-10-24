@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Identity;
 using CafeHub.Domain.Identity;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.WebApi.Authentication;
@@ -74,6 +75,9 @@ namespace CafeHub.WebApi
                 {
                     policy.RequireRole(PlatformAdminRoles.SuperAdmin);
                 });
+
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
             return services;
         }
