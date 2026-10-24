@@ -42,7 +42,9 @@ namespace CafeHub.UnitTests
             var result = await service.IssueAsync(adminId, CancellationToken.None);
             Assert.True(result.IsSuccess);
             return result.Value;
-        }        [Fact]
+        }
+
+        [Fact]
         public async Task Issue_StoresOnlyTheHash_AndReturnsTheRawValueOnce()
         {
             var adminId = Guid.NewGuid();
