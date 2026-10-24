@@ -26,6 +26,7 @@ The table below is generated from the real `Directory.Packages.props` and must b
 | FluentValidation | 12.2.0 | Request validation framework for Application use cases |
 | FluentValidation.DependencyInjectionExtensions | 12.2.0 | Registers FluentValidation validators from an assembly in `AddApplication` |
 | MediatR | 12.5.0 | CQRS command and query contracts with `IMediator` dispatching |
+| Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.12 | HS256 access-token issuance through the transitive `Microsoft.IdentityModel.JsonWebTokens` types and bearer authentication setup (proposed, pending owner confirmation, story CFMD-267 sub-task CFMD-268; 10.0.13 was rejected because it was younger than the 14-day minimum age rule when this sub-task started) |
 | Microsoft.AspNetCore.Identity.EntityFrameworkCore | 10.0.13 | ASP.NET Core Identity entity bases and EF Core integration for the platform admin identity tables (approved by the owner for story CFMD-263, sub-task CFMD-264) |
 | Microsoft.AspNetCore.OpenApi | 10.0.13 | Built-in OpenAPI document generation for the Development-only document endpoint |
 | Microsoft.EntityFrameworkCore | 10.0.13 | EF Core runtime for MasterDbContext and TenantDbContext |
