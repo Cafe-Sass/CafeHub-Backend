@@ -1,6 +1,8 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Domain.Identity;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.WebApi.Authentication;
+using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Correlation;
 using CafeHub.WebApi.Documentation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -52,7 +54,26 @@ namespace CafeHub.WebApi
                     jwtBearerOptions.Events = new ProblemDetailsJwtBearerEvents();
                 });
 
-            services.AddAuthorization();
+            return services;
+        }
+
+        public static IServiceCollection AddPlatformAuthorization(this IServiceCollection services)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.AddAuthorizationBuilder()
+                .AddPolicy(PlatformAuthorizationPolicies.PlatformAdmin, policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireRole(PlatformAdminRoles.SuperAdmin);
+                })
+                .AddPolicy(PlatformAuthorizationPolicies.SuperAdmin, policy =>
+                {
+                    policy.RequireRole(PlatformAdminRoles.SuperAdmin);
+                });
 
             return services;
         }

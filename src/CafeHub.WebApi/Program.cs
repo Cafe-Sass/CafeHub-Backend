@@ -12,6 +12,7 @@ builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCorrelationId();
 builder.Services.AddPlatformAuthentication();
+builder.Services.AddPlatformAuthorization();
 builder.Services.AddApiDocumentation();
 
 var app = builder.Build();
