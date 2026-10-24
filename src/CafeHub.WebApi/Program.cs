@@ -2,10 +2,14 @@ using CafeHub.Application;
 using CafeHub.Infrastructure;
 using CafeHub.WebApi;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.Idempotency;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<IdempotencyKeyActionFilter>();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApplication(builder.Configuration);
