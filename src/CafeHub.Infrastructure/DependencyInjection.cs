@@ -39,6 +39,12 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(TimeProvider.System);
             services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
 
+            services.AddSingleton(_ => RefreshTokenOptionsBinder.Bind(configuration));
+            services.AddSingleton<ITokenHasher, TokenHasher>();
+            services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
+            services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
+            services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
             return services;
         }
     }
