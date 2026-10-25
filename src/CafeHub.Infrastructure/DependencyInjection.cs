@@ -3,12 +3,14 @@ using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Contracts;
+using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.Application.Plans.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Identity;
 using CafeHub.Infrastructure.Onboarding;
+using CafeHub.Infrastructure.Onboarding.Payments;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
 using CafeHub.Infrastructure.Persistence.Master.Onboarding;
@@ -20,6 +22,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace CafeHub.Infrastructure
 {
@@ -83,6 +86,14 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();
+
+            services.AddSingleton(sp =>
+            {
+                var hostingEnvironment = sp.GetRequiredService<IHostEnvironment>();
+                var paymentOptions = PaymentOptionsBinder.Bind(configuration, hostingEnvironment.IsDevelopment());
+                return paymentOptions.Mock;
+            });
+            services.AddSingleton<IPaymentGateway, MockPaymentGateway>();
 
             return services;
         }
