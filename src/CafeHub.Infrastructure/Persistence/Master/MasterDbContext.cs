@@ -1,4 +1,5 @@
 using CafeHub.Domain.Identity;
+using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Plans;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
@@ -18,6 +19,7 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<Plan> Plans => Set<Plan>();
         public DbSet<PlanVersion> PlanVersions => Set<PlanVersion>();
         public DbSet<PlanEntitlement> PlanEntitlements => Set<PlanEntitlement>();
+        public DbSet<OnboardingRequest> OnboardingRequests => Set<OnboardingRequest>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
