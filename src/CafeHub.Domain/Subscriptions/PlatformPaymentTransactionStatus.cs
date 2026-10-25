@@ -1,6 +1,6 @@
 namespace CafeHub.Domain.Subscriptions
 {
-    public enum PaymentTransactionStatus
+    public enum PlatformPaymentTransactionStatus
     {
         Initiated,
         Succeeded,

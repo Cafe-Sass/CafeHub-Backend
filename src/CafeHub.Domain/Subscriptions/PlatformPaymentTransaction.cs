@@ -18,7 +18,7 @@ namespace CafeHub.Domain.Subscriptions
 
         public string CurrencyCode { get; private set; } = string.Empty;
 
-        public PaymentTransactionStatus Status { get; private set; }
+        public PlatformPaymentTransactionStatus Status { get; private set; }
 
         public DateTimeOffset? SettledAt { get; private set; }
 
@@ -39,7 +39,7 @@ namespace CafeHub.Domain.Subscriptions
             string idempotencyKey,
             decimal amount,
             string currencyCode,
-            PaymentTransactionStatus status,
+            PlatformPaymentTransactionStatus status,
             DateTimeOffset? settledAt,
             string? failureCode,
             DateTimeOffset createdAt,
