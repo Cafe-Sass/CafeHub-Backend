@@ -50,6 +50,8 @@ namespace CafeHub.UnitTests
                 "subscriptions",
                 "tenant_databases",
                 "tenants",
+                "provisioning_jobs",
+                "provisioning_job_attempts",
             }.OrderBy(t => t).ToList();
 
             Assert.Equal(expectedTables, tableNames);
