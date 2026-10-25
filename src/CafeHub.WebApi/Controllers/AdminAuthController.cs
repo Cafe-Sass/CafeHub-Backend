@@ -34,5 +34,33 @@ namespace CafeHub.WebApi.Controllers
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
+
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<ActionResult<AdminTokenResponse>> Refresh([FromBody] RefreshAdminTokenCommand command, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command, cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("logout")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout([FromBody] LogoutAdminCommand command, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command, cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return NoContent();
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
     }
 }
