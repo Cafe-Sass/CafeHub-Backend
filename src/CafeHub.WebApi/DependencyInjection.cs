@@ -7,6 +7,7 @@ using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Correlation;
 using CafeHub.WebApi.Documentation;
 using CafeHub.WebApi.RateLimiting;
+using CafeHub.WebApi.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -56,6 +57,18 @@ namespace CafeHub.WebApi
                     AuthRateLimiting.PolicyName,
                     httpContext => AuthRateLimitPolicy.CreatePartition(httpContext, options));
             });
+
+            return services;
+        }
+
+        public static IServiceCollection AddSuperAdminSeeding(this IServiceCollection services)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.AddHostedService<SuperAdminSeedingHostedService>();
 
             return services;
         }
