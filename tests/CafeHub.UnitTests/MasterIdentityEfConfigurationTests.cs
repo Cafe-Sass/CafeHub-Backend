@@ -34,6 +34,7 @@ namespace CafeHub.UnitTests
 
             var expectedTables = new[]
             {
+                "onboarding_requests",
                 "plan_entitlements",
                 "plan_versions",
                 "plans",
