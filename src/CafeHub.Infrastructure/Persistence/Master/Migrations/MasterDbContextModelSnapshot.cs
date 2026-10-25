@@ -102,6 +102,182 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Plans.Plan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<bool>("IsSelectable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_selectable");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plans");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plans_code");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_plans_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_plans_updated_by");
+
+                    b.ToTable("plans", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_plans_code_format", "code ~ '^[a-z][a-z0-9-]{2,63}$'");
+
+                            t.HasCheckConstraint("ck_plans_display_name_length", "length(display_name) >= 1 AND length(display_name) <= 256");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.PlanEntitlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entitlement_key");
+
+                    b.Property<Guid>("PlanVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_version_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_entitlements");
+
+                    b.HasIndex("PlanVersionId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_entitlements_key");
+
+                    b.ToTable("plan_entitlements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_entitlements_entitlement_key_format", "entitlement_key ~ '^[a-z][a-z0-9_.]*$'");
+
+                            t.HasCheckConstraint("ck_plan_entitlements_entitlement_key_length", "length(entitlement_key) >= 1 AND length(entitlement_key) <= 128");
+
+                            t.HasCheckConstraint("ck_plan_entitlements_value_length", "length(value) >= 1 AND length(value) <= 512");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.PlanVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BillingPeriod")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("billing_period");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("currency_code");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("price");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_versions");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_plan_versions_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_plan_versions_updated_by");
+
+                    b.HasIndex("PlanId", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_versions_plan_version");
+
+                    b.ToTable("plan_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_versions_billing_period", "billing_period IN ('Monthly', 'Annual')");
+
+                            t.HasCheckConstraint("ck_plan_versions_currency_code_format", "currency_code ~ '^[a-z]{3}$'");
+
+                            t.HasCheckConstraint("ck_plan_versions_price_non_negative", "price >= 0");
+
+                            t.HasCheckConstraint("ck_plan_versions_status", "status IN ('Draft', 'Active', 'Retired')");
+
+                            t.HasCheckConstraint("ck_plan_versions_version_number_positive", "version_number >= 1");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Infrastructure.Persistence.Master.Audit.PlatformAuditRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -496,6 +672,53 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .HasConstraintName("fk_refresh_tokens_replaced_by_id");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Plans.Plan", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plans_created_by");
+
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plans_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.PlanEntitlement", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Plans.PlanVersion", null)
+                        .WithMany("Entitlements")
+                        .HasForeignKey("PlanVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_entitlements_plan_version_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.PlanVersion", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plan_versions_created_by");
+
+                    b.HasOne("CafeHub.Domain.Plans.Plan", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_versions_plan_id");
+
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plan_versions_updated_by");
+                });
+
             modelBuilder.Entity("CafeHub.Infrastructure.Persistence.Master.Audit.PlatformAuditRecord", b =>
                 {
                     b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
@@ -576,6 +799,16 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_platform_admin_user_roles_platform_admin_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.Plan", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Plans.PlanVersion", b =>
+                {
+                    b.Navigation("Entitlements");
                 });
 #pragma warning restore 612, 618
         }
