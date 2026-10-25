@@ -15,6 +15,7 @@ namespace CafeHub.UnitTests.Plans
         public int FindByIdCallCount { get; private set; }
 
         public int PlanVersionExistsCallCount { get; private set; }
+        public int FindVersionByIdCallCount { get; private set; }
         public bool PlanVersionsExist { get; set; } = true;
 
         public int? TotalCount { get; set; }
@@ -29,6 +30,12 @@ namespace CafeHub.UnitTests.Plans
         {
             PlanVersionExistsCallCount++;
             return Task.FromResult(PlanVersionsExist);
+        }
+
+        public Task<PlanVersion?> FindVersionByIdAsync(Guid planVersionId, CancellationToken cancellationToken)
+        {
+            FindVersionByIdCallCount++;
+            return Task.FromResult(Plans.SelectMany(plan => plan.Versions).FirstOrDefault(version => version.Id == planVersionId));
         }
 
         public void Add(Plan plan)

@@ -370,6 +370,11 @@ namespace CafeHub.UnitTests.Onboarding.Commands
         {
             return false;
         }
+
+        public bool IsIdempotencyKeyViolation(Exception exception)
+        {
+            return exception is ThrowingPostgresException;
+        }
     }
 
     internal sealed class ThrowingPostgresException : Exception
