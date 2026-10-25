@@ -12,7 +12,9 @@ namespace CafeHub.Infrastructure.Audit
         private const int MaxSubjectTypeLength = 64;
         private const int MaxReasonLength = 64;
 
-        private static readonly Regex ActionCodePattern = new("^[a-z0-9]+(\\.[a-z0-9]+)+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ActionCodePattern = new(
+            "^[a-z0-9]+(?:_[a-z0-9]+)*(?:\\.[a-z0-9]+(?:_[a-z0-9]+)*)+$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex ReasonCodePattern = new("^[a-z][a-z0-9_]{0,63}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private readonly ICurrentUser currentUser;
@@ -74,7 +76,7 @@ namespace CafeHub.Infrastructure.Audit
         {
             if (string.IsNullOrWhiteSpace(entry.Action) || entry.Action.Length > MaxActionCodeLength || !ActionCodePattern.IsMatch(entry.Action))
             {
-                throw new ArgumentException($"The audit action must be a lowercase dot-separated code of 1 to {MaxActionCodeLength} characters.", nameof(entry));
+                throw new ArgumentException($"The audit action must be a lowercase dot-separated code whose segments may contain underscores, 1 to {MaxActionCodeLength} characters.", nameof(entry));
             }
 
             var outcomeLabel = entry.Outcome.ToString().ToLowerInvariant();

@@ -231,6 +231,36 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public void Write_AcceptsAWordSeparatorUnderscore_InAnActionSegment()
+        {
+            var (writer, store, _) = CreateWriter();
+            var entry = new PlatformAuditEntry
+            {
+                ActorKind = PlatformAuditActorKind.Admin,
+                Action = "plans.version_created.succeeded",
+                TargetType = "plan",
+                TargetId = Guid.NewGuid(),
+                Outcome = PlatformAuditOutcome.Succeeded,
+            };
+
+            writer.Write(entry);
+
+            Assert.Equal("plans.version_created.succeeded", Assert.Single(store.Records).ActionCode);
+        }
+
+        [Fact]
+        public void Write_RejectsUnderscoresAtTheEdgesOrRepeatedInsideAnActionSegment()
+        {
+            var (writer, store, _) = CreateWriter();
+            var entry = CreateEntry(PlatformAuditActorKind.System);
+
+            Assert.Throws<ArgumentException>(() => writer.Write(WithAction(entry, "plans._created.succeeded")));
+            Assert.Throws<ArgumentException>(() => writer.Write(WithAction(entry, "plans.created_.succeeded")));
+            Assert.Throws<ArgumentException>(() => writer.Write(WithAction(entry, "plans.version__created.succeeded")));
+            Assert.Empty(store.Records);
+        }
+
+        [Fact]
         public void Write_RejectsAnUppercaseAnOversizedOrShortAction()
         {
             var (writer, store, _) = CreateWriter();
