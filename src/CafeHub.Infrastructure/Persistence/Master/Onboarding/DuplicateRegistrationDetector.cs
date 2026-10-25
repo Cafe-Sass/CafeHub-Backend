@@ -17,6 +17,11 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
             return Classify(exception, "uq_onboarding_requests_slug");
         }
 
+        public bool IsIdempotencyKeyViolation(Exception exception)
+        {
+            return Classify(exception, "uq_platform_payment_transactions_key");
+        }
+
         /// <summary>
         /// Matches a database exception against a constraint. Extracted as a static member so it can be tested
         /// without constructing an Npgsql exception (whose provider-populated properties are hard to arrange).

@@ -8,6 +8,8 @@ namespace CafeHub.Application.Onboarding.Contracts
     public interface IOnboardingRequestStore
     {
         Task<OnboardingRequest?> FindPublicByEmailAsync(string emailLower, CancellationToken cancellationToken);
+        Task<OnboardingRequest?> FindByIdAsync(Guid id, CancellationToken cancellationToken);
         Task AddAsync(OnboardingRequest request, CancellationToken cancellationToken);
+        Task UpdateAsync(OnboardingRequest request, CancellationToken cancellationToken);
     }
 }

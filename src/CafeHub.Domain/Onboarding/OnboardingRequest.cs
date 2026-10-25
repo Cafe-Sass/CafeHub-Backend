@@ -153,6 +153,18 @@ namespace CafeHub.Domain.Onboarding
             };
         }
 
+        public void TransitionTo(OnboardingRequestStatus newStatus, DateTimeOffset now)
+        {
+            if (!Enum.IsDefined(newStatus))
+            {
+                throw new ArgumentException("The onboarding request status is not defined.", nameof(newStatus));
+            }
+
+            Status = newStatus;
+            UpdatedAt = now;
+            UpdatedBy = null;
+        }
+
         private static void ValidateCommonInvariants(
             Guid id,
             Guid planVersionId,
