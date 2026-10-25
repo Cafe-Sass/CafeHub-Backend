@@ -43,9 +43,12 @@ namespace CafeHub.UnitTests
 
         public List<Guid> RequestedAdminIds { get; } = new();
 
+        public CancellationToken LastCancellationToken { get; private set; }
+
         public Task<AuthenticatedAdmin?> FindActiveByIdAsync(Guid adminId, CancellationToken cancellationToken)
         {
             RequestedAdminIds.Add(adminId);
+            LastCancellationToken = cancellationToken;
 
             return Task.FromResult(NextAdmin);
         }
