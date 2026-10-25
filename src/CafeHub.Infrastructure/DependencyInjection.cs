@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Plans.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
@@ -8,6 +9,7 @@ using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Identity;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
+using CafeHub.Infrastructure.Persistence.Master.Onboarding;
 using CafeHub.Infrastructure.Persistence.Master.Plans;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Tenancy;
@@ -75,6 +77,9 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IPlatformAuditRecordStore, PlatformAuditRecordStore>();
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
             services.AddScoped<IPlanRepository, PlanRepository>();
+            services.AddScoped<IOnboardingRequestStore, OnboardingRequestStore>();
+            services.AddScoped<ISlugAvailability, SlugAvailability>();
+            services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
 
             return services;
         }
