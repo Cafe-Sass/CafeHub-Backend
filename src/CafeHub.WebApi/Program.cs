@@ -14,6 +14,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSuperAdminSeeding();
 builder.Services.AddCorrelationId();
 builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddPlatformAuthentication();
