@@ -1,4 +1,5 @@
 using CafeHub.Domain.Identity;
+using CafeHub.Domain.Plans;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,9 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<PlatformAdminRoleClaim> PlatformAdminRoleClaims => Set<PlatformAdminRoleClaim>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<PlatformAuditRecord> PlatformAuditRecords => Set<PlatformAuditRecord>();
+        public DbSet<Plan> Plans => Set<Plan>();
+        public DbSet<PlanVersion> PlanVersions => Set<PlanVersion>();
+        public DbSet<PlanEntitlement> PlanEntitlements => Set<PlanEntitlement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -34,6 +34,9 @@ namespace CafeHub.UnitTests
 
             var expectedTables = new[]
             {
+                "plan_entitlements",
+                "plan_versions",
+                "plans",
                 "platform_admin_role_claims",
                 "platform_admin_roles",
                 "platform_admin_user_claims",
