@@ -638,6 +638,130 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("lifecycle_status");
+
+                    b.Property<Guid>("OnboardingRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("onboarding_request_id");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slug");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenants");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("OnboardingRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenants_onboarding_request_id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenants_slug");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("tenants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenants_lifecycle_status", "lifecycle_status IN ('Provisioning', 'Active', 'Suspended', 'Terminated')");
+
+                            t.HasCheckConstraint("ck_tenants_slug_format", "slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'");
+
+                            t.HasCheckConstraint("ck_tenants_slug_lowercase", "slug = lower(slug)");
+
+                            t.HasCheckConstraint("ck_tenants_slug_reserved", "slug NOT IN ('admin','api','t','www','app','static','assets','health','login','signup','support','platform')");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.TenantDatabase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("SecretReference")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("secret_reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_databases");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("SecretReference")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_databases_secret_reference");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_databases_tenant_id");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("tenant_databases", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_databases_secret_reference_format", "secret_reference ~ '^[a-z0-9][a-z0-9-]*$'");
+
+                            t.HasCheckConstraint("ck_tenant_databases_secret_reference_length", "length(secret_reference) >= 1 AND length(secret_reference) <= 128");
+
+                            t.HasCheckConstraint("ck_tenant_databases_status", "status IN ('Pending', 'Provisioned', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Infrastructure.Persistence.Master.Audit.PlatformAuditRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1140,6 +1264,50 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_periods_subscription_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Tenant", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_created_by");
+
+                    b.HasOne("CafeHub.Domain.Onboarding.OnboardingRequest", null)
+                        .WithMany()
+                        .HasForeignKey("OnboardingRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenants_onboarding_request_id");
+
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenants_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.TenantDatabase", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_databases_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_databases_tenant_id");
+
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_databases_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Infrastructure.Persistence.Master.Audit.PlatformAuditRecord", b =>
