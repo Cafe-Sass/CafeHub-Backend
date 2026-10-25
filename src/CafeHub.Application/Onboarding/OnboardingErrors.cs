@@ -27,5 +27,21 @@ namespace CafeHub.Application.Onboarding
         {
             return Error.NotFound(PlanVersionNotFoundCode, PlanVersionNotFoundMessage);
         }
+
+        public const string RequestNotFoundCode = "Onboarding.RequestNotFound";
+        public const string RequestNotFoundMessage = "The onboarding request was not found.";
+
+        public static Error RequestNotFound()
+        {
+            return Error.NotFound(RequestNotFoundCode, RequestNotFoundMessage);
+        }
+
+        public const string RequestNotPayableCode = "Onboarding.RequestNotPayable";
+        public const string RequestNotPayableMessage = "The onboarding request is not payable.";
+
+        public static Error RequestNotPayable()
+        {
+            return Error.Conflict(RequestNotPayableCode, RequestNotPayableMessage);
+        }
     }
 }
