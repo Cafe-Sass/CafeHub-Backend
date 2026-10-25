@@ -86,6 +86,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();
+            services.AddScoped<IPaymentTransactionStore, PaymentTransactionStore>();
 
             services.AddSingleton(sp =>
             {

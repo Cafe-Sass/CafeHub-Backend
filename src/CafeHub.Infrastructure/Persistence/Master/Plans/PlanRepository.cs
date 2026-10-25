@@ -22,6 +22,13 @@ namespace CafeHub.Infrastructure.Persistence.Master.Plans
                 .AnyAsync(version => version.Id == planVersionId, cancellationToken);
         }
 
+        public Task<PlanVersion?> FindVersionByIdAsync(Guid planVersionId, CancellationToken cancellationToken)
+        {
+            return context.PlanVersions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(version => version.Id == planVersionId, cancellationToken);
+        }
+
         public void Add(Plan plan)
         {
             context.Plans.Add(plan);

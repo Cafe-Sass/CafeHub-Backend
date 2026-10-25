@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Commands;
+using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.RateLimiting;
 using MediatR;
@@ -38,6 +39,23 @@ namespace CafeHub.WebApi.Controllers
                 return response.IsDuplicate
                     ? Ok(response)
                     : Created(string.Empty, response);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("{id}/payments")]
+        [AllowAnonymous]
+        public async Task<ActionResult<PaymentOutcomeResponse>> Pay(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            var command = new PayOnboardingRequestCommand(id);
+            var result = await sender.Send(command, cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value!);
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);

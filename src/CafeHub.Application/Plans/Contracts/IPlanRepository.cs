@@ -13,6 +13,8 @@ namespace CafeHub.Application.Plans.Contracts
 
         Task<bool> PlanVersionExistsAsync(Guid planVersionId, CancellationToken cancellationToken);
 
+        Task<PlanVersion?> FindVersionByIdAsync(Guid planVersionId, CancellationToken cancellationToken);
+
         void Add(Plan plan);
 
         Task<Plan?> FindByIdWithVersionsAsync(Guid planId, CancellationToken cancellationToken);

@@ -35,6 +35,21 @@ namespace CafeHub.UnitTests.Onboarding.Application
             return Task.CompletedTask;
         }
 
+        public Task<OnboardingRequest?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(this.requests.FirstOrDefault(request => request.Id == id));
+        }
+
+        public Task UpdateAsync(OnboardingRequest request, CancellationToken cancellationToken)
+        {
+            var index = this.requests.FindIndex(r => r.Id == request.Id);
+            if (index >= 0)
+            {
+                this.requests[index] = request;
+            }
+            return Task.CompletedTask;
+        }
+
         public IReadOnlyList<OnboardingRequest> Requests => this.requests.AsReadOnly();
         public int AddCallCount { get; private set; }
     }
