@@ -405,6 +405,110 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Provisioning.ProvisioningJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_provisioning_jobs");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_provisioning_jobs_tenant_id");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("provisioning_jobs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_provisioning_jobs_status", "status IN ('Pending', 'Running', 'Succeeded', 'Failed')");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Provisioning.ProvisioningJobAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_number");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("text")
+                        .HasColumnName("error_code");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("finished_at");
+
+                    b.Property<Guid>("ProvisioningJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provisioning_job_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_provisioning_job_attempts");
+
+                    b.HasIndex("ProvisioningJobId", "AttemptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_provisioning_job_attempts_attempt");
+
+                    b.ToTable("provisioning_job_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_provisioning_job_attempts_attempt_number_positive", "attempt_number >= 1");
+
+                            t.HasCheckConstraint("ck_provisioning_job_attempts_error_code_length", "error_code IS NULL OR length(error_code) <= 128");
+
+                            t.HasCheckConstraint("ck_provisioning_job_attempts_status", "status IN ('Running', 'Succeeded', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Subscriptions.PlatformPaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1229,6 +1333,38 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_plan_versions_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Provisioning.ProvisioningJob", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_provisioning_jobs_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_provisioning_jobs_tenant_id");
+
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_provisioning_jobs_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Provisioning.ProvisioningJobAttempt", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Provisioning.ProvisioningJob", null)
+                        .WithMany()
+                        .HasForeignKey("ProvisioningJobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_provisioning_job_attempts_provisioning_job_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Subscriptions.PlatformPaymentTransaction", b =>
