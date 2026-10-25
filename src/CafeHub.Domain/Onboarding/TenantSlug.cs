@@ -40,6 +40,13 @@ namespace CafeHub.Domain.Onboarding
                     nameof(value));
             }
 
+            if (value.Contains("--"))
+            {
+                throw new ArgumentException(
+                    "The tenant slug must not contain consecutive hyphens.",
+                    nameof(value));
+            }
+
             if (ReservedWords.Contains(value))
             {
                 throw new ArgumentException(

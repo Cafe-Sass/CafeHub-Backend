@@ -9,19 +9,32 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
 
         public bool IsPublicEmailGuardViolation(Exception exception)
         {
-            return IsUniqueViolation(exception, "uq_onboarding_requests_public_owner_email");
+            return Classify(exception, "uq_onboarding_requests_public_owner_email");
         }
 
         public bool IsSlugTakenViolation(Exception exception)
         {
-            return IsUniqueViolation(exception, "uq_onboarding_requests_slug");
+            return Classify(exception, "uq_onboarding_requests_slug");
         }
 
-        private static bool IsUniqueViolation(Exception exception, string constraintName)
+        /// <summary>
+        /// Matches a database exception against a constraint. Extracted as a static member so it can be tested
+        /// without constructing an Npgsql exception (whose provider-populated properties are hard to arrange).
+        /// </summary>
+        public static bool Matches(string? sqlState, string? constraintName, string expectedConstraintName)
         {
-            return exception is PostgresException postgres
-                && postgres.SqlState == UniqueViolationSqlState
-                && string.Equals(postgres.ConstraintName, constraintName, StringComparison.Ordinal);
+            return sqlState == UniqueViolationSqlState
+                && string.Equals(constraintName, expectedConstraintName, StringComparison.Ordinal);
+        }
+
+        private static bool Classify(Exception exception, string constraintName)
+        {
+            if (exception is not PostgresException postgres)
+            {
+                return false;
+            }
+
+            return Matches(postgres.SqlState, postgres.ConstraintName, constraintName);
         }
     }
 }
