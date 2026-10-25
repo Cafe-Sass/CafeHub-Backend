@@ -110,7 +110,7 @@ namespace CafeHub.UnitTests
             return Task.FromResult<ActionExecutedContext>(new ActionExecutedContext(
                 new ActionContext(new DefaultHttpContext(), new RouteData(), new ActionDescriptor()),
                 new List<IFilterMetadata>(),
-                controller: null));
+                controller: new object()));
         }
     }
 }
