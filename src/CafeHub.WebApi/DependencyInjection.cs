@@ -6,9 +6,11 @@ using CafeHub.WebApi.Authentication;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Correlation;
 using CafeHub.WebApi.Documentation;
+using CafeHub.WebApi.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +30,32 @@ namespace CafeHub.WebApi
             services.AddHttpContextAccessor();
             services.AddSingleton<ICorrelationIdAccessor, HttpContextCorrelationIdAccessor>();
             services.AddSingleton<ICorrelationIdGenerator, GuidCorrelationIdGenerator>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddAuthRateLimiting(this IServiceCollection services, IConfiguration configuration)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            if (configuration is null)
+            {
+                throw new ArgumentNullException(nameof(configuration));
+            }
+
+            var options = AuthRateLimitOptionsBinder.Bind(configuration);
+            services.AddSingleton(options);
+            services.AddRateLimiter(rateLimiterOptions =>
+            {
+                rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                rateLimiterOptions.OnRejected = AuthRateLimitRejectionWriter.WriteAsync;
+                rateLimiterOptions.AddPolicy(
+                    AuthRateLimiting.PolicyName,
+                    httpContext => AuthRateLimitPolicy.CreatePartition(httpContext, options));
+            });
 
             return services;
         }

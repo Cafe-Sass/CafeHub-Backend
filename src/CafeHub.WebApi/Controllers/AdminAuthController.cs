@@ -2,14 +2,17 @@ using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Identity.Commands;
 using CafeHub.Application.Identity.DTOs;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.RateLimiting;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CafeHub.WebApi.Controllers
 {
     [ApiController]
     [Route("api/v1/admin/auth")]
+    [EnableRateLimiting(AuthRateLimiting.PolicyName)]
     public sealed class AdminAuthController : ControllerBase
     {
         private readonly ISender sender;
