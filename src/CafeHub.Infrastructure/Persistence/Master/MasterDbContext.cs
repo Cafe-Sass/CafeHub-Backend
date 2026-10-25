@@ -1,7 +1,9 @@
 using CafeHub.Domain.Identity;
 using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Plans;
+using CafeHub.Domain.Provisioning;
 using CafeHub.Domain.Subscriptions;
+using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +28,8 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<PlatformPaymentTransaction> PlatformPaymentTransactions => Set<PlatformPaymentTransaction>();
         public DbSet<global::CafeHub.Domain.Tenants.Tenant> Tenants => Set<global::CafeHub.Domain.Tenants.Tenant>();
         public DbSet<global::CafeHub.Domain.Tenants.TenantDatabase> TenantDatabases => Set<global::CafeHub.Domain.Tenants.TenantDatabase>();
+        public DbSet<global::CafeHub.Domain.Provisioning.ProvisioningJob> ProvisioningJobs => Set<global::CafeHub.Domain.Provisioning.ProvisioningJob>();
+        public DbSet<global::CafeHub.Domain.Provisioning.ProvisioningJobAttempt> ProvisioningJobAttempts => Set<global::CafeHub.Domain.Provisioning.ProvisioningJobAttempt>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
