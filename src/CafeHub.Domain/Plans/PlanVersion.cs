@@ -1,54 +1,43 @@
+using System.Collections.ObjectModel;
+
 namespace CafeHub.Domain.Plans
 {
     public sealed class PlanVersion
     {
         private const decimal MaximumPrice = 9_999_999_999.99m;
 
-        private PlanVersion(
-            Guid id,
-            Guid planId,
-            int versionNumber,
-            decimal price,
-            string currencyCode,
-            BillingPeriod billingPeriod,
-            PlanVersionStatus status,
-            DateTimeOffset createdAt,
-            Guid? createdBy)
+        private readonly List<PlanEntitlement> entitlements;
+        private readonly ReadOnlyCollection<PlanEntitlement> entitlementsView;
+
+        private PlanVersion()
         {
-            Id = id;
-            PlanId = planId;
-            VersionNumber = versionNumber;
-            Price = price;
-            CurrencyCode = currencyCode;
-            BillingPeriod = billingPeriod;
-            Status = status;
-            CreatedAt = createdAt;
-            UpdatedAt = createdAt;
-            CreatedBy = createdBy;
-            UpdatedBy = createdBy;
+            entitlements = new List<PlanEntitlement>();
+            entitlementsView = entitlements.AsReadOnly();
         }
 
-        public Guid Id { get; }
+        public Guid Id { get; private set; }
 
-        public Guid PlanId { get; }
+        public Guid PlanId { get; private set; }
 
-        public int VersionNumber { get; }
+        public int VersionNumber { get; private set; }
 
-        public decimal Price { get; }
+        public decimal Price { get; private set; }
 
-        public string CurrencyCode { get; } = string.Empty;
+        public string CurrencyCode { get; private set; } = string.Empty;
 
-        public BillingPeriod BillingPeriod { get; }
+        public BillingPeriod BillingPeriod { get; private set; }
 
-        public PlanVersionStatus Status { get; }
+        public PlanVersionStatus Status { get; private set; }
 
-        public DateTimeOffset CreatedAt { get; }
+        public IReadOnlyCollection<PlanEntitlement> Entitlements => entitlementsView;
 
-        public DateTimeOffset UpdatedAt { get; }
+        public DateTimeOffset CreatedAt { get; private set; }
 
-        public Guid? CreatedBy { get; }
+        public DateTimeOffset UpdatedAt { get; private set; }
 
-        public Guid? UpdatedBy { get; }
+        public Guid? CreatedBy { get; private set; }
+
+        public Guid? UpdatedBy { get; private set; }
 
         internal static PlanVersion Create(
             Guid id,
@@ -58,6 +47,7 @@ namespace CafeHub.Domain.Plans
             string currencyCode,
             BillingPeriod billingPeriod,
             PlanVersionStatus status,
+            IEnumerable<PlanEntitlement> entitlements,
             DateTimeOffset createdAt,
             Guid? createdBy)
         {
@@ -98,16 +88,46 @@ namespace CafeHub.Domain.Plans
                 throw new ArgumentException("The plan version status is not defined.", nameof(status));
             }
 
-            return new PlanVersion(
-                id,
-                planId,
-                versionNumber,
-                price,
-                currencyCode,
-                billingPeriod,
-                status,
-                createdAt,
-                createdBy);
+            ArgumentNullException.ThrowIfNull(entitlements);
+
+            var entitlementRows = entitlements.ToArray();
+
+            if (entitlementRows.Any(entitlement => entitlement.PlanVersionId != id))
+            {
+                throw new ArgumentException(
+                    "Every entitlement must belong to the plan version that owns it.",
+                    nameof(entitlements));
+            }
+
+            var hasDuplicateKeys = entitlementRows
+                .GroupBy(entitlement => entitlement.Key, StringComparer.Ordinal)
+                .Any(group => group.Count() > 1);
+
+            if (hasDuplicateKeys)
+            {
+                throw new ArgumentException(
+                    "An entitlement key must appear at most once per plan version.",
+                    nameof(entitlements));
+            }
+
+            var version = new PlanVersion
+            {
+                Id = id,
+                PlanId = planId,
+                VersionNumber = versionNumber,
+                Price = price,
+                CurrencyCode = currencyCode,
+                BillingPeriod = billingPeriod,
+                Status = status,
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt,
+                CreatedBy = createdBy,
+                UpdatedBy = createdBy,
+            };
+
+            version.entitlements.AddRange(entitlementRows);
+
+            return version;
         }
 
         private static bool IsWellFormedPrice(decimal price)

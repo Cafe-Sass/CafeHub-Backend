@@ -75,6 +75,7 @@ namespace CafeHub.Domain.Plans
             string currencyCode,
             BillingPeriod billingPeriod,
             PlanVersionStatus status,
+            IEnumerable<PlanEntitlement> entitlements,
             DateTimeOffset createdAt,
             Guid? createdBy = null)
         {
@@ -88,6 +89,7 @@ namespace CafeHub.Domain.Plans
                 currencyCode,
                 billingPeriod,
                 status,
+                entitlements,
                 createdAt,
                 createdBy);
 
