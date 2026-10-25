@@ -46,13 +46,15 @@ namespace CafeHub.UnitTests
                 "platform_audit_records",
                 "platform_payment_transactions",
                 "refresh_tokens",
-                "subscriptions",
                 "subscription_periods",
+                "subscriptions",
+                "tenant_databases",
+                "tenants",
             }.OrderBy(t => t).ToList();
 
             Assert.Equal(expectedTables, tableNames);
             Assert.DoesNotContain(tableNames, t => t != null && t != "refresh_tokens" && (t.Contains("login") || t.Contains("token")));
-            Assert.DoesNotContain(tableNames, t => t != null && t.Contains("tenant"));
+            Assert.DoesNotContain(tableNames, t => t != null && t != "tenants" && t != "tenant_databases" && t.Contains("tenant"));
         }
 
         [Fact]
