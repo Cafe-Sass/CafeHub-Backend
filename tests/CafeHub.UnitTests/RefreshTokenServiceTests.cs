@@ -149,6 +149,22 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task RevokeFamily_WithTheLogoutReason_RevokesEveryTokenInTheFamily_AndReturnsItsAdministrator()
+        {
+            var adminId = Guid.NewGuid();
+            var (service, store, _, _, _) = CreateService(FirstRawToken, SecondRawToken);
+            await IssueToken(service, adminId);
+            (await service.RotateAsync(FirstRawToken, CancellationToken.None)).AssertSuccess();
+
+            var result = await service.RevokeFamilyAsync(SecondRawToken, RefreshTokenRevocationReasons.Logout, CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(adminId, result.Value);
+            Assert.All(store.Tokens, token => Assert.Equal(RefreshTokenRevocationReasons.Logout, token.RevokedReason));
+            Assert.All(store.Tokens, token => Assert.NotNull(token.RevokedAt));
+        }
+
+        [Fact]
         public async Task RevokeFamily_WithAnUnknownToken_ReturnsTheInvalidRefreshTokenError()
         {
             var (service, _, _, _, _) = CreateService(FirstRawToken);

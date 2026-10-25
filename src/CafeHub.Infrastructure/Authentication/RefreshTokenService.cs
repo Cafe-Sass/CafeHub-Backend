@@ -9,9 +9,8 @@ namespace CafeHub.Infrastructure.Authentication
 {
     internal sealed class RefreshTokenService : IRefreshTokenService
     {
-        public const string InvalidRefreshTokenCode = "Auth.InvalidRefreshToken";
-        public const string InvalidRefreshTokenMessage = "The refresh token is not valid.";
-        public const int MaxRawTokenLength = 512;
+        public const string InvalidRefreshTokenCode = AuthErrors.InvalidRefreshTokenCode;
+        public const string InvalidRefreshTokenMessage = AuthErrors.InvalidRefreshTokenMessage;
 
         private readonly IRefreshTokenStore store;
         private readonly IMasterUnitOfWork unitOfWork;
@@ -143,7 +142,7 @@ namespace CafeHub.Infrastructure.Authentication
             });
         }
 
-        public async Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
+        public async Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
         {
             if (!RefreshTokenRevocationReasons.IsDefined(reason))
             {
@@ -153,7 +152,7 @@ namespace CafeHub.Infrastructure.Authentication
             if (!IsPlausibleRawToken(rawToken))
             {
                 LogRejection("invalid_input");
-                return Result.Failure(InvalidRefreshTokenError());
+                return InvalidRefreshTokenResult<Guid>();
             }
 
             var tokenHash = tokenHasher.Hash(rawToken);
@@ -166,12 +165,12 @@ namespace CafeHub.Infrastructure.Authentication
             {
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
                 LogRejection("unknown_token");
-                return Result.Failure(InvalidRefreshTokenError());
+                return InvalidRefreshTokenResult<Guid>();
             }
 
             await RevokeFamilyAndCommitAsync(token.FamilyId, now, reason, cancellationToken);
 
-            return Result.Success();
+            return Result.Success(token.AdminId);
         }
 
         private async Task RevokeFamilyAndCommitAsync(Guid familyId, DateTimeOffset revokedAt, string reason, CancellationToken cancellationToken)
@@ -187,12 +186,12 @@ namespace CafeHub.Infrastructure.Authentication
 
         private static bool IsPlausibleRawToken(string? rawToken)
         {
-            return !string.IsNullOrWhiteSpace(rawToken) && rawToken.Length <= MaxRawTokenLength;
+            return !string.IsNullOrWhiteSpace(rawToken) && rawToken.Length <= IRefreshTokenService.MaxRawTokenLength;
         }
 
         private static Error InvalidRefreshTokenError()
         {
-            return Error.Unauthorized(InvalidRefreshTokenCode, InvalidRefreshTokenMessage);
+            return AuthErrors.InvalidRefreshToken();
         }
 
         private static Result<T> InvalidRefreshTokenResult<T>()

@@ -65,6 +65,7 @@ namespace CafeHub.Infrastructure
                 .AddEntityFrameworkStores<MasterDbContext>();
             services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, PlatformAdminLookupNormalizer>());
             services.AddScoped<IAdminAuthenticator, AdminAuthenticator>();
+            services.AddScoped<IAdminAccountReader, AdminAccountReader>();
 
             services.AddScoped<IPlatformAuditRecordStore, PlatformAuditRecordStore>();
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
