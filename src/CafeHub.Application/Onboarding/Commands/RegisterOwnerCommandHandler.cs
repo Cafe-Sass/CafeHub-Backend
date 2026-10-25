@@ -68,7 +68,7 @@ namespace CafeHub.Application.Onboarding.Commands
             var existing = await onboardingRequestStore.FindPublicByEmailAsync(emailLower, cancellationToken);
             if (existing is not null)
             {
-                return Result.Success(new OwnerRegistrationResponse(existing.Id, existing.Status));
+                return Result.Success(new OwnerRegistrationResponse(existing.Id, existing.Status, true));
             }
 
             await unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -100,7 +100,7 @@ namespace CafeHub.Application.Onboarding.Commands
 
                 await unitOfWork.CommitTransactionAsync(cancellationToken);
 
-                return Result.Success(new OwnerRegistrationResponse(request.Id, request.Status));
+                return Result.Success(new OwnerRegistrationResponse(request.Id, request.Status, false));
             }
             catch (Exception exception)
             {
@@ -111,7 +111,7 @@ namespace CafeHub.Application.Onboarding.Commands
                     var duplicate = await onboardingRequestStore.FindPublicByEmailAsync(emailLower, CancellationToken.None);
                     if (duplicate is not null)
                     {
-                        return Result.Success(new OwnerRegistrationResponse(duplicate.Id, duplicate.Status));
+                        return Result.Success(new OwnerRegistrationResponse(duplicate.Id, duplicate.Status, true));
                     }
                 }
 

@@ -1,6 +1,6 @@
 using CafeHub.Application.Abstractions.Correlation;
-using CafeHub.Application.Onboarding.Commands;
 using CafeHub.Application.Onboarding;
+using CafeHub.Application.Onboarding.Commands;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.RateLimiting;
 using MediatR;

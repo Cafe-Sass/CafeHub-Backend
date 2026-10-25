@@ -2,13 +2,6 @@ using CafeHub.Application.Abstractions.Results;
 
 namespace CafeHub.Application.Onboarding
 {
-    /// <summary>
-    /// Error codes and messages for the onboarding module, following the <c>&lt;Module&gt;.&lt;Reason&gt;</c>
-    /// convention with module <c>Onboarding</c>. A slug that violates the format or reserved-word rules maps to
-    /// <c>Onboarding.SlugInvalid</c> (Validation, field <c>slug</c>); a slug already in use maps to
-    /// <c>Onboarding.SlugTaken</c> (Conflict). A duplicate public-registration email is not an error: it is the
-    /// <see cref="ExistingRequest"/> outcome.
-    /// </summary>
     public static class OnboardingErrors
     {
         public const string SlugInvalidCode = "Onboarding.SlugInvalid";
@@ -17,14 +10,22 @@ namespace CafeHub.Application.Onboarding
         public const string SlugTakenCode = "Onboarding.SlugTaken";
         public const string SlugTakenMessage = "The slug is already taken.";
 
-        public static ValidationError SlugInvalid()
+        public static Error SlugInvalid()
         {
-            return ValidationError.Create(new[] { new FieldError("slug", SlugInvalidMessage) });
+            return Error.Validation(SlugInvalidCode, SlugInvalidMessage);
         }
 
         public static Error SlugTaken()
         {
             return Error.Conflict(SlugTakenCode, SlugTakenMessage);
+        }
+
+        public const string PlanVersionNotFoundCode = "Onboarding.PlanVersionNotFound";
+        public const string PlanVersionNotFoundMessage = "The plan version was not found.";
+
+        public static Error PlanVersionNotFound()
+        {
+            return Error.NotFound(PlanVersionNotFoundCode, PlanVersionNotFoundMessage);
         }
     }
 }
