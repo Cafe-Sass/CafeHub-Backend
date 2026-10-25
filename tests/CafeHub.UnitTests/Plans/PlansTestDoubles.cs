@@ -14,12 +14,21 @@ namespace CafeHub.UnitTests.Plans
 
         public int FindByIdCallCount { get; private set; }
 
+        public int PlanVersionExistsCallCount { get; private set; }
+        public bool PlanVersionsExist { get; set; } = true;
+
         public int? TotalCount { get; set; }
 
         public Task<bool> KeyExistsAsync(string key, CancellationToken cancellationToken)
         {
             KeyExistsCallCount++;
             return Task.FromResult(Plans.Any(plan => string.Equals(plan.Code, key, StringComparison.Ordinal)));
+        }
+
+        public Task<bool> PlanVersionExistsAsync(Guid planVersionId, CancellationToken cancellationToken)
+        {
+            PlanVersionExistsCallCount++;
+            return Task.FromResult(PlanVersionsExist);
         }
 
         public void Add(Plan plan)

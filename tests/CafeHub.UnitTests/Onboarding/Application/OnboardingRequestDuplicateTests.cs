@@ -7,6 +7,8 @@ namespace CafeHub.UnitTests.Onboarding.Application
     public sealed class FakeOnboardingRequestStore : IOnboardingRequestStore
     {
         private readonly List<OnboardingRequest> requests;
+        public bool SkipFirstFind { get; set; }
+        private int findCallCount;
 
         public FakeOnboardingRequestStore(params OnboardingRequest[] requests)
         {
@@ -15,6 +17,12 @@ namespace CafeHub.UnitTests.Onboarding.Application
 
         public Task<OnboardingRequest?> FindPublicByEmailAsync(string emailLower, CancellationToken cancellationToken)
         {
+            findCallCount++;
+            if (SkipFirstFind && findCallCount == 1)
+            {
+                return Task.FromResult<OnboardingRequest?>(null);
+            }
+
             var found = this.requests.FirstOrDefault(request =>
                 string.Equals(request.OwnerEmail, emailLower, StringComparison.OrdinalIgnoreCase));
             return Task.FromResult(found);
@@ -23,8 +31,12 @@ namespace CafeHub.UnitTests.Onboarding.Application
         public Task AddAsync(OnboardingRequest request, CancellationToken cancellationToken)
         {
             this.requests.Add(request);
+            AddCallCount++;
             return Task.CompletedTask;
         }
+
+        public IReadOnlyList<OnboardingRequest> Requests => this.requests.AsReadOnly();
+        public int AddCallCount { get; private set; }
     }
 
     public sealed class OnboardingRequestDuplicateTests
