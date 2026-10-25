@@ -1,6 +1,7 @@
 using CafeHub.Domain.Identity;
 using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Plans;
+using CafeHub.Domain.Subscriptions;
 using CafeHub.Infrastructure.Persistence.Master.Audit;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,9 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<PlanVersion> PlanVersions => Set<PlanVersion>();
         public DbSet<PlanEntitlement> PlanEntitlements => Set<PlanEntitlement>();
         public DbSet<OnboardingRequest> OnboardingRequests => Set<OnboardingRequest>();
+        public DbSet<Subscription> Subscriptions => Set<Subscription>();
+        public DbSet<SubscriptionPeriod> SubscriptionPeriods => Set<SubscriptionPeriod>();
+        public DbSet<PlatformPaymentTransaction> PlatformPaymentTransactions => Set<PlatformPaymentTransaction>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
