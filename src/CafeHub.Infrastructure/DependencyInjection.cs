@@ -53,8 +53,10 @@ namespace CafeHub.Infrastructure
 
             var identityLockoutOptions = IdentityOptionsBinder.Bind(configuration);
             services.AddSingleton(identityLockoutOptions);
+            services.AddSingleton(_ => PlatformSeedOptionsBinder.Bind(configuration));
             services.Configure<IdentityOptions>(options =>
             {
+                PlatformAdminPasswordPolicy.Apply(options);
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = identityLockoutOptions.MaxFailedAccessAttempts;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(identityLockoutOptions.LockoutMinutes);
@@ -66,6 +68,7 @@ namespace CafeHub.Infrastructure
             services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, PlatformAdminLookupNormalizer>());
             services.AddScoped<IAdminAuthenticator, AdminAuthenticator>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();
+            services.AddScoped<ISuperAdminSeeder, SuperAdminSeeder>();
 
             services.AddScoped<IPlatformAuditRecordStore, PlatformAuditRecordStore>();
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
