@@ -114,6 +114,13 @@ namespace CafeHub.UnitTests
             Assert.Equal(SeedEmail, administrator.Email);
             Assert.True(administrator.IsActive);
             Assert.NotNull(administrator.PasswordHash);
+            var passwordHasher = new PasswordHasher<PlatformAdminUser>();
+            Assert.Equal(
+                PasswordVerificationResult.Success,
+                passwordHasher.VerifyHashedPassword(administrator, administrator.PasswordHash, SeedPassword));
+            Assert.Equal(
+                PasswordVerificationResult.Failed,
+                passwordHasher.VerifyHashedPassword(administrator, administrator.PasswordHash, "Different!Password34"));
             Assert.Equal(FixedNow, administrator.CreatedAt);
             Assert.Equal(FixedNow, administrator.UpdatedAt);
             var role = Assert.Single(context.RoleStore.Roles);
@@ -231,6 +238,32 @@ namespace CafeHub.UnitTests
             var capturedLogText = CapturedLogText(context);
             Assert.DoesNotContain(password, capturedLogText, StringComparison.Ordinal);
             Assert.DoesNotContain(SeedEmail, capturedLogText, StringComparison.Ordinal);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task ABlankSeedPassword_FailsWithTheSafeMessage_AndCreatesNothing(string? password)
+        {
+            var context = CreateContext(new PlatformSeedOptions
+            {
+                SuperAdminEmail = SeedEmail,
+                SuperAdminPassword = password,
+            });
+
+            var result = await context.Seeder.SeedAsync(CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(PlatformSeedErrors.InvalidConfigurationCode, result.Error!.Code);
+            Assert.Equal(PlatformSeedErrors.InvalidConfigurationMessage, result.Error.Message);
+            Assert.DoesNotContain(SeedEmail, result.Error.Message, StringComparison.Ordinal);
+            Assert.Empty(context.UserStore.Users);
+            Assert.Empty(context.RoleStore.Roles);
+            Assert.Empty(context.AuditWriter.Entries);
+            Assert.Equal(0, context.UnitOfWork.BeginCount);
+            Assert.Equal(0, context.UnitOfWork.CommitCount);
+            Assert.DoesNotContain(SeedEmail, CapturedLogText(context), StringComparison.Ordinal);
         }
 
         [Fact]
