@@ -285,7 +285,7 @@ namespace CafeHub.UnitTests
             throw new NotSupportedException();
         }
 
-        public Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
+        public Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
