@@ -40,7 +40,7 @@ namespace CafeHub.Domain.Onboarding
 
         public string TenantSlug { get; private set; } = string.Empty;
 
-        public OnboardingRequestStatus Status { get; private set; }
+        public OnboardingRequestStatus Status { get; internal set; }
 
         public Guid? ReviewedBy { get; private set; }
 
