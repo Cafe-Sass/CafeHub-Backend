@@ -44,7 +44,10 @@ namespace CafeHub.UnitTests
                 "platform_admin_user_roles",
                 "platform_admins",
                 "platform_audit_records",
+                "platform_payment_transactions",
                 "refresh_tokens",
+                "subscriptions",
+                "subscription_periods",
             }.OrderBy(t => t).ToList();
 
             Assert.Equal(expectedTables, tableNames);
