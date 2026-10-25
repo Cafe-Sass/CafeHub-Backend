@@ -4,12 +4,16 @@ using CafeHub.Application.Identity;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
+using CafeHub.Infrastructure.Identity;
 using CafeHub.Infrastructure.Persistence.Master;
+using CafeHub.Infrastructure.Persistence.Master.Identity;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Tenancy;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace CafeHub.Infrastructure
 {
@@ -46,6 +50,21 @@ namespace CafeHub.Infrastructure
             services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
             services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
             services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
+            var identityLockoutOptions = IdentityOptionsBinder.Bind(configuration);
+            services.AddSingleton(identityLockoutOptions);
+            services.Configure<IdentityOptions>(options =>
+            {
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = identityLockoutOptions.MaxFailedAccessAttempts;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(identityLockoutOptions.LockoutMinutes);
+            });
+
+            services.AddIdentityCore<PlatformAdminUser>()
+                .AddRoles<PlatformAdminRole>()
+                .AddEntityFrameworkStores<MasterDbContext>();
+            services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, PlatformAdminLookupNormalizer>());
+            services.AddScoped<IAdminAuthenticator, AdminAuthenticator>();
 
             services.AddScoped<IPlatformAuditRecordStore, PlatformAuditRecordStore>();
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
