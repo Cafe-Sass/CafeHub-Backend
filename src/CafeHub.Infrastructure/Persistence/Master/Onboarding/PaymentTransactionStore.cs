@@ -15,6 +15,13 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
                     && transaction.IdempotencyKey == idempotencyKey, cancellationToken);
         }
 
+        public Task<bool> KeyExistsAsync(string idempotencyKey, CancellationToken cancellationToken)
+        {
+            return context.PlatformPaymentTransactions
+                .AsNoTracking()
+                .AnyAsync(transaction => transaction.IdempotencyKey == idempotencyKey, cancellationToken);
+        }
+
         public Task AddAsync(PlatformPaymentTransaction transaction, CancellationToken cancellationToken)
         {
             context.PlatformPaymentTransactions.Add(transaction);

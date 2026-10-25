@@ -2,6 +2,7 @@ using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Idempotency;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.Application.Plans.Contracts;
@@ -62,6 +63,11 @@ namespace CafeHub.Application.Onboarding.Commands
             if (existingTransaction is not null)
             {
                 return Result.Success(new PaymentOutcomeResponse(command.RequestId, request.Status, existingTransaction.Status));
+            }
+
+            if (await paymentTransactionStore.KeyExistsAsync(command.IdempotencyKey!, cancellationToken))
+            {
+                return Result.Failure<PaymentOutcomeResponse>(IdempotencyErrors.KeyReused());
             }
 
             if (request.Status != OnboardingRequestStatus.AwaitingPayment)
