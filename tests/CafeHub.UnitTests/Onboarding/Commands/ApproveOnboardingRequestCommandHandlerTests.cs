@@ -38,6 +38,11 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 AddCallCount++;
                 return Task.CompletedTask;
             }
+
+            public Task<Tenant?> FindByIdAsync(Guid tenantId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Tenants.FirstOrDefault(t => t.Id == tenantId));
+            }
         }
 
         private sealed class FakeSubscriptionRepository : ISubscriptionRepository
@@ -58,11 +63,39 @@ namespace CafeHub.UnitTests.Onboarding.Commands
         {
             public List<ProvisioningJob> Jobs { get; } = new();
             public int AddCallCount { get; private set; }
+            public int UpdateCallCount { get; private set; }
 
             public Task AddAsync(ProvisioningJob job, CancellationToken cancellationToken)
             {
                 Jobs.Add(job);
                 AddCallCount++;
+                return Task.CompletedTask;
+            }
+
+            public Task<ProvisioningJob?> FindByIdAsync(
+                Guid jobId,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Jobs.FirstOrDefault(j => j.Id == jobId));
+            }
+
+            public Task<ProvisioningJob?> FindByTenantIdAsync(
+                Guid tenantId,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Jobs.FirstOrDefault(j => j.TenantId == tenantId));
+            }
+
+            public Task UpdateAsync(ProvisioningJob job, CancellationToken cancellationToken)
+            {
+                var existing = Jobs.FirstOrDefault(j => j.Id == job.Id);
+                if (existing is not null)
+                {
+                    var index = Jobs.IndexOf(existing);
+                    Jobs[index] = job;
+                }
+
+                UpdateCallCount++;
                 return Task.CompletedTask;
             }
         }

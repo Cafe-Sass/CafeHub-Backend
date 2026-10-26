@@ -136,5 +136,17 @@ namespace CafeHub.Domain.Provisioning
             Status = ProvisioningJobStatus.Pending;
             UpdatedAt = now;
         }
+
+        public void Reschedule(DateTimeOffset now, DateTimeOffset dueAt)
+        {
+            if (Status != ProvisioningJobStatus.Running)
+            {
+                throw new InvalidOperationException("A provisioning job can only be rescheduled from Running state.");
+            }
+
+            Status = ProvisioningJobStatus.Pending;
+            DueAt = dueAt;
+            UpdatedAt = now;
+        }
     }
 }

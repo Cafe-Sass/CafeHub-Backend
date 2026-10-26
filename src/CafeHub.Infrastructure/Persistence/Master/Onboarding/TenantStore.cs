@@ -14,6 +14,15 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
                 .FirstOrDefaultAsync(tenant => tenant.OnboardingRequestId == onboardingRequestId, cancellationToken);
         }
 
+        public async Task<global::CafeHub.Domain.Tenants.Tenant?> FindByIdAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken)
+        {
+            return await context.Tenants
+                .AsNoTracking()
+                .FirstOrDefaultAsync(tenant => tenant.Id == tenantId, cancellationToken);
+        }
+
         public Task AddAsync(
             global::CafeHub.Domain.Tenants.Tenant tenant,
             CancellationToken cancellationToken)
