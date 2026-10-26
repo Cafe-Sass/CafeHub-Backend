@@ -24,7 +24,10 @@ namespace CafeHub.Application
                 configuration.RegisterServicesFromAssembly(applicationAssembly);
                 AddPipelineBehaviors(services, configuration);
             });
-            services.AddValidatorsFromAssembly(applicationAssembly, includeInternalTypes: true);
+            services.AddValidatorsFromAssembly(
+                applicationAssembly,
+                filter: result => result.ValidatorType != typeof(SortRequestValidator),
+                includeInternalTypes: true);
 
             return services;
         }
