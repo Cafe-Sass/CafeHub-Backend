@@ -20,11 +20,18 @@ namespace CafeHub.Domain.Provisioning
 
         public Guid? UpdatedBy { get; private set; }
 
+        public DateTimeOffset? DueAt { get; private set; }
+
+        public DateTimeOffset? LeaseExpiresAt { get; private set; }
+
+        public string? LeasedBy { get; private set; }
+
         public static ProvisioningJob Create(
             Guid id,
             Guid tenantId,
             ProvisioningJobStatus status,
             DateTimeOffset createdAt,
+            DateTimeOffset? dueAt = null,
             Guid? createdBy = null)
         {
             if (id == Guid.Empty)
@@ -49,9 +56,41 @@ namespace CafeHub.Domain.Provisioning
                 Status = status,
                 CreatedAt = createdAt,
                 UpdatedAt = createdAt,
+                DueAt = dueAt,
                 CreatedBy = createdBy,
                 UpdatedBy = createdBy,
             };
+        }
+
+        public void Claim(string workerId, DateTimeOffset now, TimeSpan leaseDuration)
+        {
+            if (string.IsNullOrWhiteSpace(workerId))
+            {
+                throw new ArgumentException("The worker id is required.", nameof(workerId));
+            }
+
+            if (leaseDuration <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(leaseDuration),
+                    "The lease duration must be positive.");
+            }
+
+            if (Status != ProvisioningJobStatus.Pending &&
+                (Status != ProvisioningJobStatus.Running || LeaseExpiresAt is null || LeaseExpiresAt > now))
+            {
+                throw new InvalidOperationException("A provisioning job can only be claimed from Pending state, or from Running state when its lease has expired.");
+            }
+
+            if (DueAt is not null && DueAt > now)
+            {
+                throw new InvalidOperationException("The provisioning job is not due yet.");
+            }
+
+            Status = ProvisioningJobStatus.Running;
+            LeasedBy = workerId;
+            LeaseExpiresAt = now.Add(leaseDuration);
+            UpdatedAt = now;
         }
 
         public void Start(DateTimeOffset now)

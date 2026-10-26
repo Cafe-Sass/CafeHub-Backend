@@ -83,6 +83,76 @@ namespace CafeHub.UnitTests.Provisioning.Domain
         }
 
         [Fact]
+        public void Claim_TransitionsPendingToRunningAndSetsLease()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+            var now = new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero);
+
+            job.Claim("worker-1", now, TimeSpan.FromMinutes(5));
+
+            Assert.Equal(ProvisioningJobStatus.Running, job.Status);
+            Assert.Equal("worker-1", job.LeasedBy);
+            Assert.Equal(new DateTimeOffset(2026, 10, 21, 10, 10, 0, TimeSpan.Zero), job.LeaseExpiresAt);
+            Assert.Equal(now, job.UpdatedAt);
+        }
+
+        [Fact]
+        public void Claim_RejectsNonPendingState()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Running, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<InvalidOperationException>(() => job.Claim("worker-1", new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero), TimeSpan.FromMinutes(5)));
+        }
+
+        [Fact]
+        public void Claim_RejectsNotDueJob()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), dueAt: new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<InvalidOperationException>(() => job.Claim("worker-1", new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero), TimeSpan.FromMinutes(5)));
+        }
+
+        [Fact]
+        public void Claim_RejectsActiveLease()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+            var now = new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero);
+
+            job.Claim("worker-1", now, TimeSpan.FromMinutes(5));
+
+            Assert.Throws<InvalidOperationException>(() => job.Claim("worker-2", now.AddMinutes(1), TimeSpan.FromMinutes(5)));
+        }
+
+        [Fact]
+        public void Claim_AllowsReclaimAfterLeaseExpiry()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+            var now = new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero);
+
+            job.Claim("worker-1", now, TimeSpan.FromMinutes(5));
+            job.Claim("worker-2", now.AddMinutes(10), TimeSpan.FromMinutes(5));
+
+            Assert.Equal("worker-2", job.LeasedBy);
+            Assert.Equal(ProvisioningJobStatus.Running, job.Status);
+        }
+
+        [Fact]
+        public void Claim_RejectsEmptyWorkerId()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<ArgumentException>(() => job.Claim("", new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero), TimeSpan.FromMinutes(5)));
+        }
+
+        [Fact]
+        public void Claim_RejectsNonPositiveLeaseDuration()
+        {
+            var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Pending, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => job.Claim("worker-1", new DateTimeOffset(2026, 10, 21, 10, 5, 0, TimeSpan.Zero), TimeSpan.Zero));
+        }
+
+        [Fact]
         public void Retry_TransitionsFailedToPending()
         {
             var job = ProvisioningJob.Create(JobId, TenantId, ProvisioningJobStatus.Failed, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
