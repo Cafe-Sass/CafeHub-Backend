@@ -15,6 +15,8 @@ using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Master.Identity;
 using CafeHub.Infrastructure.Persistence.Master.Onboarding;
 using CafeHub.Infrastructure.Persistence.Master.Plans;
+using CafeHub.Infrastructure.Persistence.Master.Provisioning;
+using CafeHub.Infrastructure.Persistence.Master.Subscriptions;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Identity;
@@ -83,6 +85,9 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
             services.AddScoped<IPlanRepository, PlanRepository>();
             services.AddScoped<IOnboardingRequestStore, OnboardingRequestStore>();
+            services.AddScoped<ITenantStore, TenantStore>();
+            services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+            services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();
