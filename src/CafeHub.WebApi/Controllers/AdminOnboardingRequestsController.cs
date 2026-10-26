@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Onboarding.Commands;
 using CafeHub.Application.Onboarding.DTOs;
 using CafeHub.Application.Onboarding.Queries;
 using CafeHub.Application.Pagination;
@@ -46,6 +47,22 @@ namespace CafeHub.WebApi.Controllers
             CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetOnboardingRequestQuery(id), cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("{id:guid}/approve")]
+        [Authorize(Policy = PlatformAuthorizationPolicies.SuperAdmin)]
+        public async Task<ActionResult<ApprovalResponse>> Approve(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ApproveOnboardingRequestCommand(id), cancellationToken);
 
             if (result.IsSuccess)
             {
