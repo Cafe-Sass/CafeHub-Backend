@@ -44,6 +44,7 @@ namespace CafeHub.UnitTests.Onboarding.Application
 
         public Task UpdateAsync(OnboardingRequest request, CancellationToken cancellationToken)
         {
+            UpdateCallCount++;
             var index = this.requests.FindIndex(r => r.Id == request.Id);
             if (index >= 0)
             {
@@ -118,6 +119,7 @@ namespace CafeHub.UnitTests.Onboarding.Application
         public IReadOnlyList<OnboardingRequest> Requests => this.requests.AsReadOnly();
         public int AddCallCount { get; private set; }
         public int ListCallCount { get; private set; }
+        public int UpdateCallCount { get; private set; }
     }
 
     public sealed class OnboardingRequestDuplicateTests
