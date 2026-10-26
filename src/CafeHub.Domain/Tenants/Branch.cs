@@ -1,13 +1,7 @@
-using System.Text.RegularExpressions;
-
 namespace CafeHub.Domain.Tenants
 {
     public sealed class Branch
     {
-        private static readonly Regex NamePattern = new(
-            "^[a-z0-9][a-z0-9- ]{1,38}[a-z0-9]$",
-            RegexOptions.CultureInvariant);
-
         private Branch()
         {
         }
@@ -59,13 +53,6 @@ namespace CafeHub.Domain.Tenants
                     nameof(name));
             }
 
-            if (!IsWellFormedName(name))
-            {
-                throw new ArgumentException(
-                    "The branch name must start with a lowercase letter or digit and contain only lowercase letters, digits, spaces, and hyphens, never a leading or trailing hyphen.",
-                    nameof(name));
-            }
-
             if (address is not null && address.Length > 512)
             {
                 throw new ArgumentException(
@@ -100,16 +87,6 @@ namespace CafeHub.Domain.Tenants
                 CreatedBy = createdBy,
                 UpdatedBy = createdBy,
             };
-        }
-
-        private static bool IsWellFormedName(string? name)
-        {
-            if (name is null || !NamePattern.IsMatch(name))
-            {
-                return false;
-            }
-
-            return true;
         }
     }
 }

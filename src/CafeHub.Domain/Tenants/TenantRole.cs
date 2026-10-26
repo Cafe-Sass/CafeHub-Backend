@@ -4,10 +4,6 @@ namespace CafeHub.Domain.Tenants
 {
     public sealed class TenantRole
     {
-        private static readonly Regex NamePattern = new(
-            "^[a-z][a-z0-9_-]{1,63}$",
-            RegexOptions.CultureInvariant);
-
         private TenantRole()
         {
         }
@@ -48,13 +44,6 @@ namespace CafeHub.Domain.Tenants
                     nameof(name));
             }
 
-            if (!IsWellFormedName(name))
-            {
-                throw new ArgumentException(
-                    "The role name must start with a lowercase letter and contain only lowercase letters, digits, underscores, and hyphens.",
-                    nameof(name));
-            }
-
             if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 256)
             {
                 throw new ArgumentException(
@@ -80,16 +69,6 @@ namespace CafeHub.Domain.Tenants
                 CreatedBy = createdBy,
                 UpdatedBy = createdBy,
             };
-        }
-
-        private static bool IsWellFormedName(string? name)
-        {
-            if (name is null || !NamePattern.IsMatch(name))
-            {
-                return false;
-            }
-
-            return true;
         }
     }
 }
