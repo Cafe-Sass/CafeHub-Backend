@@ -45,6 +45,8 @@ namespace CafeHub.Infrastructure
             });
 
             services.AddSingleton(typeof(ISecretReferenceResolver), typeof(ConfigurationSecretReferenceResolver));
+            services.AddScoped<ITenantRegistryReader, TenantRegistryReader>();
+            services.AddScoped<ITenantResolver, TenantResolver>();
             services.AddScoped(typeof(ITenantContextAccessor), typeof(TenantContextAccessor));
             services.AddScoped(serviceProvider => (ITenantContextSetter)serviceProvider.GetRequiredService<ITenantContextAccessor>());
             services.AddScoped(typeof(ITenantConnectionResolver), typeof(TenantConnectionResolver));
