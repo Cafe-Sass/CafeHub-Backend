@@ -16,13 +16,13 @@ namespace CafeHub.Infrastructure.Provisioning
         internal const string CredentialReferenceLabel = "v1";
 
         private readonly TenantDatabaseCreatorOptions _options;
-        private readonly TenantCredentialDeriver _credentialDeriver;
+        private readonly ITenantCredentialDeriver _credentialDeriver;
         private readonly ITenantProvisioningSqlExecutor _executor;
         private readonly ILogger<TenantDatabaseCreator> _logger;
 
         public TenantDatabaseCreator(
             TenantDatabaseCreatorOptions options,
-            TenantCredentialDeriver credentialDeriver,
+            ITenantCredentialDeriver credentialDeriver,
             ITenantProvisioningSqlExecutor executor,
             ILogger<TenantDatabaseCreator> logger)
         {

@@ -49,12 +49,14 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ITenantResolver, TenantResolver>();
             services.AddScoped(typeof(ITenantContextAccessor), typeof(TenantContextAccessor));
             services.AddScoped(serviceProvider => (ITenantContextSetter)serviceProvider.GetRequiredService<ITenantContextAccessor>());
-            services.AddScoped(typeof(ITenantConnectionResolver), typeof(TenantConnectionResolver));
+            services.AddSingleton(_ => TenantDatabaseOptionsBinder.Bind(configuration));
+            services.AddSingleton(serviceProvider =>
+                new Lazy<TenantDatabaseOptions>(() => serviceProvider.GetRequiredService<TenantDatabaseOptions>()));
+            services.AddScoped<ITenantConnectionResolver, RegistryTenantConnectionResolver>();
             services.AddDbContext<TenantDbContext>((serviceProvider, options) =>
             {
-                var tenantContextAccessor = serviceProvider.GetRequiredService<ITenantContextAccessor>();
                 var tenantConnectionResolver = serviceProvider.GetRequiredService<ITenantConnectionResolver>();
-                options.UseNpgsql(tenantConnectionResolver.Resolve(tenantContextAccessor.GetRequired()));
+                options.UseNpgsql(tenantConnectionResolver.Resolve());
             });
             services.AddScoped<IMasterUnitOfWork, MasterUnitOfWork>();
             services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();
@@ -103,7 +105,9 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(_ => ProvisioningWorkerOptionsBinder.Bind(configuration));
             services.AddHostedService<ProvisioningWorker>();
             services.AddSingleton(_ => TenantDatabaseCreatorOptionsBinder.Bind(configuration));
-            services.AddSingleton<TenantCredentialDeriver>();
+            services.AddSingleton(serviceProvider =>
+                new Lazy<TenantDatabaseCreatorOptions>(() => serviceProvider.GetRequiredService<TenantDatabaseCreatorOptions>()));
+            services.AddSingleton<ITenantCredentialDeriver, HmacTenantCredentialDeriver>();
             services.AddSingleton<ITenantProvisioningSqlExecutor>(provider =>
                 new NpgsqlProvisioningSqlExecutor(provider.GetRequiredService<TenantDatabaseCreatorOptions>()));
             services.AddScoped<ITenantDatabaseCreator, TenantDatabaseCreator>();

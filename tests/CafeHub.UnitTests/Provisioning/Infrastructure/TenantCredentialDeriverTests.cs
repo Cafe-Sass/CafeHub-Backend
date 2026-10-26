@@ -13,6 +13,19 @@ namespace CafeHub.UnitTests.Provisioning.Infrastructure
         private readonly TenantCredentialDeriver _deriver = new();
 
         [Fact]
+        public void Derive_MatchesThePreRefactorGoldenValue()
+        {
+            var expected = "TYV8Mje_Z1omFZ5y3sF9NgD7zf3moES-u9gO8ns70G8";
+            var actual = _deriver.Derive(
+                Enumerable.Range(0, 32).Select(value => (byte)value).ToArray(),
+                Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
+
+            Assert.True(
+                string.Equals(expected, actual, StringComparison.Ordinal),
+                "the shared deriver should preserve the provisioning credential format");
+        }
+
+        [Fact]
         public void Derive_IsDeterministic_ForTheSameTenantAndKey()
         {
             Assert.Equal(_deriver.Derive(MasterKey, TenantId), _deriver.Derive(MasterKey, TenantId));

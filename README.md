@@ -40,7 +40,10 @@ User secrets (run from the repository root; `<...>` are placeholders):
 ```bash
 dotnet user-secrets set "ConnectionStrings:Master" "<master-connection-string>" --project src/CafeHub.WebApi
 dotnet user-secrets set "ConnectionStrings:TenantDesignTime" "<tenant-design-time-connection-string>" --project src/CafeHub.WebApi
-dotnet user-secrets set "TenantConnections:<SecretReference>" "<tenant-connection-string>" --project src/CafeHub.WebApi
+dotnet user-secrets set "TenantDatabases:Host" "<postgres-host>" --project src/CafeHub.WebApi
+dotnet user-secrets set "TenantDatabases:Port" "5432" --project src/CafeHub.WebApi
+dotnet user-secrets set "TenantDatabases:SslMode" "Prefer" --project src/CafeHub.WebApi
+dotnet user-secrets set "TenantDatabases:MaxPoolSize" "10" --project src/CafeHub.WebApi
 dotnet user-secrets set "Jwt:Issuer" "<jwt-issuer>" --project src/CafeHub.WebApi
 dotnet user-secrets set "Jwt:Audience" "<jwt-audience>" --project src/CafeHub.WebApi
 dotnet user-secrets set "Jwt:SigningKey" "<jwt-signing-key>" --project src/CafeHub.WebApi
@@ -51,13 +54,16 @@ Equivalent environment variables (`__` is the level separator):
 ```text
 ConnectionStrings__Master
 ConnectionStrings__TenantDesignTime
-TenantConnections__<SecretReference>
+TenantDatabases__Host
+TenantDatabases__Port
+TenantDatabases__SslMode
+TenantDatabases__MaxPoolSize
 Jwt__Issuer
 Jwt__Audience
 Jwt__SigningKey
 ```
 
-One `TenantConnections:<SecretReference>` entry is required per tenant secret reference; the registry stores the reference, never the raw connection string.
+Tenant connection strings are assembled at runtime from the validated tenant registry record and the shared provisioning credential derivation. The `TenantDatabases` values come from User Secrets locally and environment variables in deployed environments. Configure `TenantDatabases:SslMode` as `Require` or stronger in deployed environments; `Prefer` is the local default for development PostgreSQL instances without TLS.
 
 The `Jwt:SigningKey` must be at least 32 bytes when UTF-8 encoded. It comes from User Secrets locally and from an environment variable in deployed environments; it is never written to a tracked file, logged, or returned. Issuer, audience, and lifetime are validated at startup and the host refuses to start when they are missing or weak.
 
