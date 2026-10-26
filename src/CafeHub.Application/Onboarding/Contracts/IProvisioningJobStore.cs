@@ -8,5 +8,11 @@ namespace CafeHub.Application.Onboarding.Contracts
     public interface IProvisioningJobStore
     {
         Task AddAsync(ProvisioningJob job, CancellationToken cancellationToken);
+
+        Task<ProvisioningJob?> FindByIdAsync(Guid jobId, CancellationToken cancellationToken);
+
+        Task<ProvisioningJob?> FindByTenantIdAsync(Guid tenantId, CancellationToken cancellationToken);
+
+        Task UpdateAsync(ProvisioningJob job, CancellationToken cancellationToken);
     }
 }

@@ -8,6 +8,9 @@ namespace CafeHub.Application.Onboarding.Contracts
     public interface ITenantStore
     {
         Task<Tenant?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken);
+
+        Task<Tenant?> FindByIdAsync(Guid tenantId, CancellationToken cancellationToken);
+
         Task AddAsync(Tenant tenant, CancellationToken cancellationToken);
     }
 }
