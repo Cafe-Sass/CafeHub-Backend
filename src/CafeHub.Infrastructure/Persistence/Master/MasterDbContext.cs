@@ -34,7 +34,9 @@ namespace CafeHub.Infrastructure.Persistence.Master
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.ApplyConfigurationsFromAssembly(typeof(MasterDbContext).Assembly);
+            modelBuilder.ApplyConfigurationsFromAssembly(
+                typeof(MasterDbContext).Assembly,
+                type => type.Namespace!.StartsWith("CafeHub.Infrastructure.Persistence.Master"));
         }
     }
 }
