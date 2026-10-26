@@ -1,22 +1,19 @@
+using CafeHub.Application.Provisioning;
 using Microsoft.Extensions.Configuration;
 
 namespace CafeHub.Infrastructure.Provisioning
 {
     public static class ProvisioningRetryOptionsBinder
     {
-        private const int DefaultMaxAttempts = 5;
-        private const int DefaultBaseSeconds = 30;
-        private const int DefaultMaxSeconds = 900;
-
         public static ProvisioningRetryOptions Bind(IConfiguration? configuration)
         {
             var section = configuration?.GetSection(ProvisioningRetryConfigurationKeys.SectionName);
 
             var options = new ProvisioningRetryOptions
             {
-                MaxAttempts = ReadInt32(section, ProvisioningRetryConfigurationKeys.MaxAttemptsKey, DefaultMaxAttempts),
-                BaseSeconds = ReadInt32(section, ProvisioningRetryConfigurationKeys.BaseSecondsKey, DefaultBaseSeconds),
-                MaxSeconds = ReadInt32(section, ProvisioningRetryConfigurationKeys.MaxSecondsKey, DefaultMaxSeconds),
+                MaxAttempts = ReadInt32(section, ProvisioningRetryConfigurationKeys.MaxAttemptsKey, 5),
+                BaseSeconds = ReadInt32(section, ProvisioningRetryConfigurationKeys.BaseSecondsKey, 30),
+                MaxSeconds = ReadInt32(section, ProvisioningRetryConfigurationKeys.MaxSecondsKey, 900),
             };
 
             var problems = options.Validate();

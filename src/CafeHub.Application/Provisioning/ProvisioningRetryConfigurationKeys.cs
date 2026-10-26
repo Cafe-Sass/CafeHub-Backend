@@ -1,4 +1,4 @@
-namespace CafeHub.Infrastructure.Provisioning
+namespace CafeHub.Application.Provisioning
 {
     public static class ProvisioningRetryConfigurationKeys
     {

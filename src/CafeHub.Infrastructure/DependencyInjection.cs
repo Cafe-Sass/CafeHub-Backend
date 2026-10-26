@@ -5,6 +5,7 @@ using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.Application.Plans.Contracts;
+using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
@@ -91,7 +92,9 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
             services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();
             services.AddScoped<IProvisioningJobClaimer, ProvisioningJobClaimer>();
-            services.AddScoped<IProvisioningJobRunner, NotSupportedProvisioningJobRunner>();
+            services.AddScoped<IProvisioningJobAttemptStore, ProvisioningJobAttemptStore>();
+            services.AddScoped<ITenantDatabaseStore, TenantDatabaseStore>();
+            services.AddScoped<IProvisioningJobRunner, ProvisioningOrchestrator>();
             services.AddSingleton(_ => ProvisioningWorkerOptionsBinder.Bind(configuration));
             services.AddHostedService<ProvisioningWorker>();
             services.AddSingleton(_ => TenantDatabaseCreatorOptionsBinder.Bind(configuration));
@@ -103,6 +106,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ITenantSchemaInitializer, TenantSchemaInitializer>();
             services.AddSingleton<ITenantMigrationApplicator, NpgsqlTenantMigrationApplicator>();
             services.AddScoped<ITenantSeeder, TenantSeeder>();
+            services.AddSingleton(_ => ProvisioningRetryOptionsBinder.Bind(configuration));
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();
