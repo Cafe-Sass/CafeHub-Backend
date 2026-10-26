@@ -186,11 +186,11 @@ namespace CafeHub.Domain.Onboarding
                 throw new ArgumentException("The reviewing administrator is required.", nameof(reviewedBy));
             }
 
-            if (rejectionReason is not null && rejectionReason.Length > 1024)
+            if (rejectionReason is not null && rejectionReason.Length > 500)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(rejectionReason),
-                    "The rejection reason must not exceed 1024 characters.");
+                    "The rejection reason must not exceed 500 characters.");
             }
 
             Status = OnboardingRequestStatus.Rejected;

@@ -54,6 +54,14 @@ namespace CafeHub.Application.Onboarding
             return Error.Conflict(RequestNotApprovableCode, RequestNotApprovableMessage);
         }
 
+        public const string RequestNotRejectableCode = "Onboarding.RequestNotRejectable";
+        public const string RequestNotRejectableMessage = "The onboarding request is not rejectable.";
+
+        public static Error RequestNotRejectable()
+        {
+            return Error.Conflict(RequestNotRejectableCode, RequestNotRejectableMessage);
+        }
+
         public const string RequestNotPayableCode = "Onboarding.RequestNotPayable";
         public const string RequestNotPayableMessage = "The onboarding request is not payable.";
 
