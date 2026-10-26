@@ -15,6 +15,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "branches",
             "cafe_settings",
             "tenant_audit_records",
+            "refresh_tokens",
         ];
 
         [Fact]
@@ -42,12 +43,12 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "branches" => nameof(Branch),
                     "cafe_settings" => nameof(CafeSettings),
                     "tenant_audit_records" => nameof(TenantAuditRecord),
+                    "refresh_tokens" => nameof(TenantRefreshToken),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
                 .ToList();
 
-            Assert.Equal(expectedEntityNames.Count, entityNames.Count);
             Assert.Equal(expectedEntityNames, entityNames);
         }
 

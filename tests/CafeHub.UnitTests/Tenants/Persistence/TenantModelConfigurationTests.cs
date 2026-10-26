@@ -30,6 +30,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "branches",
             "cafe_settings",
             "tenant_audit_records",
+            "refresh_tokens",
         ];
 
         [Fact]
@@ -49,7 +50,6 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.DoesNotContain(tableNames, t => t.StartsWith("subscription_"));
             Assert.DoesNotContain(tableNames, t => t.StartsWith("plan_"));
             Assert.DoesNotContain(tableNames, t => t.StartsWith("provisioning_"));
-            Assert.DoesNotContain(tableNames, t => t.StartsWith("refresh_"));
         }
 
         [Fact]
