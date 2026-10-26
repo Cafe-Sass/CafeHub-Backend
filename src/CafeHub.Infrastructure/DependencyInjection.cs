@@ -93,6 +93,8 @@ namespace CafeHub.Infrastructure
                 .AddUserStore<TenantUserStore>()
                 .AddRoleStore<TenantRoleStore>();
             services.AddScoped<ITenantUserAuthenticator, TenantUserAuthenticator>();
+            services.AddSingleton(serviceProvider => TenantJwtOptionsBinder.Bind(configuration, serviceProvider.GetRequiredService<JwtOptions>().Audience));
+            services.AddSingleton<ITenantAccessTokenIssuer, TenantJwtAccessTokenIssuer>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();
             services.AddScoped<ISuperAdminSeeder, SuperAdminSeeder>();
 
