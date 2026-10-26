@@ -36,6 +36,16 @@ namespace CafeHub.Application.Onboarding
             return Error.NotFound(RequestNotFoundCode, RequestNotFoundMessage);
         }
 
+        public const string RequestStateInvalidCode = "Onboarding.RequestStateInvalid";
+        public const string RequestStateInvalidMessage = "The onboarding request state is not valid.";
+
+        public static Error RequestStateInvalid(string requestedState)
+        {
+            return Error.Validation(
+                RequestStateInvalidCode,
+                $"The state '{requestedState}' is not a valid onboarding request state.");
+        }
+
         public const string RequestNotPayableCode = "Onboarding.RequestNotPayable";
         public const string RequestNotPayableMessage = "The onboarding request is not payable.";
 

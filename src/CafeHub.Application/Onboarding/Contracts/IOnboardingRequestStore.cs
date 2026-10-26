@@ -1,3 +1,4 @@
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Onboarding;
 
 namespace CafeHub.Application.Onboarding.Contracts
@@ -11,5 +12,6 @@ namespace CafeHub.Application.Onboarding.Contracts
         Task<OnboardingRequest?> FindByIdAsync(Guid id, CancellationToken cancellationToken);
         Task AddAsync(OnboardingRequest request, CancellationToken cancellationToken);
         Task UpdateAsync(OnboardingRequest request, CancellationToken cancellationToken);
+        Task<OnboardingRequestListPage> ListForReviewAsync(OnboardingRequestListRequest request, CancellationToken cancellationToken);
     }
 }
