@@ -4,6 +4,8 @@ namespace CafeHub.Domain.Onboarding
 {
     public sealed class TenantSlug
     {
+        public const int MaxLength = 40;
+
         private static readonly Regex Pattern = new(
             "^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$",
             RegexOptions.CultureInvariant);
