@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 namespace CafeHub.WebApi
 {
@@ -141,9 +142,12 @@ namespace CafeHub.WebApi
             }
 
             services.AddSingleton<OpenApiExposurePolicy>();
+            var bearerSecurityTransformer = new BearerSecurityTransformer();
             services.AddOpenApi(options =>
             {
                 options.AddDocumentTransformer(new ProblemDetailsDocumentTransformer());
+                options.AddDocumentTransformer(bearerSecurityTransformer);
+                options.AddOperationTransformer(bearerSecurityTransformer);
             });
 
             return services;
@@ -160,6 +164,9 @@ namespace CafeHub.WebApi
             if (exposurePolicy.IsExposed())
             {
                 endpointRouteBuilder.MapOpenApi();
+                endpointRouteBuilder.MapSwaggerUI(
+                    "swagger",
+                    options => options.SwaggerEndpoint("/openapi/v1.json", "CafeHub API v1"));
             }
         }
     }
