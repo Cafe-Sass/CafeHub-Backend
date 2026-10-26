@@ -22,6 +22,14 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
                 .AnyAsync(transaction => transaction.IdempotencyKey == idempotencyKey, cancellationToken);
         }
 
+        public Task<PlatformPaymentTransaction?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken)
+        {
+            return context.PlatformPaymentTransactions
+                .AsNoTracking()
+                .OrderByDescending(transaction => transaction.CreatedAt)
+                .FirstOrDefaultAsync(transaction => transaction.OnboardingRequestId == onboardingRequestId, cancellationToken);
+        }
+
         public Task AddAsync(PlatformPaymentTransaction transaction, CancellationToken cancellationToken)
         {
             context.PlatformPaymentTransactions.Add(transaction);
