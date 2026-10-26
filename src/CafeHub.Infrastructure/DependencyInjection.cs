@@ -1,9 +1,9 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Contracts;
-using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.Application.Plans.Contracts;
 using CafeHub.Application.Provisioning;
