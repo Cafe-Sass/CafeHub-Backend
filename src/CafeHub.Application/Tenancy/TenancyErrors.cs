@@ -7,9 +7,11 @@ namespace CafeHub.Application.Tenancy
         public const string TenantUnavailableCode = "Tenant.Unavailable";
         public const string TenantUnavailableMessage = "The requested tenant is not available.";
 
+        private static readonly Error Unavailable = Error.NotFound(TenantUnavailableCode, TenantUnavailableMessage);
+
         public static Error TenantUnavailable()
         {
-            return Error.NotFound(TenantUnavailableCode, TenantUnavailableMessage);
+            return Unavailable;
         }
     }
 }
