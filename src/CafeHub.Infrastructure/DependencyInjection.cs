@@ -94,6 +94,11 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IProvisioningJobRunner, NotSupportedProvisioningJobRunner>();
             services.AddSingleton(_ => ProvisioningWorkerOptionsBinder.Bind(configuration));
             services.AddHostedService<ProvisioningWorker>();
+            services.AddSingleton(_ => TenantDatabaseCreatorOptionsBinder.Bind(configuration));
+            services.AddSingleton<TenantCredentialDeriver>();
+            services.AddSingleton<ITenantProvisioningSqlExecutor>(provider =>
+                new NpgsqlProvisioningSqlExecutor(provider.GetRequiredService<TenantDatabaseCreatorOptions>()));
+            services.AddScoped<ITenantDatabaseCreator, TenantDatabaseCreator>();
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();
