@@ -10,7 +10,8 @@ namespace CafeHub.Infrastructure.Tenancy
         ITenantRegistryReader tenantRegistryReader,
         Lazy<TenantDatabaseOptions> databaseOptions,
         Lazy<TenantDatabaseCreatorOptions> creatorOptions,
-        ITenantCredentialDeriver credentialDeriver) : ITenantConnectionResolver
+        ITenantCredentialDeriver credentialDeriver,
+        ITenantStateGuard tenantStateGuard) : ITenantConnectionResolver
     {
         public string Resolve()
         {
@@ -28,6 +29,15 @@ namespace CafeHub.Infrastructure.Tenancy
             if (tenant is null
                 || string.IsNullOrWhiteSpace(tenant.SecretReference)
                 || !TenantDatabaseNaming.IsValidTenantSlug(tenant.Slug))
+            {
+                throw new InvalidTenantContextException("The tenant context does not resolve to a usable tenant registration.");
+            }
+
+            if (tenantStateGuard.EnsureUsable(new ResolvedTenant(
+                tenant.TenantId,
+                tenant.Slug,
+                tenant.State,
+                tenant.SecretReference)).IsFailure)
             {
                 throw new InvalidTenantContextException("The tenant context does not resolve to a usable tenant registration.");
             }

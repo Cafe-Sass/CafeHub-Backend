@@ -128,7 +128,8 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
                 registry,
                 new Lazy<TenantDatabaseOptions>(() => options),
                 new Lazy<TenantDatabaseCreatorOptions>(() => creatorOptions),
-                new HmacTenantCredentialDeriver());
+                new HmacTenantCredentialDeriver(),
+                new TenantStateGuard());
         }
 
         private static TenantDatabaseOptions CreateOptions()
