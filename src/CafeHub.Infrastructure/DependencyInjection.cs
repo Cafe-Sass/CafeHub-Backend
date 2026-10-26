@@ -103,7 +103,7 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(_ => ProvisioningWorkerOptionsBinder.Bind(configuration));
             services.AddHostedService<ProvisioningWorker>();
             services.AddSingleton(_ => TenantDatabaseCreatorOptionsBinder.Bind(configuration));
-            services.AddSingleton<TenantCredentialDeriver>();
+            services.AddSingleton<ITenantCredentialDeriver, HmacTenantCredentialDeriver>();
             services.AddSingleton<ITenantProvisioningSqlExecutor>(provider =>
                 new NpgsqlProvisioningSqlExecutor(provider.GetRequiredService<TenantDatabaseCreatorOptions>()));
             services.AddScoped<ITenantDatabaseCreator, TenantDatabaseCreator>();
