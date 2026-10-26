@@ -5,6 +5,7 @@ using CafeHub.Application.Identity;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
+using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Provisioning;
 using CafeHub.Domain.Tenants;
 
@@ -82,6 +83,9 @@ namespace CafeHub.Application.Provisioning
                 return;
             }
 
+            var request = await onboardingRequestStore.FindByIdAsync(
+                tenant.OnboardingRequestId, cancellationToken);
+
             if (tenant.LifecycleStatus == TenantLifecycleStatus.Active)
             {
                 await CompleteJobAsync(job, now, cancellationToken);
@@ -90,13 +94,7 @@ namespace CafeHub.Application.Provisioning
 
             var attemptCount = (await attemptStore.FindByJobIdAsync(job.Id, cancellationToken)).Count;
 
-            var currentStepIndex = await ResumeStepIndexAsync(job, tenant, cancellationToken);
-            if (currentStepIndex < 0)
-            {
-                return;
-            }
-
-            for (var index = currentStepIndex; index < Steps.Count; index++)
+            for (var index = 0; index < Steps.Count; index++)
             {
                 if (!leaseStillValid(job, now))
                 {
@@ -117,13 +115,12 @@ namespace CafeHub.Application.Provisioning
 
                 await attemptStore.AddAsync(attempt, cancellationToken);
 
-                var stepResult = await RunStepAsync(index, tenant, cancellationToken);
+                var stepResult = await RunStepAsync(index, tenant, request, cancellationToken);
 
                 var finishedAt = timeProvider.GetUtcNow();
                 if (stepResult.IsSuccess)
                 {
                     attempt.Complete(finishedAt);
-                    await attemptStore.AddAsync(attempt, cancellationToken);
                     attemptCount++;
 
                     if (index == Steps.Count - 1)
@@ -135,8 +132,8 @@ namespace CafeHub.Application.Provisioning
                 }
                 else
                 {
-                    attempt.Complete(finishedAt, SanitizeError(stepResult.Error!.Message));
-                    await attemptStore.AddAsync(attempt, cancellationToken);
+                    attempt.Fail(finishedAt, SanitizeError(stepResult.Error!.Message));
+                    attemptCount++;
 
                     var nextAttempt = stepNow.AddSeconds(BackoffSeconds(attemptCount));
                     await FailOrRescheduleJobAsync(job, attemptCount, nextAttempt, cancellationToken);
@@ -146,31 +143,12 @@ namespace CafeHub.Application.Provisioning
             }
         }
 
-        private async Task<int> ResumeStepIndexAsync(
-            ProvisioningJob job,
-            Tenant tenant,
-            CancellationToken cancellationToken)
-        {
-            var database = await tenantDatabaseStore.FindByTenantIdAsync(tenant.Id, cancellationToken);
-            if (database is null || database.Status != TenantDatabaseStatus.Provisioned)
-            {
-                return 0;
-            }
-
-            if (tenant.LifecycleStatus == TenantLifecycleStatus.Active)
-            {
-                return -1;
-            }
-
-            return 2;
-        }
-
-        private async Task<Result> RunStepAsync(int index, Tenant tenant, CancellationToken cancellationToken)
+        private async Task<Result> RunStepAsync(int index, Tenant tenant, OnboardingRequest? request, CancellationToken cancellationToken)
         {
             return index switch
             {
                 0 => await EnsureDatabaseAsync(tenant),
-                1 => await InitializeSchemaAsync(tenant),
+                1 => await InitializeSchemaAsync(tenant, request),
                 _ => await MarkReadyStepResultAsync(),
             };
         }
@@ -183,18 +161,23 @@ namespace CafeHub.Application.Provisioning
             return result.IsSuccess ? Result.Success() : Result.Failure(result.Error!);
         }
 
-        private Task<Result> InitializeSchemaAsync(Tenant tenant)
+        private async Task<Result> InitializeSchemaAsync(Tenant tenant, OnboardingRequest? request)
         {
-            return schemaInitializer.InitializeAsync(
+            if (request is null)
+            {
+                return Result.Failure(ProvisioningErrors.InvalidTenantId());
+            }
+
+            return await schemaInitializer.InitializeAsync(
                 new TenantInitializationRequest(
                     tenant.Id,
                     tenant.Slug,
-                    string.Empty,
-                    string.Empty,
-                    null,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty),
+                    request.OwnerEmail,
+                    request.OwnerFullName,
+                    request.OwnerPhoneNumber,
+                    request.OwnerPasswordHash ?? string.Empty,
+                    request.CafeName,
+                    request.PlanVersionId.ToString()),
                 CancellationToken.None);
         }
 
