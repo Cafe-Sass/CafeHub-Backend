@@ -18,5 +18,16 @@ namespace CafeHub.UnitTests.Onboarding.Controllers
             Assert.True(postMethod.IsDefined(typeof(AllowAnonymousAttribute), inherit: false));
             Assert.True(typeof(OnboardingRequestsController).IsDefined(typeof(EnableRateLimitingAttribute), inherit: false));
         }
+
+        [Fact]
+        public void GetStatus_IsAnonymous_AndCarriesRateLimitAttribute()
+        {
+            var getStatusMethod = typeof(OnboardingRequestsController)
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .First(m => m.Name == "GetStatus");
+
+            Assert.True(getStatusMethod.IsDefined(typeof(AllowAnonymousAttribute), inherit: false));
+            Assert.True(getStatusMethod.IsDefined(typeof(EnableRateLimitingAttribute), inherit: false));
+        }
     }
 }
