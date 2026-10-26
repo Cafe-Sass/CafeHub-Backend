@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Onboarding.PaymentGateway;
@@ -11,6 +12,7 @@ using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Identity;
+using CafeHub.Infrastructure.Notifications;
 using CafeHub.Infrastructure.Onboarding;
 using CafeHub.Infrastructure.Onboarding.Payments;
 using CafeHub.Infrastructure.Persistence.Master;
@@ -107,6 +109,8 @@ namespace CafeHub.Infrastructure
             services.AddSingleton<ITenantMigrationApplicator, NpgsqlTenantMigrationApplicator>();
             services.AddScoped<ITenantSeeder, TenantSeeder>();
             services.AddSingleton(_ => ProvisioningRetryOptionsBinder.Bind(configuration));
+            services.AddSingleton(_ => NotificationOptionsBinder.Bind(configuration));
+            services.AddSingleton<INotificationSender, LoggingNotificationSender>();
             services.AddScoped<ISlugAvailability, SlugAvailability>();
             services.AddSingleton<IDuplicateRegistrationDetector, DuplicateRegistrationDetector>();
             services.AddSingleton<IOwnerPasswordHasher, OwnerPasswordHasher>();

@@ -2,12 +2,14 @@ using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Provisioning;
 using CafeHub.Domain.Tenants;
+using Microsoft.Extensions.Logging;
 
 namespace CafeHub.UnitTests.Provisioning.Application
 {
@@ -220,6 +222,49 @@ namespace CafeHub.UnitTests.Provisioning.Application
             public IReadOnlyCollection<string> Roles { get; set; } = new[] { "SuperAdmin" };
         }
 
+        private sealed class CapturingLogger : ILogger<ProvisioningOrchestrator>
+        {
+            public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+            {
+                return null;
+            }
+
+            public bool IsEnabled(LogLevel logLevel)
+            {
+                return true;
+            }
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                Entries.Add((logLevel, formatter(state, exception)));
+            }
+        }
+
+        internal sealed class FakeNotificationSender : INotificationSender
+        {
+            public List<NotificationMessage> Messages { get; } = [];
+            public Result? NextResult { get; set; }
+            public Exception? NextException { get; set; }
+
+            public Task<Result> SendAsync(NotificationMessage message, CancellationToken cancellationToken)
+            {
+                if (NextException is not null)
+                {
+                    throw NextException;
+                }
+
+                Messages.Add(message);
+                return Task.FromResult(NextResult ?? Result.Success());
+            }
+        }
+
         private sealed class FixedTimeProvider : TimeProvider
         {
             private DateTimeOffset _now;
@@ -238,6 +283,8 @@ namespace CafeHub.UnitTests.Provisioning.Application
         private readonly FakeUnitOfWork _unitOfWork = new();
         private readonly FakeAuditWriter _auditWriter = new();
         private readonly FakeCurrentUser _currentUser = new();
+        private readonly FakeNotificationSender _notificationSender = new();
+        private readonly CapturingLogger _logger = new();
         private readonly FixedTimeProvider _timeProvider = new(FixedNow);
         private ProvisioningRetryOptions _retryOptions = new();
 
@@ -252,9 +299,11 @@ namespace CafeHub.UnitTests.Provisioning.Application
                 _schemaInitializer,
                 _unitOfWork,
                 _auditWriter,
+                _notificationSender,
                 _currentUser,
                 _timeProvider,
-                _retryOptions);
+                _retryOptions,
+                _logger);
 
         private static Tenant CreateTenant(TenantLifecycleStatus status = TenantLifecycleStatus.Provisioning)
         {
@@ -448,6 +497,105 @@ namespace CafeHub.UnitTests.Provisioning.Application
             var problems = options.Validate();
 
             Assert.Empty(problems);
+        }
+
+        [Fact]
+        public async Task FirstTransitionToReady_RequestsExactlyOneReadinessNotification()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            var message = Assert.Single(_notificationSender.Messages);
+            Assert.Equal(NotificationKind.TenantReady, message.Kind);
+            Assert.Equal(TenantId, message.TenantId);
+            Assert.Equal("owner@example.com", message.RecipientEmail);
+            Assert.Equal(NotificationTemplateKeys.TenantReady, message.TemplateKey);
+        }
+
+        [Fact]
+        public async Task ReadinessMessage_ValuesContainOnlyCafeNameAndSlug()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            var message = Assert.Single(_notificationSender.Messages);
+            Assert.Equal(new[] { "cafeName", "tenantSlug" }, message.Values.Keys.OrderBy(k => k, StringComparer.Ordinal));
+            Assert.Equal("Cafe Name", message.Values["cafeName"]);
+            Assert.Equal("my-cafe", message.Values["tenantSlug"]);
+        }
+
+        [Fact]
+        public async Task AlreadyActiveTenant_RepeatedFinalStep_RequestsNoNotification()
+        {
+            _tenantStore.Tenant = CreateTenant(TenantLifecycleStatus.Active);
+            _jobStore.Job = CreateJobWithLease();
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Empty(_notificationSender.Messages);
+        }
+
+        [Fact]
+        public async Task NotificationFailure_KeepsReadyStateAndJobOutcome()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            _notificationSender.NextResult = Result.Failure(
+                Error.Failure("Notifications.DeliveryFailed", "The notification could not be delivered."));
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
+            Assert.Equal(ProvisioningJobAttemptStatus.Succeeded, _attemptStore.Attempts[0].Status);
+        }
+
+        [Fact]
+        public async Task NotificationException_KeepsReadyStateAndJobOutcome()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            _notificationSender.NextException = new InvalidOperationException("delivery failed");
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
+        }
+
+        [Fact]
+        public async Task NotificationFailure_LogsSanitizedEntryWithoutRecipientOrValues()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            _notificationSender.NextResult = Result.Failure(
+                Error.Failure("Notifications.DeliveryFailed", "The notification could not be delivered."));
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Contains(_logger.Entries, entry =>
+                entry.Level == LogLevel.Warning
+                && entry.Message.Contains(TenantId.ToString(), StringComparison.Ordinal)
+                && entry.Message.Contains("Notifications.DeliveryFailed", StringComparison.Ordinal)
+                && !entry.Message.Contains("owner@example.com", StringComparison.Ordinal)
+                && !entry.Message.Contains("Cafe Name", StringComparison.Ordinal)
+                && !entry.Message.Contains("my-cafe", StringComparison.Ordinal));
         }
     }
 }

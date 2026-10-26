@@ -2,12 +2,14 @@ using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding.Contracts;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Provisioning;
 using CafeHub.Domain.Tenants;
+using Microsoft.Extensions.Logging;
 
 namespace CafeHub.Application.Provisioning
 {
@@ -33,9 +35,11 @@ namespace CafeHub.Application.Provisioning
         private readonly ITenantSchemaInitializer schemaInitializer;
         private readonly IMasterUnitOfWork unitOfWork;
         private readonly IPlatformAuditWriter auditWriter;
+        private readonly INotificationSender notificationSender;
         private readonly ICurrentUser currentUser;
         private readonly TimeProvider timeProvider;
         private readonly ProvisioningRetryOptions retryOptions;
+        private readonly ILogger<ProvisioningOrchestrator> logger;
 
         public ProvisioningOrchestrator(
             IProvisioningJobStore jobStore,
@@ -47,9 +51,11 @@ namespace CafeHub.Application.Provisioning
             ITenantSchemaInitializer schemaInitializer,
             IMasterUnitOfWork unitOfWork,
             IPlatformAuditWriter auditWriter,
+            INotificationSender notificationSender,
             ICurrentUser currentUser,
             TimeProvider timeProvider,
-            ProvisioningRetryOptions retryOptions)
+            ProvisioningRetryOptions retryOptions,
+            ILogger<ProvisioningOrchestrator> logger)
         {
             this.jobStore = jobStore;
             this.attemptStore = attemptStore;
@@ -60,9 +66,11 @@ namespace CafeHub.Application.Provisioning
             this.schemaInitializer = schemaInitializer;
             this.unitOfWork = unitOfWork;
             this.auditWriter = auditWriter;
+            this.notificationSender = notificationSender;
             this.currentUser = currentUser;
             this.timeProvider = timeProvider;
             this.retryOptions = retryOptions;
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task RunAsync(ClaimedProvisioningJob claimedJob, CancellationToken cancellationToken)
@@ -126,7 +134,7 @@ namespace CafeHub.Application.Provisioning
                     if (index == Steps.Count - 1)
                     {
                         await CompleteJobAsync(job, finishedAt, cancellationToken);
-                        await MarkTenantReadyAsync(tenant, finishedAt, cancellationToken);
+                        await MarkTenantReadyAsync(tenant, request, finishedAt, cancellationToken);
                         return;
                     }
                 }
@@ -192,8 +200,14 @@ namespace CafeHub.Application.Provisioning
             await jobStore.UpdateAsync(job, cancellationToken);
         }
 
-        private async Task MarkTenantReadyAsync(Tenant tenant, DateTimeOffset now, CancellationToken cancellationToken)
+        private async Task MarkTenantReadyAsync(
+            Tenant tenant,
+            OnboardingRequest? request,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
         {
+            var firstTransition = tenant.LifecycleStatus != TenantLifecycleStatus.Active;
+
             await unitOfWork.BeginTransactionAsync(cancellationToken);
             try
             {
@@ -213,6 +227,44 @@ namespace CafeHub.Application.Provisioning
             {
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
                 throw;
+            }
+
+            if (firstTransition)
+            {
+                await RequestReadinessNotificationAsync(tenant, request, cancellationToken);
+            }
+        }
+
+        private async Task RequestReadinessNotificationAsync(
+            Tenant tenant,
+            OnboardingRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                return;
+            }
+
+            var message = NotificationMessage.TenantReady(
+                tenant.Id,
+                request.OwnerEmail,
+                request.CafeName,
+                tenant.Slug);
+
+            try
+            {
+                var result = await notificationSender.SendAsync(message, cancellationToken);
+                if (result.IsFailure)
+                {
+                    logger.LogWarning(
+                        "The readiness notification for tenant {TenantId} failed with code {ErrorCode}.",
+                        tenant.Id,
+                        result.Error!.Code);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "The readiness notification for tenant {TenantId} failed.", tenant.Id);
             }
         }
 
