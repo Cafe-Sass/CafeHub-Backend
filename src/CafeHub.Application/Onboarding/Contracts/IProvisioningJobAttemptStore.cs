@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CafeHub.Domain.Provisioning;
 
 namespace CafeHub.Application.Onboarding.Contracts
@@ -8,5 +9,7 @@ namespace CafeHub.Application.Onboarding.Contracts
     public interface IProvisioningJobAttemptStore
     {
         Task AddAsync(ProvisioningJobAttempt attempt, CancellationToken cancellationToken);
+
+        Task<IReadOnlyList<ProvisioningJobAttempt>> FindByJobIdAsync(Guid jobId, CancellationToken cancellationToken);
     }
 }
