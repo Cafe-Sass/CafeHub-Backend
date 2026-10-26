@@ -71,5 +71,22 @@ namespace CafeHub.WebApi.Controllers
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
+
+        [HttpPost("{id:guid}/reject")]
+        [Authorize(Policy = PlatformAuthorizationPolicies.SuperAdmin)]
+        public async Task<ActionResult<RejectionResponse>> Reject(
+            Guid id,
+            [FromBody] RejectOnboardingRequestCommand command,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command with { RequestId = id }, cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
     }
 }
