@@ -90,6 +90,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IPlatformAuditWriter, PlatformAuditWriter>();
             services.AddScoped<IPlanRepository, PlanRepository>();
             services.AddScoped<IOnboardingRequestStore, OnboardingRequestStore>();
+            services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
             services.AddScoped<ITenantStore, TenantStore>();
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
             services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();

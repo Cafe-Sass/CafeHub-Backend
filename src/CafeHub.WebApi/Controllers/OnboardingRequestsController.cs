@@ -1,7 +1,10 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Onboarding;
 using CafeHub.Application.Onboarding.Commands;
+using CafeHub.Application.Onboarding.DTOs;
 using CafeHub.Application.Onboarding.PaymentGateway;
+using CafeHub.Application.Onboarding.Queries;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.RateLimiting;
 using MediatR;
@@ -52,6 +55,30 @@ namespace CafeHub.WebApi.Controllers
         {
             var command = new PayOnboardingRequestCommand(id);
             var result = await sender.Send(command, cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value!);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("{id}/status")]
+        [AllowAnonymous]
+        [EnableRateLimiting(AuthRateLimiting.PolicyName)]
+        public async Task<ActionResult<OnboardingStatusResponse>> GetStatus(
+            string id,
+            CancellationToken cancellationToken)
+        {
+            if (!Guid.TryParse(id, out var requestId))
+            {
+                return Result
+                    .Failure(OnboardingErrors.RequestNotFound())
+                    .ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            var result = await sender.Send(new GetOnboardingStatusQuery(requestId), cancellationToken);
 
             if (result.IsSuccess)
             {
