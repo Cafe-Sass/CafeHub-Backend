@@ -1,3 +1,5 @@
+using System.Linq;
+
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -61,6 +63,11 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             {
                 KeyExistsCallCount++;
                 return Task.FromResult(transactions.Any(t => t.IdempotencyKey == idempotencyKey));
+            }
+
+            public Task<PlatformPaymentTransaction?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(transactions.OrderByDescending(t => t.CreatedAt).FirstOrDefault(t => t.OnboardingRequestId == onboardingRequestId));
             }
 
             public Task AddAsync(PlatformPaymentTransaction transaction, CancellationToken cancellationToken)
