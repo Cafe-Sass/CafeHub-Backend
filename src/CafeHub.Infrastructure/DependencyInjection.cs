@@ -49,12 +49,12 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ITenantResolver, TenantResolver>();
             services.AddScoped(typeof(ITenantContextAccessor), typeof(TenantContextAccessor));
             services.AddScoped(serviceProvider => (ITenantContextSetter)serviceProvider.GetRequiredService<ITenantContextAccessor>());
-            services.AddScoped(typeof(ITenantConnectionResolver), typeof(TenantConnectionResolver));
+            services.AddSingleton(TenantDatabaseOptionsBinder.Bind(configuration));
+            services.AddScoped<ITenantConnectionResolver, RegistryTenantConnectionResolver>();
             services.AddDbContext<TenantDbContext>((serviceProvider, options) =>
             {
-                var tenantContextAccessor = serviceProvider.GetRequiredService<ITenantContextAccessor>();
                 var tenantConnectionResolver = serviceProvider.GetRequiredService<ITenantConnectionResolver>();
-                options.UseNpgsql(tenantConnectionResolver.Resolve(tenantContextAccessor.GetRequired()));
+                options.UseNpgsql(tenantConnectionResolver.Resolve());
             });
             services.AddScoped<IMasterUnitOfWork, MasterUnitOfWork>();
             services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();

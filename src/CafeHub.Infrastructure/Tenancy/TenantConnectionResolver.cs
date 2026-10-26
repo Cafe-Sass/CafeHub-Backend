@@ -2,7 +2,7 @@ using CafeHub.Application.Tenancy;
 
 namespace CafeHub.Infrastructure.Tenancy
 {
-    internal sealed class TenantConnectionResolver(ISecretReferenceResolver secretReferenceResolver) : ITenantConnectionResolver
+    internal sealed class TenantConnectionResolver(ISecretReferenceResolver secretReferenceResolver)
     {
         public string Resolve(TenantContext tenant)
         {
