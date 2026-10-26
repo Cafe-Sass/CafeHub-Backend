@@ -75,5 +75,17 @@ namespace CafeHub.Domain.Subscriptions
 
             return count == 1;
         }
+
+        public void LinkToTenant(Guid tenantId, DateTimeOffset now)
+        {
+            if (tenantId == Guid.Empty)
+            {
+                throw new ArgumentException("The tenant id is required.", nameof(tenantId));
+            }
+
+            TenantId = tenantId;
+            UpdatedAt = now;
+            UpdatedBy = null;
+        }
     }
 }

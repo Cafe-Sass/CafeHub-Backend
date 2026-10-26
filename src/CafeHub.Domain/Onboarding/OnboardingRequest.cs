@@ -165,6 +165,42 @@ namespace CafeHub.Domain.Onboarding
             UpdatedBy = null;
         }
 
+        public void Approve(Guid reviewedBy, DateTimeOffset reviewedAt)
+        {
+            if (reviewedBy == Guid.Empty)
+            {
+                throw new ArgumentException("The reviewing administrator is required.", nameof(reviewedBy));
+            }
+
+            Status = OnboardingRequestStatus.Approved;
+            ReviewedBy = reviewedBy;
+            ReviewedAt = reviewedAt;
+            UpdatedAt = reviewedAt;
+            UpdatedBy = reviewedBy;
+        }
+
+        public void Reject(Guid reviewedBy, DateTimeOffset reviewedAt, string? rejectionReason)
+        {
+            if (reviewedBy == Guid.Empty)
+            {
+                throw new ArgumentException("The reviewing administrator is required.", nameof(reviewedBy));
+            }
+
+            if (rejectionReason is not null && rejectionReason.Length > 1024)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(rejectionReason),
+                    "The rejection reason must not exceed 1024 characters.");
+            }
+
+            Status = OnboardingRequestStatus.Rejected;
+            ReviewedBy = reviewedBy;
+            ReviewedAt = reviewedAt;
+            RejectionReason = rejectionReason;
+            UpdatedAt = reviewedAt;
+            UpdatedBy = reviewedBy;
+        }
+
         private static void ValidateCommonInvariants(
             Guid id,
             Guid planVersionId,

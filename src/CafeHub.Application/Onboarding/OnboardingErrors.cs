@@ -46,6 +46,14 @@ namespace CafeHub.Application.Onboarding
                 $"The state '{requestedState}' is not a valid onboarding request state.");
         }
 
+        public const string RequestNotApprovableCode = "Onboarding.RequestNotApprovable";
+        public const string RequestNotApprovableMessage = "The onboarding request is not approvable.";
+
+        public static Error RequestNotApprovable()
+        {
+            return Error.Conflict(RequestNotApprovableCode, RequestNotApprovableMessage);
+        }
+
         public const string RequestNotPayableCode = "Onboarding.RequestNotPayable";
         public const string RequestNotPayableMessage = "The onboarding request is not payable.";
 
