@@ -28,6 +28,7 @@ _ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 app.UseCorrelationId();
 app.UseExceptionHandler();
 app.UseRateLimiter();
+app.UseMiddleware<CafeHub.WebApi.Tenancy.TenantResolutionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
