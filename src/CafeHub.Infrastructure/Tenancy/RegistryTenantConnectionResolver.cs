@@ -8,13 +8,18 @@ namespace CafeHub.Infrastructure.Tenancy
     internal sealed class RegistryTenantConnectionResolver(
         ITenantContextAccessor tenantContextAccessor,
         ITenantRegistryReader tenantRegistryReader,
-        TenantDatabaseOptions databaseOptions,
-        TenantDatabaseCreatorOptions creatorOptions,
+        Lazy<TenantDatabaseOptions> databaseOptions,
+        Lazy<TenantDatabaseCreatorOptions> creatorOptions,
         ITenantCredentialDeriver credentialDeriver) : ITenantConnectionResolver
     {
         public string Resolve()
         {
             var tenantContext = tenantContextAccessor.GetRequired();
+            if (!tenantContext.IsActive)
+            {
+                throw new TenantInactiveException($"Tenant {tenantContext.TenantId} is not active. Activate the tenant before resolving its connection.");
+            }
+
             var tenant = tenantRegistryReader
                 .FindByIdAsync(tenantContext.TenantId, CancellationToken.None)
                 .GetAwaiter()
@@ -41,18 +46,19 @@ namespace CafeHub.Infrastructure.Tenancy
             try
             {
                 var password = credentialDeriver.Derive(
-                    Convert.FromBase64String(creatorOptions.CredentialMasterKey),
+                    Convert.FromBase64String(creatorOptions.Value.CredentialMasterKey),
                     tenant.TenantId);
+                var options = databaseOptions.Value;
                 var builder = new NpgsqlConnectionStringBuilder
                 {
-                    Host = databaseOptions.Host,
-                    Port = databaseOptions.Port,
+                    Host = options.Host,
+                    Port = options.Port,
                     Database = databaseName,
                     Username = roleName,
                     Password = password,
-                    SslMode = databaseOptions.SslMode,
+                    SslMode = options.SslMode,
                     Pooling = true,
-                    MaxPoolSize = databaseOptions.MaxPoolSize,
+                    MaxPoolSize = options.MaxPoolSize,
                     ApplicationName = "cafehub-tenant",
                 };
 

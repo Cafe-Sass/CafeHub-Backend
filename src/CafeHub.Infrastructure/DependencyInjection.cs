@@ -49,7 +49,9 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ITenantResolver, TenantResolver>();
             services.AddScoped(typeof(ITenantContextAccessor), typeof(TenantContextAccessor));
             services.AddScoped(serviceProvider => (ITenantContextSetter)serviceProvider.GetRequiredService<ITenantContextAccessor>());
-            services.AddSingleton(TenantDatabaseOptionsBinder.Bind(configuration));
+            services.AddSingleton(_ => TenantDatabaseOptionsBinder.Bind(configuration));
+            services.AddSingleton(serviceProvider =>
+                new Lazy<TenantDatabaseOptions>(() => serviceProvider.GetRequiredService<TenantDatabaseOptions>()));
             services.AddScoped<ITenantConnectionResolver, RegistryTenantConnectionResolver>();
             services.AddDbContext<TenantDbContext>((serviceProvider, options) =>
             {
@@ -103,6 +105,8 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(_ => ProvisioningWorkerOptionsBinder.Bind(configuration));
             services.AddHostedService<ProvisioningWorker>();
             services.AddSingleton(_ => TenantDatabaseCreatorOptionsBinder.Bind(configuration));
+            services.AddSingleton(serviceProvider =>
+                new Lazy<TenantDatabaseCreatorOptions>(() => serviceProvider.GetRequiredService<TenantDatabaseCreatorOptions>()));
             services.AddSingleton<ITenantCredentialDeriver, HmacTenantCredentialDeriver>();
             services.AddSingleton<ITenantProvisioningSqlExecutor>(provider =>
                 new NpgsqlProvisioningSqlExecutor(provider.GetRequiredService<TenantDatabaseCreatorOptions>()));

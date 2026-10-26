@@ -1,17 +1,25 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Tenancy;
+using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure;
 using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Tenant;
+using CafeHub.Infrastructure.Provisioning;
+using CafeHub.Infrastructure.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 
 namespace CafeHub.UnitTests
 {
     public sealed class TenantInfrastructureRegistrationTests
     {
-        private static ServiceProvider BuildProvider(Dictionary<string, string?> settings, Action<ITenantContextSetter>? prepareTenant = null)
+        private static ServiceProvider BuildProvider(
+            Dictionary<string, string?> settings,
+            Action<ITenantContextSetter>? prepareTenant = null,
+            TenantRegistration? tenantRegistration = null)
         {
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(settings)
@@ -20,6 +28,8 @@ namespace CafeHub.UnitTests
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(configuration);
             services.AddInfrastructure(configuration);
+            services.Replace(ServiceDescriptor.Scoped<ITenantRegistryReader>(
+                _ => new TenantRegistryReaderStub(tenantRegistration)));
 
             var serviceProvider = services.BuildServiceProvider();
 
@@ -75,14 +85,28 @@ namespace CafeHub.UnitTests
         [Fact]
         public void ResolvingTenantDbContext_UsesTenantConnection_and_DoesNotOpenConnection()
         {
-            const string configuredConnection = "Host=localhost;Port=5432;Database=cafehub_tenant_alpha";
+            var tenantId = Guid.NewGuid();
+            var settings = CreateTenantConnectionSettings();
             using var serviceProvider = BuildProvider(
-                new Dictionary<string, string?> { ["TenantConnections:cafe-alpha"] = configuredConnection },
-                setter => setter.Set(TenantContext.Create(Guid.NewGuid(), "cafe-alpha", true)));
+                settings,
+                setter => setter.Set(TenantContext.Create(tenantId, "ignored-context-reference", true)),
+                new TenantRegistration(tenantId, "cafe-alpha", TenantLifecycleStatus.Active, "v1"));
 
             var tenantDbContext = serviceProvider.GetRequiredService<TenantDbContext>();
+            var builder = new NpgsqlConnectionStringBuilder(tenantDbContext.Database.GetConnectionString());
 
-            Assert.Equal(configuredConnection, tenantDbContext.Database.GetConnectionString());
+            Assert.Equal("localhost", builder.Host);
+            Assert.Equal(5544, builder.Port);
+            Assert.Equal("cafehub_tenant_cafe_alpha", builder.Database);
+            Assert.Equal("cafehub_tenant_cafe_alpha_app", builder.Username);
+            Assert.Equal(SslMode.Require, builder.SslMode);
+            Assert.True(builder.Pooling);
+            Assert.Equal(23, builder.MaxPoolSize);
+            Assert.Equal("cafehub-tenant", builder.ApplicationName);
+            var expectedPassword = new TenantCredentialDeriver().Derive(GetCredentialMasterKey(), tenantId);
+            Assert.True(
+                string.Equals(expectedPassword, builder.Password, StringComparison.Ordinal),
+                "the connection should use the shared derived tenant credential");
         }
 
         [Fact]
@@ -91,11 +115,12 @@ namespace CafeHub.UnitTests
             const string masterConnection = "Host=localhost;Port=5432;Database=cafehub_master";
             using var serviceProvider = BuildProvider(
                 new Dictionary<string, string?> { [ConfigurationKeys.MasterConnectionString] = masterConnection },
-                setter => setter.Set(TenantContext.Create(Guid.NewGuid(), "cafe-alpha", true)));
+                setter => setter.Set(TenantContext.Create(Guid.NewGuid(), "cafe-alpha", true)),
+                tenantRegistration: null);
 
             var exception = Record.Exception(() => serviceProvider.GetRequiredService<TenantDbContext>());
 
-            Assert.IsType<TenantConnectionNotConfiguredException>(exception);
+            Assert.IsType<InvalidTenantContextException>(exception);
             Assert.DoesNotContain(masterConnection, exception.Message, StringComparison.Ordinal);
             Assert.DoesNotContain("cafehub_master", exception.Message, StringComparison.Ordinal);
         }
@@ -109,6 +134,37 @@ namespace CafeHub.UnitTests
             var masterDbContext = serviceProvider.GetRequiredService<MasterDbContext>();
 
             Assert.Equal(masterConnection, masterDbContext.Database.GetConnectionString());
+        }
+
+        private static Dictionary<string, string?> CreateTenantConnectionSettings()
+        {
+            return new Dictionary<string, string?>
+            {
+                ["TenantDatabases:Host"] = "localhost",
+                ["TenantDatabases:Port"] = "5544",
+                ["TenantDatabases:SslMode"] = "Require",
+                ["TenantDatabases:MaxPoolSize"] = "23",
+                ["Provisioning:AdminConnectionString"] = "Host=localhost;Database=provisioning",
+                ["Provisioning:CredentialMasterKey"] = Convert.ToBase64String(GetCredentialMasterKey()),
+            };
+        }
+
+        private static byte[] GetCredentialMasterKey()
+        {
+            return Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+        }
+
+        private sealed class TenantRegistryReaderStub(TenantRegistration? registration) : ITenantRegistryReader
+        {
+            public Task<TenantRegistration?> FindBySlugAsync(string normalizedSlug, CancellationToken cancellationToken)
+            {
+                return Task.FromResult<TenantRegistration?>(null);
+            }
+
+            public Task<TenantRegistration?> FindByIdAsync(Guid tenantId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(registration?.TenantId == tenantId ? registration : null);
+            }
         }
     }
 }

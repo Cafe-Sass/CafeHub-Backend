@@ -1,5 +1,6 @@
 using CafeHub.Application;
 using CafeHub.Infrastructure;
+using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.Idempotency;
@@ -22,6 +23,7 @@ builder.Services.AddPlatformAuthorization();
 builder.Services.AddApiDocumentation();
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 
 app.UseCorrelationId();
 app.UseExceptionHandler();
