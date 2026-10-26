@@ -109,7 +109,7 @@ namespace CafeHub.Application.Onboarding.Commands
 
                 // Create one pending provisioning job.
                 var jobId = Guid.CreateVersion7();
-                var job = ProvisioningJob.Create(jobId, tenantId, ProvisioningJobStatus.Pending, now, reviewerId);
+                var job = ProvisioningJob.Create(jobId, tenantId, ProvisioningJobStatus.Pending, now, createdBy: reviewerId);
 
                 await provisioningJobStore.AddAsync(job, cancellationToken);
 

@@ -20,6 +20,9 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             builder.Property(job => job.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz").IsRequired();
             builder.Property(job => job.CreatedBy).HasColumnName("created_by").HasColumnType("uuid").IsRequired(false);
             builder.Property(job => job.UpdatedBy).HasColumnName("updated_by").HasColumnType("uuid").IsRequired(false);
+            builder.Property(job => job.DueAt).HasColumnName("due_at").HasColumnType("timestamptz").IsRequired(false);
+            builder.Property(job => job.LeaseExpiresAt).HasColumnName("lease_expires_at").HasColumnType("timestamptz").IsRequired(false);
+            builder.Property(job => job.LeasedBy).HasColumnName("leased_by").HasColumnType("text").IsRequired(false);
 
             builder.HasIndex(job => job.TenantId)
                 .IsUnique()
