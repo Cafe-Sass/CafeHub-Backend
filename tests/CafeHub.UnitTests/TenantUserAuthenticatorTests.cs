@@ -34,6 +34,7 @@ namespace CafeHub.UnitTests
             var owner = CreateUser(Password);
             var store = new FakeStore(owner);
             var authenticator = CreateAuthenticator(store);
+            var beforeAttempts = DateTimeOffset.UtcNow;
 
             for (var attempt = 0; attempt < 5; attempt++)
             {
@@ -44,6 +45,8 @@ namespace CafeHub.UnitTests
             var locked = await authenticator.CheckCredentialsAsync(Email, Password, CancellationToken.None);
             Assert.Equal(AuthErrors.InvalidCredentials(), locked.Error);
             Assert.True(store.IsLocked(owner.Id));
+            var lockoutDuration = store.LockoutEnd(owner.Id)!.Value - beforeAttempts;
+            Assert.InRange(lockoutDuration, TimeSpan.FromMinutes(14), TimeSpan.FromMinutes(16));
 
             store.AdvanceLockout(owner.Id, DateTimeOffset.UtcNow.AddMinutes(-1));
             var success = await authenticator.CheckCredentialsAsync(Email, Password, CancellationToken.None);
@@ -54,12 +57,14 @@ namespace CafeHub.UnitTests
         [Fact]
         public async Task UnknownEmail_UsesDummyHashAndReturnsTheGenericError()
         {
-            var store = new FakeStore();
+            var store = new FakeStore(CreateUser(Password));
             var authenticator = CreateAuthenticator(store);
 
-            var result = await authenticator.CheckCredentialsAsync("missing@example.com", Password, CancellationToken.None);
+            var unknownResult = await authenticator.CheckCredentialsAsync("missing@example.com", Password, CancellationToken.None);
+            var wrongPasswordResult = await authenticator.CheckCredentialsAsync(Email, "wrong-password", CancellationToken.None);
 
-            Assert.Equal(AuthErrors.InvalidCredentials(), result.Error);
+            Assert.Equal(wrongPasswordResult.Error, unknownResult.Error);
+            Assert.Equal(AuthErrors.InvalidCredentials(), unknownResult.Error);
             Assert.Equal(1, authenticator.DummyVerifications);
         }
 
@@ -110,6 +115,7 @@ namespace CafeHub.UnitTests
             private List<TenantUser> Users { get; }
             public int FailedCount(Guid id) => failed.GetValueOrDefault(id);
             public bool IsLocked(Guid id) => lockout.TryGetValue(id, out var until) && until > DateTimeOffset.UtcNow;
+            public DateTimeOffset? LockoutEnd(Guid id) => lockout.GetValueOrDefault(id);
             public void AdvanceLockout(Guid id, DateTimeOffset value) => lockout[id] = value;
             public void AssignRole(Guid id, string role) => roles[id] = new List<string> { role };
             public void Dispose() { }
