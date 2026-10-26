@@ -2,6 +2,8 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
+The Tenant model contains 9 tables after adding `refresh_tokens` for owner and staff authentication sessions in Story CFMD-323; the baseline 8-table scope did not include authentication token persistence.
+
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. `CFMD-74` consumes this ERD for entity classes and migrations; no entity, migration, or DbContext change is made in this story.
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
@@ -57,11 +59,24 @@ erDiagram
         jsonb before_state
         jsonb after_state
     }
+    refresh_tokens {
+        uuid id PK
+        uuid user_id FK
+        uuid family_id
+        text token_hash UK
+        timestamptz issued_at
+        timestamptz expires_at
+        timestamptz rotated_at
+        uuid replaced_by_id FK
+        timestamptz revoked_at
+        text revoked_reason
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
     tenant_roles ||--o{ tenant_role_claims : "role claim"
     tenant_users |o--o{ tenant_audit_records : "actor"
+    tenant_users ||--o{ refresh_tokens : "sessions"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one. `branches` draws no relationship line because all of its current foreign keys are audit actor columns, which the note above omits.
@@ -178,6 +193,20 @@ Purpose: append-only record of sensitive tenant actions (FR-IAM-005, FR-AUD-001)
 - `before_state jsonb NULL`, `after_state jsonb NULL` — structured old/new snapshots where applicable (FR-AUD-001); `jsonb` without filtering/queries by content.
 - Append-only: rows are inserted once and ordinary application workflows can neither update nor delete them (`architecture/database-conventions.md`); retention duration and tamper-resistance follow TBD-20.
 
+### refresh_tokens
+
+Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-001); one row per issued token, one family per sign-in, rotation on every use, and family-wide revocation on reuse. The table stores only token hashes, never raw token values. The table is created in each Tenant database; it has no cross-database references and is not seeded.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_refresh_tokens`.
+- `user_id uuid NOT NULL FK tenant_users.id` (`fk_refresh_tokens_user_id`, `ON DELETE RESTRICT`) — the owning tenant user; `ix_refresh_tokens_user_id` supports per-user lookups. Logical user deactivation does not delete this row; rejecting that user's tokens is a service-layer check consistent with FR-IAM-002.
+- `family_id uuid NOT NULL` — sign-in family identifier shared by tokens in one session; no separate family row exists. `ix_refresh_tokens_family_id` supports family-wide revocation.
+- `token_hash text NOT NULL` (CHECK length 64 and format `^[0-9a-f]{64}$`, `ck_refresh_tokens_token_hash_format`) — lowercase hex SHA-256 of the raw token; `uq_refresh_tokens_token_hash` is the unique lookup key.
+- `issued_at timestamptz NOT NULL`; `expires_at timestamptz NOT NULL` with `ck_refresh_tokens_expiry_after_issue CHECK (expires_at > issued_at)`. Lifetime is configured by `RefreshTokens:LifetimeDays`, following the Master refresh-token service option.
+- `rotated_at timestamptz NULL` — set once at rotation; a set value marks the token as rotated and further presentation as reuse.
+- `replaced_by_id uuid NULL` self foreign key to `refresh_tokens.id` (`fk_refresh_tokens_replaced_by_id`, `ON DELETE RESTRICT`) — set with `rotated_at` and points to the successor in the same family. **Proposed, pending owner confirmation**: `uq_refresh_tokens_replaced_by_id` ensures a successor has at most one predecessor, matching the Master design; rejected alternative: a non-unique index that permits multiple predecessors to claim one successor.
+- `revoked_at timestamptz NULL`; `revoked_reason text NULL` (CHECK length 1..64 when present) — `ck_refresh_tokens_revoked_reason_labels` limits values to the Master design's proposed closed list `('logout', 'reuse_detected', 'admin_revoked')`. **Proposed, pending owner confirmation**: `ck_refresh_tokens_revocation_pair CHECK ((revoked_at IS NULL AND revoked_reason IS NULL) OR (revoked_at IS NOT NULL AND revoked_reason IS NOT NULL))`, matching the Master design; rejected alternative: a one-directional check that allows a reason without a revocation time.
+- State is derived from `rotated_at`, `revoked_at`, and `expires_at`; no status column is stored. Rows are retained as security history and are not physically deleted by ordinary workflows (PRD section 9, rule 23); cleanup of expired families is later work.
+
 ## Explicitly out of scope (later stories)
 
 - Staff assignment extras — station catalogs and per-user branch limits (FR-IAM-002 configured branch/station restrictions) arrive with the staff management story; this ERD keeps only the seeded role membership.
@@ -204,4 +233,4 @@ Purpose: append-only record of sensitive tenant actions (FR-IAM-005, FR-AUD-001)
 | TBD-20 | Audit log retention and tamper-resistance requirements |
 | — | Media object storage provider and cleanup policy (references only are modeled — the `cafe_settings` logo; no PRD TBD number exists; physical media deletion is the approved exception, rule 23) |
 
-`CFMD-74` consumes this ERD for entity classes and migrations.
+`CFMD-74` consumes this ERD for entity classes and migrations. Story CFMD-323 adds the refresh-token table in a later Tenant migration. Tenant databases provisioned before that migration need it applied; the mechanism for applying migrations to existing tenant databases remains an open item.

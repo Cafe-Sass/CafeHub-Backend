@@ -44,6 +44,17 @@ Platform administrators stay signed in through long-lived refresh tokens that ro
 - **Master database placement.** Refresh tokens authenticate platform administrators, whose identity lives in the Master (FR-PLT-001); cross-database references are forbidden by the conventions, and tenant-side owner/staff refresh sessions are a separate future concern of `architecture/erd-tenant.md`.
 - **Rejected mechanism: the Identity `user_tokens` table.** It is explicitly excluded from the Master identity model (see `architecture/erd-master.md`, `Identity model documentation`); refresh-token sessions are security state with their own lifecycle (families, rotation, revocation reasons), not framework token plumbing, so the dedicated `refresh_tokens` table is the explicit addition the ERD reserved for the Auth work.
 
+## Tenant refresh token sessions (CFMD-323)
+
+Tenant owner and staff sessions use a `refresh_tokens` table local to each Tenant database, following the Master table's shared columns, checks, indexes, and rotation chain design (FR-IAM-001). A Tenant token references `tenant_users` within that database; no FK or lookup crosses into the Master or another tenant database. The Tenant ERD has 9 tables including this addition.
+
+- Store only the lowercase hex SHA-256 token hash; the raw token is returned once at issuance and rotation, never persisted. Rejected alternative: storing raw token values, which would make a database read sufficient to take over sessions.
+- Use the existing `RefreshTokens:LifetimeDays` service option, rather than embedding lifetime in schema. Rejected alternative: a fixed table-level token lifetime, which cannot follow the validated service configuration.
+- Rotate on every use and retain a family id across the chain. Rejected alternative: reusable non-rotating tokens, which leave a stolen token usable until expiry.
+- Reuse of a rotated token revokes its family with `reuse_detected`; logout revokes with `logout`. Invalid token states share a generic rejection. Rejected alternative: revoking only the presented token, which leaves successor credentials active after replay.
+- Keep this table separate from ASP.NET Identity's `user_tokens`; the latter does not represent token families, rotation links, or revocation reasons. The Master closed `revoked_reason` labels are reused. Master constraints `uq_refresh_tokens_replaced_by_id` and `ck_refresh_tokens_revocation_pair` remain **Proposed, pending owner confirmation** in both designs, as they are proposed in the merged Master ERD.
+- New tenant databases receive the table through the Tenant migration sequence. Tenant databases provisioned before that migration require it to be applied; the mechanism for applying pending migrations to existing tenant databases remains an open operational item.
+
 ## TBD register (persistence-relevant)
 
 | PRD ID | Neutral title |
