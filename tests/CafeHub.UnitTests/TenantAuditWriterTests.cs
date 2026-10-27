@@ -1,5 +1,6 @@
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
@@ -10,6 +11,7 @@ namespace CafeHub.UnitTests
     public sealed class TenantAuditWriterTests
     {
         private static readonly DateTimeOffset RecordedAt = DateTimeOffset.Parse("2026-10-27T12:30:00Z");
+        private static readonly Guid TenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
         private static (TenantAuditWriter Writer, TenantDbContext Context) CreateWriter(
             bool isAuthenticated = false,
@@ -22,7 +24,8 @@ namespace CafeHub.UnitTests
             var writer = new TenantAuditWriter(
                 new StubCurrentTenantUser(isAuthenticated, currentUserId),
                 new FixedTimeProvider(RecordedAt),
-                context);
+                context,
+                new StubTenantContextAccessor());
             return (writer, context);
         }
 
@@ -128,9 +131,16 @@ namespace CafeHub.UnitTests
 
             public Guid? UserId { get; } = userId;
 
-            public Guid? TenantId => null;
+            public Guid? TenantId => IsAuthenticated ? TenantIdValue : null;
 
             public IReadOnlyCollection<string> Roles => Array.Empty<string>();
+
+            private static Guid TenantIdValue => Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        }
+
+        private sealed class StubTenantContextAccessor : ITenantContextAccessor
+        {
+            public TenantContext GetRequired() => TenantContext.Create(TenantId, "tenant-secret-reference", true);
         }
 
         private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

@@ -1,7 +1,8 @@
 using System.Text.RegularExpressions;
+using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
-using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Tenant;
 
@@ -19,12 +20,18 @@ namespace CafeHub.Infrastructure.Audit
         private readonly ICurrentTenantUser currentTenantUser;
         private readonly TimeProvider timeProvider;
         private readonly TenantDbContext context;
+        private readonly ITenantContextAccessor tenantContextAccessor;
 
-        public TenantAuditWriter(ICurrentTenantUser currentTenantUser, TimeProvider timeProvider, TenantDbContext context)
+        public TenantAuditWriter(
+            ICurrentTenantUser currentTenantUser,
+            TimeProvider timeProvider,
+            TenantDbContext context,
+            ITenantContextAccessor tenantContextAccessor)
         {
             this.currentTenantUser = currentTenantUser ?? throw new ArgumentNullException(nameof(currentTenantUser));
             this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
             this.context = context ?? throw new ArgumentNullException(nameof(context));
+            this.tenantContextAccessor = tenantContextAccessor ?? throw new ArgumentNullException(nameof(tenantContextAccessor));
         }
 
         public Task<Result> WriteAsync(TenantAuditEntry entry, CancellationToken cancellationToken)
@@ -37,7 +44,11 @@ namespace CafeHub.Infrastructure.Audit
                 return Task.FromResult(Result.Failure(TenantAuditErrors.InvalidEntry()));
             }
 
-            var actorId = currentTenantUser.IsAuthenticated && currentTenantUser.UserId is { } authenticatedUserId
+            var tenantContext = tenantContextAccessor.GetRequired();
+            var actorId = tenantContext.IsActive
+                && currentTenantUser.IsAuthenticated
+                && currentTenantUser.TenantId == tenantContext.TenantId
+                && currentTenantUser.UserId is { } authenticatedUserId
                 ? authenticatedUserId
                 : entry.ActorUserId;
             var actorKind = actorId.HasValue ? TenantAuditRecordKind.User : TenantAuditRecordKind.System;

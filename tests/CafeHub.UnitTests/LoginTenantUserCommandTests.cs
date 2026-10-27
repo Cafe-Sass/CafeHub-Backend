@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Identity.Commands;
 using CafeHub.Application.Identity.DTOs;
@@ -26,7 +27,9 @@ namespace CafeHub.UnitTests
             var user = new AuthenticatedTenantUser { Id = Guid.NewGuid(), Email = "owner@example.com", FullName = "Owner", UserKind = "Owner", Roles = new[] { "Owner" } };
             var issuer = new StubTenantTokenIssuer();
             var refresh = new StubTenantRefreshTokenService();
-            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Success(user)), issuer, refresh, new StubTenantContextAccessor(TenantId));
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Success(user)), issuer, refresh, new StubTenantContextAccessor(TenantId), auditWriter, unitOfWork);
 
             var result = await handler.Handle(new LoginTenantUserCommand("owner@example.com", "secret-password"), CancellationToken.None);
 
@@ -36,6 +39,11 @@ namespace CafeHub.UnitTests
             Assert.Equal("access", result.Value!.AccessToken);
             Assert.Equal("refresh", result.Value.RefreshToken);
             Assert.Equal(4, typeof(TenantTokenResponse).GetProperties().Length);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.login.succeeded", audit.Action);
+            Assert.Equal(user.Id, audit.ActorUserId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Fact]
@@ -44,13 +52,48 @@ namespace CafeHub.UnitTests
             var error = AuthErrors.InvalidCredentials();
             var issuer = new StubTenantTokenIssuer();
             var refresh = new StubTenantRefreshTokenService();
-            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Failure<AuthenticatedTenantUser>(error)), issuer, refresh, new StubTenantContextAccessor(TenantId));
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Failure<AuthenticatedTenantUser>(error)), issuer, refresh, new StubTenantContextAccessor(TenantId), auditWriter, unitOfWork);
 
             var result = await handler.Handle(new LoginTenantUserCommand("owner@example.com", "wrong"), CancellationToken.None);
 
             Assert.Equal(error, result.Error);
             Assert.Empty(issuer.Requests);
             Assert.Empty(refresh.UserIds);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.login.failed", audit.Action);
+            Assert.Null(audit.ActorUserId);
+            Assert.Null(audit.TargetId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
+        }
+
+        [Fact]
+        public async Task FailedKnownUserLogin_UsesGenericErrorAndAuditsUserIdOnly()
+        {
+            var userId = Guid.NewGuid();
+            var error = RejectedTenantCredentials.Create(userId);
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new LoginTenantUserCommandHandler(
+                new StubTenantAuthenticator(Result.Failure<AuthenticatedTenantUser>(error)),
+                new StubTenantTokenIssuer(),
+                new StubTenantRefreshTokenService(),
+                new StubTenantContextAccessor(TenantId),
+                auditWriter,
+                unitOfWork);
+
+            var result = await handler.Handle(new LoginTenantUserCommand("owner@example.com", "wrong-password"), CancellationToken.None);
+
+            Assert.Equal(AuthErrors.InvalidCredentialsCode, result.Error!.Code);
+            Assert.Equal(AuthErrors.InvalidCredentialsMessage, result.Error.Message);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.login.failed", audit.Action);
+            Assert.Equal(userId, audit.ActorUserId);
+            Assert.Equal(userId, audit.TargetId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Fact]
@@ -124,7 +167,7 @@ namespace CafeHub.UnitTests
         {
             var user = new AuthenticatedTenantUser { Id = Guid.NewGuid(), Email = "owner@example.com", FullName = "Owner", UserKind = "Owner", Roles = Array.Empty<string>() };
             var issuer = new StubTenantTokenIssuer();
-            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Success(user)), issuer, new StubTenantRefreshTokenService(), new MissingTenantContextAccessor());
+            var handler = new LoginTenantUserCommandHandler(new StubTenantAuthenticator(Result.Success(user)), issuer, new StubTenantRefreshTokenService(), new MissingTenantContextAccessor(), new RecordingTenantAuditWriter(), new RecordingTenantAuditUnitOfWork());
 
             await Assert.ThrowsAsync<TenantContextMissingException>(() => handler.Handle(new LoginTenantUserCommand("owner@example.com", "password"), CancellationToken.None));
             Assert.Empty(issuer.Requests);

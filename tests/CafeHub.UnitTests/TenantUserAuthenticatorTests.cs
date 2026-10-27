@@ -39,11 +39,17 @@ namespace CafeHub.UnitTests
             for (var attempt = 0; attempt < 5; attempt++)
             {
                 var failed = await authenticator.CheckCredentialsAsync(Email, "wrong-password", CancellationToken.None);
-                Assert.Equal(AuthErrors.InvalidCredentials(), failed.Error);
+                Assert.IsType<RejectedTenantCredentials>(failed.Error);
+                Assert.Equal(owner.Id, Assert.IsType<RejectedTenantCredentials>(failed.Error).UserId);
+                Assert.Equal(AuthErrors.InvalidCredentialsCode, failed.Error!.Code);
+                Assert.Equal(AuthErrors.InvalidCredentialsMessage, failed.Error.Message);
             }
 
             var locked = await authenticator.CheckCredentialsAsync(Email, Password, CancellationToken.None);
-            Assert.Equal(AuthErrors.InvalidCredentials(), locked.Error);
+            Assert.IsType<LockedOutTenantCredentials>(locked.Error);
+            Assert.Equal(owner.Id, Assert.IsType<LockedOutTenantCredentials>(locked.Error).UserId);
+            Assert.Equal(AuthErrors.InvalidCredentialsCode, locked.Error!.Code);
+            Assert.Equal(AuthErrors.InvalidCredentialsMessage, locked.Error.Message);
             Assert.True(store.IsLocked(owner.Id));
             var lockoutDuration = store.LockoutEnd(owner.Id)!.Value - beforeAttempts;
             Assert.InRange(lockoutDuration, TimeSpan.FromMinutes(14), TimeSpan.FromMinutes(16));
@@ -63,8 +69,12 @@ namespace CafeHub.UnitTests
             var unknownResult = await authenticator.CheckCredentialsAsync("missing@example.com", Password, CancellationToken.None);
             var wrongPasswordResult = await authenticator.CheckCredentialsAsync(Email, "wrong-password", CancellationToken.None);
 
-            Assert.Equal(wrongPasswordResult.Error, unknownResult.Error);
-            Assert.Equal(AuthErrors.InvalidCredentials(), unknownResult.Error);
+            Assert.Equal(AuthErrors.InvalidCredentialsCode, wrongPasswordResult.Error!.Code);
+            Assert.Equal(AuthErrors.InvalidCredentialsCode, unknownResult.Error!.Code);
+            Assert.Equal(AuthErrors.InvalidCredentialsMessage, wrongPasswordResult.Error.Message);
+            Assert.Equal(AuthErrors.InvalidCredentialsMessage, unknownResult.Error.Message);
+            Assert.IsType<RejectedTenantCredentials>(wrongPasswordResult.Error);
+            Assert.IsNotType<RejectedTenantCredentials>(unknownResult.Error);
             Assert.Equal(1, authenticator.DummyVerifications);
         }
 
@@ -76,10 +86,13 @@ namespace CafeHub.UnitTests
             var authenticator = CreateAuthenticator(new FakeStore(deleted));
 
             var deletedResult = await authenticator.CheckCredentialsAsync(Email, Password, CancellationToken.None);
-            var incorrectPasswordResult = await authenticator.CheckCredentialsAsync(Email, "wrong-password", CancellationToken.None);
+            var incorrectPasswordResult = await CreateAuthenticator(new FakeStore(CreateUser(Password)))
+                .CheckCredentialsAsync(Email, "wrong-password", CancellationToken.None);
 
-            Assert.Equal(incorrectPasswordResult.Error, deletedResult.Error);
-            Assert.Equal(AuthErrors.InvalidCredentials(), deletedResult.Error);
+            Assert.Equal(incorrectPasswordResult.Error!.Code, deletedResult.Error!.Code);
+            Assert.Equal(AuthErrors.InvalidCredentialsCode, deletedResult.Error.Code);
+            Assert.IsType<RejectedTenantCredentials>(incorrectPasswordResult.Error);
+            Assert.IsNotType<RejectedTenantCredentials>(deletedResult.Error);
         }
 
         private static TenantUser CreateUser(string password)
