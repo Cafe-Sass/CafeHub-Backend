@@ -18,6 +18,8 @@ namespace CafeHub.Application.Identity
         public const string InvalidRefreshTokenMessage = "The refresh token is not valid.";
         public const string CurrentAdminUnavailableCode = "Auth.CurrentAdminUnavailable";
         public const string CurrentAdminUnavailableMessage = "The current administrator is not available.";
+        public const string CurrentTenantUserUnavailableCode = "Auth.CurrentTenantUserUnavailable";
+        public const string CurrentTenantUserUnavailableMessage = "The current tenant user is not available.";
 
         public static Error InvalidCredentials()
         {
@@ -32,6 +34,11 @@ namespace CafeHub.Application.Identity
         public static Error CurrentAdminUnavailable()
         {
             return Error.Unauthorized(CurrentAdminUnavailableCode, CurrentAdminUnavailableMessage);
+        }
+
+        public static Error CurrentTenantUserUnavailable()
+        {
+            return Error.Unauthorized(CurrentTenantUserUnavailableCode, CurrentTenantUserUnavailableMessage);
         }
     }
 }
