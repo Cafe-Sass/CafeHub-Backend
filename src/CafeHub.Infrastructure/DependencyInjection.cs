@@ -88,6 +88,15 @@ namespace CafeHub.Infrastructure
                 .AddEntityFrameworkStores<MasterDbContext>();
             services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, PlatformAdminLookupNormalizer>());
             services.AddScoped<IAdminAuthenticator, AdminAuthenticator>();
+            services.AddIdentityCore<CafeHub.Domain.Tenants.TenantUser>()
+                .AddRoles<CafeHub.Domain.Tenants.TenantRole>()
+                .AddUserStore<TenantUserStore>()
+                .AddRoleStore<TenantRoleStore>();
+            services.AddScoped<ITenantUserAuthenticator, TenantUserAuthenticator>();
+            services.AddSingleton(serviceProvider => TenantJwtOptionsBinder.Bind(configuration, serviceProvider.GetRequiredService<JwtOptions>().Audience));
+            services.AddSingleton<ITenantAccessTokenIssuer, TenantJwtAccessTokenIssuer>();
+            services.AddScoped<ITenantRefreshTokenStore, TenantRefreshTokenStore>();
+            services.AddScoped<ITenantRefreshTokenService, TenantRefreshTokenService>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();
             services.AddScoped<ISuperAdminSeeder, SuperAdminSeeder>();
 
