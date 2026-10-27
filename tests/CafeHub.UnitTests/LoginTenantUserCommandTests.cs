@@ -97,6 +97,26 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task FailedAuditWrite_PropagatesInsteadOfReturningUnauditedLoginFailure()
+        {
+            var unitOfWork = new RecordingTenantAuditUnitOfWork();
+            var handler = new LoginTenantUserCommandHandler(
+                new StubTenantAuthenticator(Result.Failure<AuthenticatedTenantUser>(AuthErrors.InvalidCredentials())),
+                new StubTenantTokenIssuer(),
+                new StubTenantRefreshTokenService(),
+                new StubTenantContextAccessor(TenantId),
+                new FailingTenantAuditWriter(),
+                unitOfWork);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+                new LoginTenantUserCommand("owner@example.com", "wrong-password"),
+                CancellationToken.None));
+
+            Assert.Equal(0, unitOfWork.BeginCount);
+            Assert.Equal(0, unitOfWork.CommitCount);
+        }
+
+        [Fact]
         public void TenantTokenOptions_RejectPlatformAudienceAndInvalidLifetimes()
         {
             Assert.Empty(new TenantJwtOptions { Audience = "tenant-api" }.Validate("platform-api"));
@@ -188,6 +208,14 @@ namespace CafeHub.UnitTests
         {
             public Task<Result<AuthenticatedTenantUser>> CheckCredentialsAsync(string email, string password, CancellationToken cancellationToken) => Task.FromResult(result);
             public Task<AuthenticatedTenantUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedTenantUser?>(result.IsSuccess ? result.Value : null);
+        }
+
+        private sealed class FailingTenantAuditWriter : ITenantAuditWriter
+        {
+            public Task<Result> WriteAsync(TenantAuditEntry entry, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Result.Failure(Error.Failure("Audit.WriteFailed", "The audit entry could not be written.")));
+            }
         }
 
         private sealed class StubTenantTokenIssuer : ITenantAccessTokenIssuer
