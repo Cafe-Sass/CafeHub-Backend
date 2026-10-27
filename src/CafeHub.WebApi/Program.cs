@@ -19,6 +19,7 @@ builder.Services.AddSuperAdminSeeding();
 builder.Services.AddCorrelationId();
 builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddPlatformAuthentication();
+builder.Services.AddTenantAuthentication();
 builder.Services.AddPlatformAuthorization();
 builder.Services.AddApiDocumentation();
 

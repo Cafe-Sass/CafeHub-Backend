@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace CafeHub.WebApi.Authentication
 {
-    public sealed class ProblemDetailsJwtBearerEvents : JwtBearerEvents
+    public class ProblemDetailsJwtBearerEvents : JwtBearerEvents
     {
         private const string UnauthorizedCode = "Identity.NotAuthenticated";
         private const string UnauthorizedMessage = "Authentication is required to use this resource.";
