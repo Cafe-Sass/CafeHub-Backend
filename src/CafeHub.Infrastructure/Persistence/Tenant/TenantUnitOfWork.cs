@@ -15,12 +15,20 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
             var transaction = context.Database.CurrentTransaction ?? throw new InvalidOperationException("A transaction must be started before it is committed.");
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await transaction.DisposeAsync();
         }
 
         public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
         {
             var transaction = context.Database.CurrentTransaction ?? throw new InvalidOperationException("A transaction must be started before it is rolled back.");
-            await transaction.RollbackAsync(cancellationToken);
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            finally
+            {
+                await transaction.DisposeAsync();
+            }
         }
     }
 }
