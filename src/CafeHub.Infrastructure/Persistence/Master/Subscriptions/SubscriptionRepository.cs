@@ -14,5 +14,15 @@ namespace CafeHub.Infrastructure.Persistence.Master.Subscriptions
                 .AsNoTracking()
                 .FirstOrDefaultAsync(subscription => subscription.OnboardingRequestId == onboardingRequestId, cancellationToken);
         }
+
+        public Task AddAsync(
+            Subscription subscription,
+            SubscriptionPeriod initialPeriod,
+            CancellationToken cancellationToken)
+        {
+            context.Subscriptions.Add(subscription);
+            context.SubscriptionPeriods.Add(initialPeriod);
+            return Task.CompletedTask;
+        }
     }
 }

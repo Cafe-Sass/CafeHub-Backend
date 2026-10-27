@@ -1,3 +1,4 @@
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -10,6 +11,8 @@ using CafeHub.Domain.Onboarding;
 using CafeHub.UnitTests.Onboarding.Application;
 using CafeHub.UnitTests.Plans;
 using FluentValidation.TestHelper;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests.Onboarding.Commands
 {
@@ -55,6 +58,33 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 auditWriter,
                 currentUser,
                 timeProvider ?? TimeProvider.System);
+        }
+
+        [Fact]
+        public async Task Send_Success_UsesOnlyHandlerOwnedMasterTransaction()
+        {
+            var request = PaidRequest();
+            var store = new FakeOnboardingRequestStore(request);
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            var currentUser = new FakeCurrentUser { AdminId = ReviewerId };
+            await using var provider = new ServiceCollection()
+                .AddApplication()
+                .AddSingleton<IOnboardingRequestStore>(store)
+                .AddSingleton<IMasterUnitOfWork>(unitOfWork)
+                .AddSingleton<IPlatformAuditWriter>(auditWriter)
+                .AddSingleton<ICurrentUser>(currentUser)
+                .AddSingleton(TimeProvider.System)
+                .BuildServiceProvider();
+
+            var result = await provider.GetRequiredService<ISender>().Send(
+                new RejectOnboardingRequestCommand(RequestId, "Reason"));
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(0, unitOfWork.RollbackCount);
+            Assert.Single(auditWriter.Entries);
         }
 
         [Fact]

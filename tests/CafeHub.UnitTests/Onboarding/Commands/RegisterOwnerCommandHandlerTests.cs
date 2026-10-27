@@ -1,3 +1,4 @@
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -9,6 +10,8 @@ using CafeHub.Domain.Onboarding;
 using CafeHub.UnitTests.Onboarding.Application;
 using CafeHub.UnitTests.Plans;
 using FluentValidation.TestHelper;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests.Onboarding.Commands
 {
@@ -108,7 +111,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
         private static RegisterOwnerCommand ValidCommand() => new(
             "Owner.Name@Example.com",
             "Owner Name",
-            "+1-555-0100",
+            "1-555-0100",
             "Cafe Name",
             "Str0ngP@ssw0rd!",
             "my-cafe",
@@ -149,6 +152,72 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.Equal(1, unitOfWork.BeginCount);
             Assert.Equal(1, unitOfWork.CommitCount);
             Assert.Equal(0, unitOfWork.RollbackCount);
+        }
+
+        [Fact]
+        public async Task Send_RegistrationCommand_UsesOnlyTheHandlerOwnedMasterTransaction()
+        {
+            var store = new FakeOnboardingRequestStore();
+            var slugAvailability = new FakeSlugAvailability();
+            var passwordHasher = new FakeOwnerPasswordHasher();
+            var planRepository = new FakePlanRepository { PlanVersionsExist = true };
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+
+            using var provider = CreateMediatorProvider(
+                store, slugAvailability, passwordHasher, planRepository, unitOfWork, auditWriter);
+            var result = await provider.GetRequiredService<IMediator>().Send(ValidCommand());
+
+            Assert.True(result.IsSuccess);
+            Assert.Single(store.Requests);
+            Assert.Single(auditWriter.Entries);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(0, unitOfWork.RollbackCount);
+        }
+
+        [Fact]
+        public async Task Send_RegistrationCommitFailure_RollsBackOnceAndRethrows()
+        {
+            var store = new FakeOnboardingRequestStore();
+            var slugAvailability = new FakeSlugAvailability();
+            var passwordHasher = new FakeOwnerPasswordHasher();
+            var planRepository = new FakePlanRepository { PlanVersionsExist = true };
+            var expectedException = new InvalidOperationException("commit failed");
+            var unitOfWork = new FakeMasterUnitOfWork { ThrowOnCommit = expectedException };
+            var auditWriter = new RecordingPlanAuditWriter();
+
+            using var provider = CreateMediatorProvider(
+                store, slugAvailability, passwordHasher, planRepository, unitOfWork, auditWriter);
+
+            var actualException = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                provider.GetRequiredService<IMediator>().Send(ValidCommand()));
+
+            Assert.Same(expectedException, actualException);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(1, unitOfWork.RollbackCount);
+        }
+
+        private static ServiceProvider CreateMediatorProvider(
+            FakeOnboardingRequestStore store,
+            FakeSlugAvailability slugAvailability,
+            FakeOwnerPasswordHasher passwordHasher,
+            FakePlanRepository planRepository,
+            FakeMasterUnitOfWork unitOfWork,
+            RecordingPlanAuditWriter auditWriter)
+        {
+            return new ServiceCollection()
+                .AddApplication()
+                .AddSingleton<IOnboardingRequestStore>(store)
+                .AddSingleton<ISlugAvailability>(slugAvailability)
+                .AddSingleton<IDuplicateRegistrationDetector>(new DuplicateRegistrationDetectorForTests())
+                .AddSingleton<IOwnerPasswordHasher>(passwordHasher)
+                .AddSingleton<IPlanRepository>(planRepository)
+                .AddSingleton<IMasterUnitOfWork>(unitOfWork)
+                .AddSingleton<IPlatformAuditWriter>(auditWriter)
+                .AddSingleton(TimeProvider.System)
+                .BuildServiceProvider();
         }
 
         [Theory]

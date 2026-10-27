@@ -12,5 +12,7 @@ namespace CafeHub.Application.Onboarding.Contracts
         Task<Tenant?> FindByIdAsync(Guid tenantId, CancellationToken cancellationToken);
 
         Task AddAsync(Tenant tenant, CancellationToken cancellationToken);
+
+        Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken);
     }
 }

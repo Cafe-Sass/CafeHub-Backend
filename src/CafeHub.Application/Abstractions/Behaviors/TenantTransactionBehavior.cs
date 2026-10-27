@@ -2,6 +2,7 @@ using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.Application.Abstractions.Behaviors
 {
@@ -9,11 +10,11 @@ namespace CafeHub.Application.Abstractions.Behaviors
         where TRequest : notnull
         where TResponse : Result
     {
-        private readonly ITenantUnitOfWork unitOfWork;
+        private readonly IServiceProvider serviceProvider;
 
-        public TenantTransactionBehavior(ITenantUnitOfWork unitOfWork)
+        public TenantTransactionBehavior(IServiceProvider serviceProvider)
         {
-            this.unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
 
         public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
@@ -22,6 +23,8 @@ namespace CafeHub.Application.Abstractions.Behaviors
             {
                 return await next(cancellationToken);
             }
+
+            var unitOfWork = serviceProvider.GetRequiredService<ITenantUnitOfWork>();
 
             await unitOfWork.BeginTransactionAsync(cancellationToken);
             try

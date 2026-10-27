@@ -30,5 +30,13 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
             context.Tenants.Add(tenant);
             return Task.CompletedTask;
         }
+
+        public Task UpdateAsync(
+            global::CafeHub.Domain.Tenants.Tenant tenant,
+            CancellationToken cancellationToken)
+        {
+            context.Tenants.Update(tenant);
+            return Task.CompletedTask;
+        }
     }
 }

@@ -8,5 +8,7 @@ namespace CafeHub.Application.Onboarding.Contracts
     public interface ISubscriptionRepository
     {
         Task<Subscription?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken);
+
+        Task AddAsync(Subscription subscription, SubscriptionPeriod initialPeriod, CancellationToken cancellationToken);
     }
 }

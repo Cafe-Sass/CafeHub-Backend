@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -29,7 +30,7 @@ namespace CafeHub.WebApi.Documentation
                 Type = SecuritySchemeType.Http,
                 Scheme = "bearer",
                 BearerFormat = "JWT",
-                Description = "A JSON Web Token obtained from the admin sign-in endpoint.",
+                Description = "Use a JWT access token from admin or tenant sign-in. In Swagger UI, paste the raw token without the 'Bearer ' prefix; Swagger adds that prefix to the Authorization header.",
             };
 
             return Task.CompletedTask;
@@ -42,21 +43,32 @@ namespace CafeHub.WebApi.Documentation
                 throw new ArgumentNullException(nameof(operation));
             }
 
-            if (context?.Description?.ActionDescriptor?.EndpointMetadata is not { } metadata)
+            var actionDescriptor = context?.Description?.ActionDescriptor;
+            if (actionDescriptor is null)
             {
                 return Task.CompletedTask;
             }
 
-            if (metadata.OfType<IAllowAnonymous>().Any() || !metadata.OfType<IAuthorizeData>().Any())
+            var metadata = actionDescriptor.EndpointMetadata ?? [];
+            var controllerAttributes = actionDescriptor is ControllerActionDescriptor controllerAction
+                ? controllerAction.ControllerTypeInfo.GetCustomAttributes(inherit: true)
+                    .Concat(controllerAction.MethodInfo.GetCustomAttributes(inherit: true))
+                : Enumerable.Empty<object>();
+            var authorizationMetadata = metadata.Concat(controllerAttributes).ToArray();
+
+            if (authorizationMetadata.OfType<IAllowAnonymous>().Any()
+                || !authorizationMetadata.OfType<IAuthorizeData>().Any())
             {
                 return Task.CompletedTask;
             }
 
-            operation.Security ??= new List<OpenApiSecurityRequirement>();
-            operation.Security.Add(new OpenApiSecurityRequirement
-            {
-                [new OpenApiSecuritySchemeReference(SchemeName, context.Document, string.Empty)] = new List<string>(),
-            });
+            operation.Security =
+            [
+                new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference(SchemeName, context!.Document, null)] = new List<string>(),
+                },
+            ];
 
             return Task.CompletedTask;
         }

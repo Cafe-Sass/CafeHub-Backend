@@ -10,6 +10,7 @@ using CafeHub.WebApi.RateLimiting;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace CafeHub.WebApi.Controllers
@@ -51,9 +52,13 @@ namespace CafeHub.WebApi.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<PaymentOutcomeResponse>> Pay(
             Guid id,
+            [FromHeader(Name = "Idempotency-Key"), BindRequired] string? idempotencyKey,
             CancellationToken cancellationToken)
         {
-            var command = new PayOnboardingRequestCommand(id);
+            var command = new PayOnboardingRequestCommand(id)
+            {
+                IdempotencyKey = idempotencyKey,
+            };
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsSuccess)

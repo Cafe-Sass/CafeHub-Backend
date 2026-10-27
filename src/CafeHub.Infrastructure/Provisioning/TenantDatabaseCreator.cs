@@ -90,6 +90,14 @@ namespace CafeHub.Infrastructure.Provisioning
                     cancellationToken);
                 await _executor.ExecuteTenantStatementAsync(
                     databaseName,
+                    $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {SqlIdentifier.Quote(applicationRoleName)}",
+                    cancellationToken);
+                await _executor.ExecuteTenantStatementAsync(
+                    databaseName,
+                    $"GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {SqlIdentifier.Quote(applicationRoleName)}",
+                    cancellationToken);
+                await _executor.ExecuteTenantStatementAsync(
+                    databaseName,
                     $"ALTER DEFAULT PRIVILEGES FOR ROLE {SqlIdentifier.Quote(ownerRoleName)} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {SqlIdentifier.Quote(applicationRoleName)}",
                     cancellationToken);
                 await _executor.ExecuteTenantStatementAsync(

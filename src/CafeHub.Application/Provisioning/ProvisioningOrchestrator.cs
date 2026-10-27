@@ -155,18 +155,42 @@ namespace CafeHub.Application.Provisioning
         {
             return index switch
             {
-                0 => await EnsureDatabaseAsync(tenant),
+                0 => await EnsureDatabaseAsync(tenant, cancellationToken),
                 1 => await InitializeSchemaAsync(tenant, request),
                 _ => await MarkReadyStepResultAsync(),
             };
         }
 
-        private async Task<Result> EnsureDatabaseAsync(Tenant tenant)
+        private async Task<Result> EnsureDatabaseAsync(Tenant tenant, CancellationToken cancellationToken)
         {
             var result = await databaseCreator.EnsureDatabaseAsync(
                 new TenantDatabaseSpec(tenant.Id, tenant.Slug),
-                CancellationToken.None);
-            return result.IsSuccess ? Result.Success() : Result.Failure(result.Error!);
+                cancellationToken);
+            if (result.IsFailure)
+            {
+                return Result.Failure(result.Error!);
+            }
+
+            var databaseInfo = result.Value!;
+            var tenantDatabase = await tenantDatabaseStore.FindByTenantIdAsync(tenant.Id, cancellationToken);
+            if (tenantDatabase is null)
+            {
+                tenantDatabase = TenantDatabase.Create(
+                    Guid.CreateVersion7(),
+                    tenant.Id,
+                    databaseInfo.CredentialReference,
+                    TenantDatabaseStatus.Provisioned,
+                    timeProvider.GetUtcNow());
+                await tenantDatabaseStore.AddAsync(tenantDatabase, cancellationToken);
+            }
+            else if (tenantDatabase.Status != TenantDatabaseStatus.Provisioned
+                || !string.Equals(tenantDatabase.SecretReference, databaseInfo.CredentialReference, StringComparison.Ordinal))
+            {
+                tenantDatabase.MarkProvisioned(databaseInfo.CredentialReference, timeProvider.GetUtcNow());
+                await tenantDatabaseStore.UpdateAsync(tenantDatabase, cancellationToken);
+            }
+
+            return Result.Success();
         }
 
         private async Task<Result> InitializeSchemaAsync(Tenant tenant, OnboardingRequest? request)
@@ -212,6 +236,7 @@ namespace CafeHub.Application.Provisioning
             try
             {
                 tenant.TransitionTo(TenantLifecycleStatus.Active, now);
+                await tenantStore.UpdateAsync(tenant, cancellationToken);
                 await unitOfWork.CommitTransactionAsync(cancellationToken);
 
                 auditWriter.Write(new PlatformAuditEntry

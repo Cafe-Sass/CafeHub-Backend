@@ -1,4 +1,9 @@
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Identity;
+using CafeHub.Application.Identity.Commands;
+using CafeHub.Application.Identity.DTOs;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure;
@@ -6,6 +11,7 @@ using CafeHub.Infrastructure.Persistence.Master;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Provisioning;
 using CafeHub.Infrastructure.Tenancy;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -136,6 +142,32 @@ namespace CafeHub.UnitTests
             Assert.Equal(masterConnection, masterDbContext.Database.GetConnectionString());
         }
 
+        [Fact]
+        public void ResolvingLoginAdminHandler_DoesNotRequireTenantContext()
+        {
+            var settings = new Dictionary<string, string?>
+            {
+                [ConfigurationKeys.MasterConnectionString] = "Host=localhost;Port=5432;Database=cafehub_master",
+                ["Jwt:Issuer"] = "cafehub-tests",
+                ["Jwt:Audience"] = "cafehub-admin-tests",
+                ["Jwt:SigningKey"] = new string('k', 32),
+            };
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddSingleton<ICurrentUser, UnauthenticatedCurrentUser>();
+            services.AddApplication(configuration);
+            services.AddInfrastructure(configuration);
+
+            using var rootProvider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+            using var scope = rootProvider.CreateScope();
+
+            var handler = scope.ServiceProvider.GetRequiredService<
+                IRequestHandler<LoginAdminCommand, Result<AdminTokenResponse>>>();
+
+            Assert.NotNull(handler);
+        }
+
         private static Dictionary<string, string?> CreateTenantConnectionSettings()
         {
             return new Dictionary<string, string?>
@@ -165,6 +197,15 @@ namespace CafeHub.UnitTests
             {
                 return Task.FromResult(registration?.TenantId == tenantId ? registration : null);
             }
+        }
+
+        private sealed class UnauthenticatedCurrentUser : ICurrentUser
+        {
+            public bool IsAuthenticated => false;
+
+            public Guid? AdminId => null;
+
+            public IReadOnlyCollection<string> Roles => Array.Empty<string>();
         }
     }
 }
