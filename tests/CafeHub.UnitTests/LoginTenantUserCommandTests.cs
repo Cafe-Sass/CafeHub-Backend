@@ -158,7 +158,7 @@ namespace CafeHub.UnitTests
             public List<Guid> UserIds { get; } = new();
             public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken) { UserIds.Add(userId); return Task.FromResult(Result.Success(new IssuedTenantRefreshToken { RawToken = "refresh", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), FamilyId = Guid.NewGuid() })); }
             public Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken) => Task.FromResult(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken()));
-            public Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) => Task.FromResult(Result.Failure<Guid>(AuthErrors.InvalidRefreshToken()));
+            public Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) => Task.FromResult(Result.Failure(AuthErrors.InvalidRefreshToken()));
         }
 
         private sealed class StubTenantContextAccessor(Guid tenantId) : ITenantContextAccessor

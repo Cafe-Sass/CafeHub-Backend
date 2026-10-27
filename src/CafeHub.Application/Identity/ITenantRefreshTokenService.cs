@@ -10,6 +10,6 @@ namespace CafeHub.Application.Identity
 
         Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken);
 
-        Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken);
+        Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken);
     }
 }

@@ -121,7 +121,7 @@ namespace CafeHub.Infrastructure.Authentication
             });
         }
 
-        public async Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
+        public async Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken)
         {
             if (!RefreshTokenRevocationReasons.IsDefined(reason))
             {
@@ -131,7 +131,7 @@ namespace CafeHub.Infrastructure.Authentication
             if (!IsPlausibleRawToken(rawToken))
             {
                 LogRejection("invalid_input");
-                return InvalidRefreshTokenResult<Guid>();
+                return Result.Failure(AuthErrors.InvalidRefreshToken());
             }
 
             var tokenHash = hasher.Hash(rawToken);
@@ -142,11 +142,11 @@ namespace CafeHub.Infrastructure.Authentication
             {
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
                 LogRejection("unknown_token");
-                return InvalidRefreshTokenResult<Guid>();
+                return Result.Failure(AuthErrors.InvalidRefreshToken());
             }
 
             await RevokeFamilyAndCommitAsync(token.FamilyId, timeProvider.GetUtcNow(), reason, cancellationToken);
-            return Result.Success(token.UserId);
+            return Result.Success();
         }
 
         private async Task RevokeFamilyAndCommitAsync(Guid familyId, DateTimeOffset revokedAt, string reason, CancellationToken cancellationToken)

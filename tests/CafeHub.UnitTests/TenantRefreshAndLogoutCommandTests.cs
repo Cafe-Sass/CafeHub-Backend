@@ -58,16 +58,18 @@ namespace CafeHub.UnitTests
             Assert.Equal(AuthErrors.InvalidRefreshToken(), result.Error);
         }
 
-        [Fact]
-        public async Task Logout_IsIdempotentForUnknownOrAlreadyRevokedToken()
+        [Theory]
+        [InlineData("unknown")]
+        [InlineData("already-revoked")]
+        public async Task Logout_IsIdempotentForUnknownOrAlreadyRevokedToken(string token)
         {
             var service = new StubRefreshService(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken()));
             var handler = new LogoutTenantUserCommandHandler(service);
 
-            var result = await handler.Handle(new LogoutTenantUserCommand("unknown"), default);
+            var result = await handler.Handle(new LogoutTenantUserCommand(token), default);
 
             Assert.True(result.IsSuccess);
-            Assert.Equal(("unknown", RefreshTokenRevocationReasons.Logout), service.Revocation);
+            Assert.Equal((token, RefreshTokenRevocationReasons.Logout), service.Revocation);
         }
 
         [Theory]
@@ -111,7 +113,7 @@ namespace CafeHub.UnitTests
             public (string Token, string Reason)? Revocation { get; private set; }
             public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken) => throw new NotImplementedException();
             public Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken) { RotatedRawToken = rawToken; return Task.FromResult(rotationResult); }
-            public Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) { Revocation = (rawToken, reason); return Task.FromResult(Result.Failure<Guid>(AuthErrors.InvalidRefreshToken())); }
+            public Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) { Revocation = (rawToken, reason); return Task.FromResult(Result.Failure(AuthErrors.InvalidRefreshToken())); }
         }
 
         private sealed class StubAuthenticator(AuthenticatedTenantUser? user) : ITenantUserAuthenticator
