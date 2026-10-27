@@ -46,6 +46,10 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             AssertColumn(entity, nameof(TenantRefreshToken.ReplacedById), "replaced_by_id", typeof(Guid?), true);
             AssertColumn(entity, nameof(TenantRefreshToken.RevokedAt), "revoked_at", typeof(DateTimeOffset?), true);
             AssertColumn(entity, nameof(TenantRefreshToken.RevokedReason), "revoked_reason", typeof(string), true);
+            var concurrencyToken = entity.FindProperty("xmin");
+            Assert.NotNull(concurrencyToken);
+            Assert.True(concurrencyToken.IsConcurrencyToken);
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, concurrencyToken.ValueGenerated);
         }
 
         [Fact]
@@ -112,6 +116,21 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(4, indexes.Count);
             Assert.All(indexes, index => Assert.Equal("refresh_tokens", index.Table));
             Assert.Equal(5, migration.UpOperations.Count);
+        }
+
+        [Fact]
+        public void AddTenantRefreshTokenConcurrencyTokenMigration_UsesPostgresRowVersion()
+        {
+            using var context = CreateTenantContext();
+            var migrations = context.GetService<IMigrationsAssembly>();
+            var migrationType = migrations.Migrations.Single(migration => migration.Key.EndsWith("_AddTenantRefreshTokenConcurrencyToken", StringComparison.Ordinal)).Value;
+            var migration = migrations.CreateMigration(migrationType, context.Database.ProviderName!);
+            var addColumn = Assert.Single(migration.UpOperations.OfType<AddColumnOperation>());
+
+            Assert.Equal("xmin", addColumn.Name);
+            Assert.Equal("refresh_tokens", addColumn.Table);
+            Assert.Equal("xid", addColumn.ColumnType);
+            Assert.True(addColumn.IsRowVersion);
         }
 
         private static void AssertColumn(IEntityType entity, string propertyName, string columnName, Type clrType, bool nullable)

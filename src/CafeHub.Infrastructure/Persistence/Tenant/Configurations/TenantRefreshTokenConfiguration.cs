@@ -45,6 +45,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .HasForeignKey(token => token.ReplacedById)
                 .HasConstraintName("fk_refresh_tokens_replaced_by_id")
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property<uint>("xmin").IsRowVersion();
         }
     }
 }

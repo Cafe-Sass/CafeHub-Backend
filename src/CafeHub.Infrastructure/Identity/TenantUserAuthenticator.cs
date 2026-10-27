@@ -57,6 +57,25 @@ namespace CafeHub.Infrastructure.Identity
             });
         }
 
+        public async Task<AuthenticatedTenantUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is null || user.DeletedAt is not null)
+            {
+                return null;
+            }
+
+            var roles = await userManager.GetRolesAsync(user);
+            return new AuthenticatedTenantUser
+            {
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                FullName = user.FullName,
+                UserKind = user.UserKind.ToString(),
+                Roles = roles.ToList(),
+            };
+        }
+
         private void VerifyDummyPassword(string password)
         {
             DummyVerifications++;
