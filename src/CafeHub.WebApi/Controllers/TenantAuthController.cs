@@ -32,6 +32,24 @@ namespace CafeHub.WebApi.Controllers
             if (result.IsSuccess) return Ok(result.Value);
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
+
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<ActionResult<TenantTokenResponse>> Refresh([FromBody] RefreshTenantTokenCommand command, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command, cancellationToken);
+            if (result.IsSuccess) return Ok(result.Value);
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("logout")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Logout([FromBody] LogoutTenantUserCommand command, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command, cancellationToken);
+            if (result.IsSuccess) return NoContent();
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
     }
 
     public static class TenantRouteConstants
