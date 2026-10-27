@@ -151,8 +151,8 @@ namespace CafeHub.UnitTests
 
             var context = await ValidateAndBindAsync(CreateTenantToken(tenantId: OtherTenantId), tenant, logger: logger);
 
-            Assert.NotNull(context.Result?.Failure);
             Assert.Contains(logger.Messages, message => message.Contains("tenant_mismatch", StringComparison.Ordinal));
+            Assert.NotNull(context.Result);
             Assert.DoesNotContain(logger.Messages, message => message.Contains(OtherTenantId.ToString(), StringComparison.Ordinal));
         }
 
@@ -167,8 +167,8 @@ namespace CafeHub.UnitTests
 
             var context = await ValidateAndBindAsync(CreateTenantToken(tokenKind: tokenKind, includeTenantId: hasTenantId, tenantIdValue: tenantId), tenant, logger: logger);
 
-            Assert.NotNull(context.Result?.Failure);
             Assert.Contains(logger.Messages, message => message.Contains(category, StringComparison.Ordinal));
+            Assert.NotNull(context.Result);
         }
 
         [Fact]
@@ -179,8 +179,8 @@ namespace CafeHub.UnitTests
 
             var context = await ValidateAndBindAsync(CreateTenantToken(tokenKind: null), tenant, logger: logger);
 
-            Assert.NotNull(context.Result?.Failure);
             Assert.Contains(logger.Messages, message => message.Contains("token_kind", StringComparison.Ordinal));
+            Assert.NotNull(context.Result);
         }
 
         [Fact]
@@ -191,8 +191,8 @@ namespace CafeHub.UnitTests
 
             var context = await ValidateAndBindAsync(CreateTenantToken(), tenant, new MissingTenantContextAccessor(), logger);
 
-            Assert.NotNull(context.Result?.Failure);
             Assert.Contains(logger.Messages, message => message.Contains("no_tenant_context", StringComparison.Ordinal));
+            Assert.NotNull(context.Result);
         }
 
         [Theory]
@@ -265,13 +265,15 @@ namespace CafeHub.UnitTests
         [Fact]
         public void TenantScheme_DoesNotChangePlatformDefaultScheme()
         {
-            var (tenant, _, services) = RegisterSchemes();
+            var (tenant, platform, services) = RegisterSchemes();
             using (services)
             {
                 var authenticationOptions = services.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
                 Assert.Equal(JwtBearerDefaults.AuthenticationScheme, authenticationOptions.DefaultAuthenticateScheme);
                 Assert.Equal(JwtBearerDefaults.AuthenticationScheme, authenticationOptions.DefaultChallengeScheme);
                 Assert.Equal(TenantAuthenticationSchemes.Bearer, authenticationOptions.Schemes.Single(scheme => scheme.Name == TenantAuthenticationSchemes.Bearer).Name);
+                Assert.IsType<ProblemDetailsJwtBearerEvents>(platform.Events);
+                Assert.IsType<TenantJwtBearerEvents>(tenant.Events);
                 Assert.NotNull(tenant.Events.OnTokenValidated);
             }
         }

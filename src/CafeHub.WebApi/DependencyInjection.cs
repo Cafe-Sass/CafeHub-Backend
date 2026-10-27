@@ -94,7 +94,7 @@ namespace CafeHub.WebApi
                 {
                     jwtBearerOptions.MapInboundClaims = false;
                     jwtBearerOptions.TokenValidationParameters = PlatformTokenValidationParameters.Create(jwtOptions);
-                    jwtBearerOptions.Events = new TenantJwtBearerEvents();
+                    jwtBearerOptions.Events = new ProblemDetailsJwtBearerEvents();
                 });
 
             return services;
@@ -115,7 +115,7 @@ namespace CafeHub.WebApi
                 {
                     jwtBearerOptions.MapInboundClaims = false;
                     jwtBearerOptions.TokenValidationParameters = TenantTokenValidationParameters.Create(jwtOptions, tenantJwtOptions);
-                    jwtBearerOptions.Events = new ProblemDetailsJwtBearerEvents();
+                    jwtBearerOptions.Events = new TenantJwtBearerEvents();
                 });
 
             return services;
