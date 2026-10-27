@@ -100,6 +100,27 @@ namespace CafeHub.WebApi
             return services;
         }
 
+        public static IServiceCollection AddTenantAuthentication(this IServiceCollection services)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.AddAuthentication()
+                .AddJwtBearer(TenantAuthenticationSchemes.Bearer);
+
+            services.AddOptions<JwtBearerOptions>(TenantAuthenticationSchemes.Bearer)
+                .Configure<JwtOptions, TenantJwtOptions>((jwtBearerOptions, jwtOptions, tenantJwtOptions) =>
+                {
+                    jwtBearerOptions.MapInboundClaims = false;
+                    jwtBearerOptions.TokenValidationParameters = TenantTokenValidationParameters.Create(jwtOptions, tenantJwtOptions);
+                    jwtBearerOptions.Events = new ProblemDetailsJwtBearerEvents();
+                });
+
+            return services;
+        }
+
         public static IServiceCollection AddPlatformAuthorization(this IServiceCollection services)
         {
             if (services is null)
