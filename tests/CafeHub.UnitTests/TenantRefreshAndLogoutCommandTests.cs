@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Identity.Commands;
 using CafeHub.Application.Identity.DTOs;
@@ -20,7 +21,9 @@ namespace CafeHub.UnitTests
             var user = User(Guid.NewGuid(), "Manager");
             var refresh = new StubRefreshService(Result.Success(new RotatedTenantRefreshToken { RawToken = "rotated-secret", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), UserId = user.Id }));
             var issuer = new StubIssuer();
-            var handler = new RefreshTenantTokenCommandHandler(refresh, new StubAuthenticator(user), issuer, new TenantContextAccessor());
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new RefreshTenantTokenCommandHandler(refresh, new StubAuthenticator(user), issuer, new TenantContextAccessor(), auditWriter, unitOfWork);
 
             var result = await handler.Handle(new RefreshTenantTokenCommand("presented-secret"), default);
 
@@ -30,6 +33,11 @@ namespace CafeHub.UnitTests
             Assert.Equal(new[] { "Manager" }, Assert.Single(issuer.Requests).Roles);
             Assert.Equal(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), issuer.Requests[0].TenantId);
             Assert.Equal("presented-secret", refresh.RotatedRawToken);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.refresh.succeeded", audit.Action);
+            Assert.Equal(user.Id, audit.ActorUserId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Fact]
@@ -38,7 +46,9 @@ namespace CafeHub.UnitTests
             var id = Guid.NewGuid();
             var refresh = new StubRefreshService(Result.Success(new RotatedTenantRefreshToken { RawToken = "rotated-secret", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), UserId = id }));
             var issuer = new StubIssuer();
-            var handler = new RefreshTenantTokenCommandHandler(refresh, new StubAuthenticator(null), issuer, new TenantContextAccessor());
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new RefreshTenantTokenCommandHandler(refresh, new StubAuthenticator(null), issuer, new TenantContextAccessor(), auditWriter, unitOfWork);
 
             var result = await handler.Handle(new RefreshTenantTokenCommand("presented-secret"), default);
 
@@ -46,16 +56,27 @@ namespace CafeHub.UnitTests
             Assert.Equal(AuthErrors.InvalidRefreshToken(), result.Error);
             Assert.Equal(("rotated-secret", RefreshTokenRevocationReasons.AdminRevoked), refresh.Revocation);
             Assert.Empty(issuer.Requests);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.refresh.failed", audit.Action);
+            Assert.Equal(id, audit.ActorUserId);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Fact]
         public async Task Refresh_MapsAnyRotationFailureToGenericInvalidRefreshError()
         {
-            var handler = new RefreshTenantTokenCommandHandler(new StubRefreshService(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken())), new StubAuthenticator(null), new StubIssuer(), new TenantContextAccessor());
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new RefreshTenantTokenCommandHandler(new StubRefreshService(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken())), new StubAuthenticator(null), new StubIssuer(), new TenantContextAccessor(), auditWriter, unitOfWork);
 
             var result = await handler.Handle(new RefreshTenantTokenCommand("secret"), default);
 
             Assert.Equal(AuthErrors.InvalidRefreshToken(), result.Error);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.refresh.failed", audit.Action);
+            Assert.Null(audit.ActorUserId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Theory]
@@ -64,12 +85,19 @@ namespace CafeHub.UnitTests
         public async Task Logout_IsIdempotentForUnknownOrAlreadyRevokedToken(string token)
         {
             var service = new StubRefreshService(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken()));
-            var handler = new LogoutTenantUserCommandHandler(service);
+            var auditWriter = new RecordingTenantAuditWriter();
+            var unitOfWork = new RecordingTenantAuditUnitOfWork(auditWriter);
+            var handler = new LogoutTenantUserCommandHandler(service, auditWriter, unitOfWork);
 
             var result = await handler.Handle(new LogoutTenantUserCommand(token), default);
 
             Assert.True(result.IsSuccess);
             Assert.Equal((token, RefreshTokenRevocationReasons.Logout), service.Revocation);
+            var audit = Assert.Single(auditWriter.Entries);
+            Assert.Equal("tenant.logout.succeeded", audit.Action);
+            Assert.Null(audit.ActorUserId);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Single(auditWriter.PersistedEntries);
         }
 
         [Theory]

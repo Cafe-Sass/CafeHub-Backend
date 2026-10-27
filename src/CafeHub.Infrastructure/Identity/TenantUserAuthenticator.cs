@@ -36,13 +36,13 @@ namespace CafeHub.Infrastructure.Identity
             if (user.LockoutEnabled && await userManager.GetLockoutEndDateAsync(user) is { } until && until > timeProvider.GetUtcNow())
             {
                 VerifyDummyPassword(password);
-                return Result.Failure<AuthenticatedTenantUser>(AuthErrors.InvalidCredentials());
+                return Result.Failure<AuthenticatedTenantUser>(LockedOutTenantCredentials.Create(user.Id));
             }
 
             if (!await userManager.CheckPasswordAsync(user, password))
             {
                 await userManager.AccessFailedAsync(user);
-                return Result.Failure<AuthenticatedTenantUser>(AuthErrors.InvalidCredentials());
+                return Result.Failure<AuthenticatedTenantUser>(RejectedTenantCredentials.Create(user.Id));
             }
 
             await userManager.ResetAccessFailedCountAsync(user);
