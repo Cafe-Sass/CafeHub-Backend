@@ -9,6 +9,7 @@ using CafeHub.WebApi.Documentation;
 using CafeHub.WebApi.RateLimiting;
 using CafeHub.WebApi.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -141,6 +142,35 @@ namespace CafeHub.WebApi
 
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddTenantAuthorization(this IServiceCollection services)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.AddAuthorizationBuilder()
+                .AddPolicy(TenantPolicies.TenantUser, policy =>
+                {
+                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(new TenantBoundRequirement());
+                })
+                .AddPolicy(TenantPolicies.TenantOwner, policy =>
+                {
+                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireRole(TenantRoles.Owner);
+                    policy.AddRequirements(new TenantBoundRequirement());
+                });
+
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentTenantUser, HttpContextCurrentTenantUser>();
+            services.AddScoped<IAuthorizationHandler, TenantBoundAuthorizationHandler>();
 
             return services;
         }

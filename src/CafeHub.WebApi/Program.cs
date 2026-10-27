@@ -21,6 +21,7 @@ builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddPlatformAuthentication();
 builder.Services.AddTenantAuthentication();
 builder.Services.AddPlatformAuthorization();
+builder.Services.AddTenantAuthorization();
 builder.Services.AddApiDocumentation();
 
 var app = builder.Build();
