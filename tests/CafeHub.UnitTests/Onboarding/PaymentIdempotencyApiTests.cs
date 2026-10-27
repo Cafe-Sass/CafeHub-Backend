@@ -3,8 +3,8 @@ using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Onboarding.Commands;
 using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.WebApi.Controllers;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.DependencyInjection;
 

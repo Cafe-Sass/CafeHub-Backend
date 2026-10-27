@@ -1,11 +1,11 @@
 using System.Reflection;
 using System.Text.Json;
-using CafeHub.WebApi.Documentation;
 using CafeHub.WebApi.Controllers;
+using CafeHub.WebApi.Documentation;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;

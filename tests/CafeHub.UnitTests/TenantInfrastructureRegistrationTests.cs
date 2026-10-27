@@ -1,6 +1,6 @@
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
-using CafeHub.Application;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Identity.Commands;
 using CafeHub.Application.Identity.DTOs;
