@@ -11,6 +11,7 @@ using CafeHub.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace CafeHub.UnitTests
@@ -95,7 +96,7 @@ namespace CafeHub.UnitTests
         public async Task TenantRefreshIssuance_PersistsOnlyTheTokenHash()
         {
             var tokenStore = new CapturingTenantRefreshStore();
-            var service = new TenantRefreshTokenService(tokenStore, new RecordingTenantUnitOfWork(), new FixedTokenGenerator(), new FixedTokenHasher(), new RefreshTokenOptions(), new FixedTimeProvider(DateTimeOffset.Parse("2026-10-27T10:00:00Z")));
+            var service = new TenantRefreshTokenService(tokenStore, new RecordingTenantUnitOfWork(), new FixedTokenGenerator(), new FixedTokenHasher(), new RefreshTokenOptions(), new FixedTimeProvider(DateTimeOffset.Parse("2026-10-27T10:00:00Z")), NullLogger<TenantRefreshTokenService>.Instance);
 
             var result = await service.IssueAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -143,6 +144,7 @@ namespace CafeHub.UnitTests
         private sealed class StubTenantAuthenticator(Result<AuthenticatedTenantUser> result) : ITenantUserAuthenticator
         {
             public Task<Result<AuthenticatedTenantUser>> CheckCredentialsAsync(string email, string password, CancellationToken cancellationToken) => Task.FromResult(result);
+            public Task<AuthenticatedTenantUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedTenantUser?>(result.IsSuccess ? result.Value : null);
         }
 
         private sealed class StubTenantTokenIssuer : ITenantAccessTokenIssuer
@@ -155,6 +157,8 @@ namespace CafeHub.UnitTests
         {
             public List<Guid> UserIds { get; } = new();
             public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken) { UserIds.Add(userId); return Task.FromResult(Result.Success(new IssuedTenantRefreshToken { RawToken = "refresh", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), FamilyId = Guid.NewGuid() })); }
+            public Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken) => Task.FromResult(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken()));
+            public Task<Result<Guid>> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) => Task.FromResult(Result.Failure<Guid>(AuthErrors.InvalidRefreshToken()));
         }
 
         private sealed class StubTenantContextAccessor(Guid tenantId) : ITenantContextAccessor
@@ -185,7 +189,10 @@ namespace CafeHub.UnitTests
         private sealed class CapturingTenantRefreshStore : ITenantRefreshTokenStore
         {
             public TenantRefreshToken? Token { get; private set; }
+            public Task<TenantRefreshToken?> FindByTokenHashAsync(string tokenHash, CancellationToken cancellationToken) => Task.FromResult(Token is not null && Token.TokenHash == tokenHash ? Token : null);
+            public Task<IReadOnlyList<TenantRefreshToken>> FindFamilyAsync(Guid familyId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TenantRefreshToken>>(Token is not null && Token.FamilyId == familyId ? new[] { Token } : Array.Empty<TenantRefreshToken>());
             public void Add(TenantRefreshToken token) => Token = token;
+            public void ClearTracking() { }
         }
 
         private sealed class RecordingTenantUnitOfWork : ITenantUnitOfWork
