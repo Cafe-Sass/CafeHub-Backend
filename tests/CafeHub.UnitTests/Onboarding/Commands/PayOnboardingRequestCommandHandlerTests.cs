@@ -1,5 +1,6 @@
 using System.Linq;
 
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -13,6 +14,8 @@ using CafeHub.Domain.Plans;
 using CafeHub.Domain.Subscriptions;
 using CafeHub.UnitTests.Onboarding.Application;
 using CafeHub.UnitTests.Plans;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests.Onboarding.Commands
 {
@@ -83,6 +86,26 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             }
         }
 
+        private sealed class FakeSubscriptionRepository : ISubscriptionRepository
+        {
+            public Subscription? Subscription { get; private set; }
+            public SubscriptionPeriod? InitialPeriod { get; private set; }
+            public int AddCallCount { get; private set; }
+
+            public Task<Subscription?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Subscription);
+            }
+
+            public Task AddAsync(Subscription subscription, SubscriptionPeriod initialPeriod, CancellationToken cancellationToken)
+            {
+                Subscription = subscription;
+                InitialPeriod = initialPeriod;
+                AddCallCount++;
+                return Task.CompletedTask;
+            }
+        }
+
         private static PayOnboardingRequestCommandHandler BuildHandler(
             FakeOnboardingRequestStore store,
             FakePaymentTransactionStore transactionStore,
@@ -91,13 +114,15 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             IMasterUnitOfWork unitOfWork,
             RecordingPlanAuditWriter auditWriter,
             DuplicateRegistrationDetectorForTests detector,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            FakeSubscriptionRepository? subscriptionRepository = null)
         {
             return new PayOnboardingRequestCommandHandler(
                 store,
                 transactionStore,
                 paymentGateway,
                 planRepository,
+                subscriptionRepository ?? new FakeSubscriptionRepository(),
                 unitOfWork,
                 auditWriter,
                 timeProvider ?? TimeProvider.System,
@@ -164,8 +189,9 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             var unitOfWork = new RecordingMasterUnitOfWork();
             var auditWriter = new RecordingPlanAuditWriter();
             var detector = new DuplicateRegistrationDetectorForTests();
+            var subscriptionRepository = new FakeSubscriptionRepository();
 
-            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector);
+            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector, subscriptionRepository: subscriptionRepository);
 
             var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -179,6 +205,12 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.Equal(OnboardingRequestStatus.PaidAwaitingReview, store.Requests[0].Status);
             Assert.Single(transactionStore.Transactions);
             Assert.Equal(PlatformPaymentTransactionStatus.Succeeded, transactionStore.Transactions[0].Status);
+            Assert.Equal(1, subscriptionRepository.AddCallCount);
+            Assert.NotNull(subscriptionRepository.Subscription);
+            Assert.Equal(RequestId, subscriptionRepository.Subscription!.OnboardingRequestId);
+            Assert.NotNull(subscriptionRepository.InitialPeriod);
+            Assert.Equal(subscriptionRepository.Subscription.Id, subscriptionRepository.InitialPeriod!.SubscriptionId);
+            Assert.Equal(PlanVersionId, subscriptionRepository.InitialPeriod.PlanVersionId);
             Assert.Equal(1, paymentGateway.ChargeCallCount);
             Assert.Equal(1, unitOfWork.BeginCount);
             Assert.Equal(1, unitOfWork.CommitCount);
@@ -188,6 +220,45 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.Equal("onboarding.payment.succeeded", auditEntry.Action);
             Assert.Equal(PlatformAuditActorKind.System, auditEntry.ActorKind);
             Assert.Equal(PlatformAuditOutcome.Succeeded, auditEntry.Outcome);
+        }
+
+        [Fact]
+        public async Task Send_PaymentCommand_UsesOnlyTheHandlerOwnedMasterTransaction()
+        {
+            var store = new FakeOnboardingRequestStore(
+                OnboardingRequest.CreateForPublicRegistration(
+                    RequestId, PlanVersionId, "owner@example.com", "Owner Name",
+                    null, "Cafe Name", "hash", "my-cafe", TestData.CreatedAt));
+            var transactionStore = new FakePaymentTransactionStore();
+            var paymentGateway = new FakePaymentGateway();
+            var planRepository = new FakePlanRepository { Plans = { CreatePlanWithVersion() } };
+            var unitOfWork = new RecordingMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            var subscriptionRepository = new FakeSubscriptionRepository();
+
+            using var provider = new ServiceCollection()
+                .AddApplication()
+                .AddSingleton<IOnboardingRequestStore>(store)
+                .AddSingleton<IPaymentTransactionStore>(transactionStore)
+                .AddSingleton<IPaymentGateway>(paymentGateway)
+                .AddSingleton<IPlanRepository>(planRepository)
+                .AddSingleton<ISubscriptionRepository>(subscriptionRepository)
+                .AddSingleton<IMasterUnitOfWork>(unitOfWork)
+                .AddSingleton<IPlatformAuditWriter>(auditWriter)
+                .AddSingleton<IDuplicateRegistrationDetector>(new DuplicateRegistrationDetectorForTests())
+                .AddSingleton(TimeProvider.System)
+                .BuildServiceProvider();
+
+            var result = await provider.GetRequiredService<IMediator>().Send(ValidCommand());
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(OnboardingRequestStatus.PaidAwaitingReview, result.Value!.State);
+            Assert.Equal(1, paymentGateway.ChargeCallCount);
+            Assert.Single(transactionStore.Transactions);
+            Assert.Equal(1, subscriptionRepository.AddCallCount);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(0, unitOfWork.RollbackCount);
         }
 
         [Fact]
@@ -203,8 +274,9 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             var unitOfWork = new RecordingMasterUnitOfWork();
             var auditWriter = new RecordingPlanAuditWriter();
             var detector = new DuplicateRegistrationDetectorForTests();
+            var subscriptionRepository = new FakeSubscriptionRepository();
 
-            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector);
+            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector, subscriptionRepository: subscriptionRepository);
 
             var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -222,6 +294,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.Equal(1, paymentGateway.ChargeCallCount);
             Assert.Equal(1, unitOfWork.BeginCount);
             Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(0, subscriptionRepository.AddCallCount);
 
             var auditEntry = Assert.Single(auditWriter.Entries);
             Assert.Equal("onboarding.payment.failed", auditEntry.Action);
@@ -273,8 +346,9 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             var unitOfWork = new RecordingMasterUnitOfWork();
             var auditWriter = new RecordingPlanAuditWriter();
             var detector = new DuplicateRegistrationDetectorForTests();
+            var subscriptionRepository = new FakeSubscriptionRepository();
 
-            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector);
+            var handler = BuildHandler(store, transactionStore, paymentGateway, planRepository, unitOfWork, auditWriter, detector, subscriptionRepository: subscriptionRepository);
 
             var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -285,6 +359,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.Equal(0, paymentGateway.ChargeCallCount);
             Assert.Equal(0, unitOfWork.BeginCount);
             Assert.Equal(0, transactionStore.AddCallCount);
+            Assert.Equal(0, subscriptionRepository.AddCallCount);
         }
 
         [Fact]

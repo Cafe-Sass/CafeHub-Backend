@@ -78,6 +78,27 @@ namespace CafeHub.Domain.Tenants
             };
         }
 
+        public void MarkProvisioned(string secretReference, DateTimeOffset now)
+        {
+            if (string.IsNullOrWhiteSpace(secretReference) || secretReference.Length > 128)
+            {
+                throw new ArgumentException(
+                    "The secret reference must be between 1 and 128 characters.",
+                    nameof(secretReference));
+            }
+
+            if (!IsWellFormedSecretReference(secretReference))
+            {
+                throw new ArgumentException(
+                    "The secret reference must start with a lowercase letter or digit and contain only lowercase letters, digits, and hyphens.",
+                    nameof(secretReference));
+            }
+
+            SecretReference = secretReference;
+            Status = TenantDatabaseStatus.Provisioned;
+            UpdatedAt = now;
+        }
+
         private static bool IsWellFormedSecretReference(string? secretReference)
         {
             if (secretReference is null || secretReference.Length == 0)

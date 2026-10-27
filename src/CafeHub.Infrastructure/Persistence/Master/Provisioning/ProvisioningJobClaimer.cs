@@ -2,6 +2,7 @@ using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CafeHub.Infrastructure.Persistence.Master.Provisioning
 {
@@ -43,11 +44,17 @@ namespace CafeHub.Infrastructure.Persistence.Master.Provisioning
                 RETURNING id AS "Id", tenant_id AS "TenantId"
                 """;
 
-            var claimedRow = await context.Database
+            var claimedRows = await context.Database
                 .SqlQueryRaw<ClaimedJobRow>(
                     sql,
-                    new { leaseExpiry, workerId, now })
-                .FirstOrDefaultAsync(cancellationToken);
+                    new NpgsqlParameter("leaseExpiry", leaseExpiry),
+                    new NpgsqlParameter("workerId", workerId),
+                    new NpgsqlParameter("now", now))
+                .ToListAsync(cancellationToken);
+
+            // The UPDATE returns at most one row because the selected ID is limited to one job.
+            // Materialize the non-composable UPDATE ... RETURNING SQL directly, then select locally.
+            var claimedRow = claimedRows.FirstOrDefault();
 
             if (claimedRow is null)
             {

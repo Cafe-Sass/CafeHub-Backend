@@ -22,6 +22,7 @@ namespace CafeHub.Application.Onboarding.Commands
         private readonly IPaymentTransactionStore paymentTransactionStore;
         private readonly IPaymentGateway paymentGateway;
         private readonly IPlanRepository planRepository;
+        private readonly ISubscriptionRepository subscriptionRepository;
         private readonly IMasterUnitOfWork unitOfWork;
         private readonly IPlatformAuditWriter auditWriter;
         private readonly TimeProvider timeProvider;
@@ -32,6 +33,7 @@ namespace CafeHub.Application.Onboarding.Commands
             IPaymentTransactionStore paymentTransactionStore,
             IPaymentGateway paymentGateway,
             IPlanRepository planRepository,
+            ISubscriptionRepository subscriptionRepository,
             IMasterUnitOfWork unitOfWork,
             IPlatformAuditWriter auditWriter,
             TimeProvider timeProvider,
@@ -41,6 +43,7 @@ namespace CafeHub.Application.Onboarding.Commands
             this.paymentTransactionStore = paymentTransactionStore;
             this.paymentGateway = paymentGateway;
             this.planRepository = planRepository;
+            this.subscriptionRepository = subscriptionRepository;
             this.unitOfWork = unitOfWork;
             this.auditWriter = auditWriter;
             this.timeProvider = timeProvider;
@@ -139,6 +142,8 @@ namespace CafeHub.Application.Onboarding.Commands
                         null,
                         null,
                         now);
+
+                    await subscriptionRepository.AddAsync(subscription, period, cancellationToken);
 
                     await onboardingRequestStore.UpdateAsync(request, cancellationToken);
 

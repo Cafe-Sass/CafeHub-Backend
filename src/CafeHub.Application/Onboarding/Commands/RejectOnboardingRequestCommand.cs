@@ -5,7 +5,7 @@ using CafeHub.Application.Onboarding.DTOs;
 namespace CafeHub.Application.Onboarding.Commands
 {
     public sealed record RejectOnboardingRequestCommand(Guid RequestId, string? Reason)
-        : ICommand<RejectionResponse>, IIdempotentCommand, IMasterTransactionalCommand
+        : ICommand<RejectionResponse>, IIdempotentCommand
     {
         public string? IdempotencyKey { get; set; }
     }

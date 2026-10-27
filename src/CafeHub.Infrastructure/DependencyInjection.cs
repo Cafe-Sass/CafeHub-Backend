@@ -25,6 +25,7 @@ using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Provisioning;
 using CafeHub.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -84,8 +85,16 @@ namespace CafeHub.Infrastructure
             });
 
             services.AddIdentityCore<PlatformAdminUser>()
-                .AddRoles<PlatformAdminRole>()
-                .AddEntityFrameworkStores<MasterDbContext>();
+                .AddRoles<PlatformAdminRole>();
+            services.AddScoped<IUserStore<PlatformAdminUser>, PlatformAdminUserStore>();
+            services.AddScoped<IRoleStore<PlatformAdminRole>>(provider =>
+                new RoleStore<
+                    PlatformAdminRole,
+                    MasterDbContext,
+                    Guid,
+                    PlatformAdminUserRole,
+                    PlatformAdminRoleClaim>(
+                        provider.GetRequiredService<MasterDbContext>()));
             services.Replace(ServiceDescriptor.Scoped<ILookupNormalizer, PlatformAdminLookupNormalizer>());
             services.AddScoped<IAdminAuthenticator, AdminAuthenticator>();
             services.AddIdentityCore<CafeHub.Domain.Tenants.TenantUser>()

@@ -5,7 +5,7 @@ using CafeHub.Application.Onboarding.PaymentGateway;
 namespace CafeHub.Application.Onboarding.Commands
 {
     public sealed record PayOnboardingRequestCommand(Guid RequestId)
-        : ICommand<PaymentOutcomeResponse>, IIdempotentCommand, IMasterTransactionalCommand
+        : ICommand<PaymentOutcomeResponse>, IIdempotentCommand
     {
         public string? IdempotencyKey { get; set; }
     }

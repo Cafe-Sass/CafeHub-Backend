@@ -5,7 +5,7 @@ using CafeHub.Application.Onboarding.DTOs;
 namespace CafeHub.Application.Onboarding.Commands
 {
     public sealed record ApproveOnboardingRequestCommand(Guid RequestId)
-        : ICommand<ApprovalResponse>, IIdempotentCommand, IMasterTransactionalCommand
+        : ICommand<ApprovalResponse>, IIdempotentCommand
     {
         public string? IdempotencyKey { get; set; }
     }

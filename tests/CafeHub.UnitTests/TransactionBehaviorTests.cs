@@ -62,7 +62,10 @@ namespace CafeHub.UnitTests
         public async Task Handle_TenantMarkedCommand_Succeeds_BeginOnce_CommitOnce_NoRollback()
         {
             var unitOfWork = new RecordingTenantUnitOfWork();
-            var behavior = new TenantTransactionBehavior<TestTenantMarkedCommand, Result>(unitOfWork);
+            using var services = new ServiceCollection()
+                .AddSingleton<ITenantUnitOfWork>(unitOfWork)
+                .BuildServiceProvider();
+            var behavior = new TenantTransactionBehavior<TestTenantMarkedCommand, Result>(services);
             RequestHandlerDelegate<Result> next = (_) => Task.FromResult(Result.Success());
 
             var result = await behavior.Handle(new TestTenantMarkedCommand(), next, CancellationToken.None);
@@ -77,12 +80,16 @@ namespace CafeHub.UnitTests
         public async Task Send_MasterMarkedCommand_TouchesOnlyMasterUnitOfWork()
         {
             var masterUnitOfWork = new RecordingMasterUnitOfWork();
-            var tenantUnitOfWork = new RecordingTenantUnitOfWork();
+            var tenantUnitOfWorkWasResolved = false;
             using var provider = new ServiceCollection()
                 .AddApplication()
                 .AddSingleton<IRequestHandler<TestMasterMarkedCommand, Result>>(new TestMasterMarkedCommandHandler())
                 .AddSingleton<IMasterUnitOfWork>(masterUnitOfWork)
-                .AddSingleton<ITenantUnitOfWork>(tenantUnitOfWork)
+                .AddScoped<ITenantUnitOfWork>(_ =>
+                {
+                    tenantUnitOfWorkWasResolved = true;
+                    throw new InvalidOperationException("A Master request must not resolve tenant persistence.");
+                })
                 .BuildServiceProvider();
             var mediator = provider.GetRequiredService<IMediator>();
 
@@ -92,9 +99,7 @@ namespace CafeHub.UnitTests
             Assert.Equal(1, masterUnitOfWork.BeginCount);
             Assert.Equal(1, masterUnitOfWork.CommitCount);
             Assert.Equal(0, masterUnitOfWork.RollbackCount);
-            Assert.Equal(0, tenantUnitOfWork.BeginCount);
-            Assert.Equal(0, tenantUnitOfWork.CommitCount);
-            Assert.Equal(0, tenantUnitOfWork.RollbackCount);
+            Assert.False(tenantUnitOfWorkWasResolved);
         }
 
         [Fact]

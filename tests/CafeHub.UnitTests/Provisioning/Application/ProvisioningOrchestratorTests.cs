@@ -69,8 +69,21 @@ namespace CafeHub.UnitTests.Provisioning.Application
 
         private sealed class FakeTenantStore : ITenantStore
         {
-            public Tenant? Tenant { get; set; }
+            private Tenant? _tenant;
+
+            public Tenant? Tenant
+            {
+                get => _tenant;
+                set
+                {
+                    _tenant = value;
+                    PersistedLifecycleStatus = value?.LifecycleStatus;
+                }
+            }
+
+            public TenantLifecycleStatus? PersistedLifecycleStatus { get; private set; }
             public int FindByIdCallCount { get; private set; }
+            public int UpdateCallCount { get; private set; }
 
             public Task<Tenant?> FindByOnboardingRequestIdAsync(
                 Guid onboardingRequestId,
@@ -89,26 +102,40 @@ namespace CafeHub.UnitTests.Provisioning.Application
             {
                 return Task.CompletedTask;
             }
+
+            public Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken)
+            {
+                _tenant = tenant;
+                PersistedLifecycleStatus = tenant.LifecycleStatus;
+                UpdateCallCount++;
+                return Task.CompletedTask;
+            }
         }
 
         private sealed class FakeTenantDatabaseStore : ITenantDatabaseStore
         {
             public TenantDatabase? Database { get; set; }
+            public int AddCallCount { get; private set; }
+            public int UpdateCallCount { get; private set; }
 
             public Task<TenantDatabase?> FindByTenantIdAsync(
                 Guid tenantId,
                 CancellationToken cancellationToken)
             {
-                return Task.FromResult(Database);
+                return Task.FromResult(Database?.TenantId == tenantId ? Database : null);
             }
 
             public Task AddAsync(TenantDatabase tenantDatabase, CancellationToken cancellationToken)
             {
+                Database = tenantDatabase;
+                AddCallCount++;
                 return Task.CompletedTask;
             }
 
             public Task UpdateAsync(TenantDatabase tenantDatabase, CancellationToken cancellationToken)
             {
+                Database = tenantDatabase;
+                UpdateCallCount++;
                 return Task.CompletedTask;
             }
         }
@@ -351,11 +378,73 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.All(_attemptStore.Attempts, a => Assert.Equal(ProvisioningJobAttemptStatus.Succeeded, a.Status));
             Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
+            Assert.Equal(1, _tenantStore.UpdateCallCount);
+            Assert.NotNull(_databaseStore.Database);
+            Assert.Equal(TenantId, _databaseStore.Database!.TenantId);
+            Assert.Equal("v1", _databaseStore.Database.SecretReference);
+            Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
+            Assert.Equal(1, _databaseStore.AddCallCount);
+            Assert.Equal(0, _databaseStore.UpdateCallCount);
             Assert.Equal(1, _unitOfWork.CommitCount);
+            Assert.Equal(1, _unitOfWork.BeginCount);
+            Assert.Equal(0, _unitOfWork.RollbackCount);
             Assert.Single(_auditWriter.Entries);
             Assert.Equal("tenant.provisioned.succeeded", _auditWriter.Entries[0].Action);
             Assert.Equal(1, _databaseCreator.CreateCallCount);
             Assert.Equal(1, _schemaInitializer.InitializeCallCount);
+        }
+
+        [Fact]
+        public async Task HappyPath_WithExistingProvisionedDatabaseMetadata_DoesNotDuplicateMetadata()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            var existingDatabaseId = Guid.CreateVersion7();
+            _databaseStore.Database = TenantDatabase.Create(
+                existingDatabaseId,
+                TenantId,
+                "v1",
+                TenantDatabaseStatus.Provisioned,
+                FixedNow);
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(existingDatabaseId, _databaseStore.Database.Id);
+            Assert.Equal(0, _databaseStore.AddCallCount);
+            Assert.Equal(0, _databaseStore.UpdateCallCount);
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
+            Assert.Equal(1, _tenantStore.UpdateCallCount);
+            Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
+        }
+
+        [Fact]
+        public async Task HappyPath_UpdatesExistingIncompleteDatabaseMetadataOnRetry()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            var existingDatabaseId = Guid.CreateVersion7();
+            _databaseStore.Database = TenantDatabase.Create(
+                existingDatabaseId,
+                TenantId,
+                "old-reference",
+                TenantDatabaseStatus.Failed,
+                FixedNow);
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(existingDatabaseId, _databaseStore.Database.Id);
+            Assert.Equal("v1", _databaseStore.Database.SecretReference);
+            Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
+            Assert.Equal(0, _databaseStore.AddCallCount);
+            Assert.Equal(1, _databaseStore.UpdateCallCount);
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
+            Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
         }
 
         [Fact]
@@ -373,6 +462,8 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.Equal(ProvisioningJobAttemptStatus.Failed, _attemptStore.Attempts[0].Status);
             Assert.NotEqual(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
             Assert.Equal(TenantLifecycleStatus.Provisioning, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Null(_databaseStore.Database);
+            Assert.Equal(0, _tenantStore.UpdateCallCount);
             Assert.Equal(1, _databaseCreator.CreateCallCount);
             Assert.Equal(0, _schemaInitializer.InitializeCallCount);
         }

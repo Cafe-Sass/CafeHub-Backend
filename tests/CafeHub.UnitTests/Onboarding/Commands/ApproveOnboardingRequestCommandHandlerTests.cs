@@ -1,3 +1,4 @@
+using CafeHub.Application;
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -13,6 +14,8 @@ using CafeHub.Domain.Tenants;
 using CafeHub.UnitTests.Onboarding.Application;
 using CafeHub.UnitTests.Plans;
 using FluentValidation.TestHelper;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests.Onboarding.Commands
 {
@@ -23,6 +26,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             public List<Tenant> Tenants { get; } = new();
             public int AddCallCount { get; private set; }
             public int FindCallCount { get; private set; }
+            public int UpdateCallCount { get; private set; }
 
             public Task<Tenant?> FindByOnboardingRequestIdAsync(
                 Guid onboardingRequestId,
@@ -39,6 +43,12 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 return Task.CompletedTask;
             }
 
+            public Task UpdateAsync(Tenant tenant, CancellationToken cancellationToken)
+            {
+                UpdateCallCount++;
+                return Task.CompletedTask;
+            }
+
             public Task<Tenant?> FindByIdAsync(Guid tenantId, CancellationToken cancellationToken)
             {
                 return Task.FromResult(Tenants.FirstOrDefault(t => t.Id == tenantId));
@@ -49,6 +59,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
         {
             public Subscription? Subscription { get; set; }
             public int FindCallCount { get; private set; }
+            public int AddCallCount { get; private set; }
 
             public Task<Subscription?> FindByOnboardingRequestIdAsync(
                 Guid onboardingRequestId,
@@ -57,6 +68,12 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 FindCallCount++;
                 return Task.FromResult(Subscription);
             }
+
+            public Task AddAsync(Subscription subscription, SubscriptionPeriod initialPeriod, CancellationToken cancellationToken)
+            {
+                AddCallCount++;
+                return Task.CompletedTask;
+            }
         }
 
         private sealed class FakeProvisioningJobStore : IProvisioningJobStore
@@ -64,9 +81,15 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             public List<ProvisioningJob> Jobs { get; } = new();
             public int AddCallCount { get; private set; }
             public int UpdateCallCount { get; private set; }
+            public Exception? ThrowOnAdd { get; set; }
 
             public Task AddAsync(ProvisioningJob job, CancellationToken cancellationToken)
             {
+                if (ThrowOnAdd is not null)
+                {
+                    throw ThrowOnAdd;
+                }
+
                 Jobs.Add(job);
                 AddCallCount++;
                 return Task.CompletedTask;
@@ -156,6 +179,121 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 auditWriter,
                 currentUser,
                 timeProvider ?? TimeProvider.System);
+        }
+
+        private static ServiceProvider CreateMediatorProvider(
+            FakeOnboardingRequestStore store,
+            FakeTenantStore tenantStore,
+            FakeSubscriptionRepository subscriptionRepository,
+            FakeProvisioningJobStore provisioningJobStore,
+            FakeMasterUnitOfWork unitOfWork,
+            RecordingPlanAuditWriter auditWriter,
+            FakeCurrentUser currentUser)
+        {
+            return new ServiceCollection()
+                .AddApplication()
+                .AddSingleton<IOnboardingRequestStore>(store)
+                .AddSingleton<ITenantStore>(tenantStore)
+                .AddSingleton<ISubscriptionRepository>(subscriptionRepository)
+                .AddSingleton<IProvisioningJobStore>(provisioningJobStore)
+                .AddSingleton<IMasterUnitOfWork>(unitOfWork)
+                .AddSingleton<IPlatformAuditWriter>(auditWriter)
+                .AddSingleton<ICurrentUser>(currentUser)
+                .AddSingleton(TimeProvider.System)
+                .BuildServiceProvider();
+        }
+
+        [Fact]
+        public async Task Send_Success_UsesOnlyHandlerOwnedMasterTransaction()
+        {
+            var request = PaidRequest();
+            var store = new FakeOnboardingRequestStore(request);
+            var tenantStore = new FakeTenantStore();
+            var subscriptionRepository = new FakeSubscriptionRepository { Subscription = ActiveSubscription() };
+            var provisioningJobStore = new FakeProvisioningJobStore();
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            await using var provider = CreateMediatorProvider(store, tenantStore, subscriptionRepository, provisioningJobStore, unitOfWork, auditWriter, new FakeCurrentUser { AdminId = ReviewerId });
+
+            var result = await provider.GetRequiredService<ISender>().Send(new ApproveOnboardingRequestCommand(RequestId));
+
+            Assert.True(result.IsSuccess);
+            Assert.Single(tenantStore.Tenants);
+            Assert.Single(provisioningJobStore.Jobs);
+            Assert.Single(auditWriter.Entries);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.Equal(0, unitOfWork.RollbackCount);
+        }
+
+        [Fact]
+        public async Task Send_MissingSubscription_RollsBackHandlerOwnedMasterTransactionOnce()
+        {
+            var request = PaidRequest();
+            var store = new FakeOnboardingRequestStore(request);
+            var tenantStore = new FakeTenantStore();
+            var subscriptionRepository = new FakeSubscriptionRepository();
+            var provisioningJobStore = new FakeProvisioningJobStore();
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            await using var provider = CreateMediatorProvider(store, tenantStore, subscriptionRepository, provisioningJobStore, unitOfWork, auditWriter, new FakeCurrentUser { AdminId = ReviewerId });
+
+            var result = await provider.GetRequiredService<ISender>().Send(new ApproveOnboardingRequestCommand(RequestId));
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(0, unitOfWork.CommitCount);
+            Assert.Equal(1, unitOfWork.RollbackCount);
+            Assert.Empty(provisioningJobStore.Jobs);
+            Assert.Empty(auditWriter.Entries);
+        }
+
+        [Fact]
+        public async Task Send_HandlerException_RollsBackHandlerOwnedMasterTransactionOnce()
+        {
+            var request = PaidRequest();
+            var expectedException = new InvalidOperationException("Provisioning job persistence failed.");
+            var store = new FakeOnboardingRequestStore(request);
+            var tenantStore = new FakeTenantStore();
+            var subscriptionRepository = new FakeSubscriptionRepository { Subscription = ActiveSubscription() };
+            var provisioningJobStore = new FakeProvisioningJobStore { ThrowOnAdd = expectedException };
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            await using var provider = CreateMediatorProvider(store, tenantStore, subscriptionRepository, provisioningJobStore, unitOfWork, auditWriter, new FakeCurrentUser { AdminId = ReviewerId });
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                provider.GetRequiredService<ISender>().Send(new ApproveOnboardingRequestCommand(RequestId)));
+
+            Assert.Same(expectedException, exception);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(0, unitOfWork.CommitCount);
+            Assert.Equal(1, unitOfWork.RollbackCount);
+            Assert.Empty(provisioningJobStore.Jobs);
+            Assert.Empty(auditWriter.Entries);
+        }
+
+        [Fact]
+        public async Task Send_RepeatedApproval_IsIdempotentWithoutStartingTransaction()
+        {
+            var request = PaidRequest();
+            request.Approve(ReviewerId, new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero));
+            var tenantId = Guid.CreateVersion7();
+            var existingTenant = Tenant.Create(tenantId, RequestId, "my-cafe", TenantLifecycleStatus.Provisioning,
+                new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero), ReviewerId);
+            var store = new FakeOnboardingRequestStore(request);
+            var tenantStore = new FakeTenantStore { Tenants = { existingTenant } };
+            var provisioningJobStore = new FakeProvisioningJobStore();
+            var unitOfWork = new FakeMasterUnitOfWork();
+            var auditWriter = new RecordingPlanAuditWriter();
+            await using var provider = CreateMediatorProvider(store, tenantStore, new FakeSubscriptionRepository(), provisioningJobStore, unitOfWork, auditWriter, new FakeCurrentUser { AdminId = ReviewerId });
+
+            var result = await provider.GetRequiredService<ISender>().Send(new ApproveOnboardingRequestCommand(RequestId));
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(tenantId, result.Value!.TenantId);
+            Assert.Equal(0, unitOfWork.BeginCount);
+            Assert.Empty(provisioningJobStore.Jobs);
+            Assert.Empty(auditWriter.Entries);
         }
 
         [Fact]

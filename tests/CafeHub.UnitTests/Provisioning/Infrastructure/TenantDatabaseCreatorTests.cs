@@ -60,7 +60,21 @@ namespace CafeHub.UnitTests.Provisioning.Infrastructure
             Assert.Contains(_resolver.TenantStatements, entry =>
                 entry.Statement.Contains($"GRANT USAGE ON SCHEMA public TO \"{ApplicationRole}\"", StringComparison.Ordinal));
             Assert.Contains(_resolver.TenantStatements, entry =>
-                entry.Statement.Contains($"ALTER DEFAULT PRIVILEGES FOR ROLE \"{OwnerRole}\"", StringComparison.Ordinal));
+                entry.Statement.Contains(
+                    $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{ApplicationRole}\"",
+                    StringComparison.Ordinal));
+            Assert.Contains(_resolver.TenantStatements, entry =>
+                entry.Statement.Contains(
+                    $"GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO \"{ApplicationRole}\"",
+                    StringComparison.Ordinal));
+            Assert.Contains(_resolver.TenantStatements, entry =>
+                entry.Statement.Contains(
+                    $"ALTER DEFAULT PRIVILEGES FOR ROLE \"{OwnerRole}\" IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{ApplicationRole}\"",
+                    StringComparison.Ordinal));
+            Assert.Contains(_resolver.TenantStatements, entry =>
+                entry.Statement.Contains(
+                    $"ALTER DEFAULT PRIVILEGES FOR ROLE \"{OwnerRole}\" IN SCHEMA public GRANT USAGE ON SEQUENCES TO \"{ApplicationRole}\"",
+                    StringComparison.Ordinal));
 
             Assert.DoesNotContain(cluster, statement => statement.Contains("DROP", StringComparison.Ordinal));
             Assert.DoesNotContain(_resolver.TenantStatements.Select(entry => entry.Statement),

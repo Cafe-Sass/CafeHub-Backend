@@ -11,5 +11,5 @@ namespace CafeHub.Application.Onboarding.Commands
         string Password,
         string Slug,
         Guid PlanVersionId)
-        : ICommand<OwnerRegistrationResponse>, IMasterTransactionalCommand;
+        : ICommand<OwnerRegistrationResponse>;
 }
