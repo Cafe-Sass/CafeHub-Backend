@@ -48,7 +48,7 @@ namespace CafeHub.WebApi.Tenancy
             }
 
             var tenant = resolved.Value;
-            tenantContextSetter.Set(TenantContext.Create(tenant.TenantId, tenant.SecretReference!, true));
+            tenantContextSetter.Set(TenantContext.Create(tenant.TenantId, tenant.SecretReference!, true, tenant.Slug));
             await next(context);
         }
 

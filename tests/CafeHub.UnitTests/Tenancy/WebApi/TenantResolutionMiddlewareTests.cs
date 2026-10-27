@@ -24,6 +24,7 @@ namespace CafeHub.UnitTests.Tenancy.WebApi
             Assert.True(nextCalled);
             Assert.Equal(1, setter.Count);
             Assert.Equal(id, setter.Context!.TenantId);
+            Assert.Equal("cafe", setter.Context.Slug);
         }
 
         [Theory]
