@@ -22,6 +22,9 @@ namespace CafeHub.UnitTests
                 .SelectMany(source => source.Endpoints)
                 .OfType<RouteEndpoint>()
                 .Single(endpoint => endpoint.RoutePattern.RawText == "/");
+            Assert.Contains(
+                rootEndpoint.Metadata,
+                metadata => metadata is IExcludeFromDescriptionMetadata { ExcludeFromDescription: true });
             var context = new DefaultHttpContext
             {
                 RequestServices = app.Services,
