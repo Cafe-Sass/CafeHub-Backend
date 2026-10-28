@@ -89,6 +89,26 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
         }
 
         [Fact]
+        public void Resolve_AcceptsDemoCarlosTenantScopedReference()
+        {
+            var tenantId = Guid.Parse("01a1807f-8ce3-7fc3-a78f-04d0c485641d");
+            var reference = "v1-01a1807f8ce37fc3a78f04d0c485641d";
+            var registry = new TenantRegistryReaderStub(new TenantRegistration(
+                tenantId,
+                "demo-carlos",
+                TenantLifecycleStatus.Active,
+                reference));
+            var accessor = new TenantContextAccessor();
+            accessor.Set(TenantContext.Create(tenantId, reference, true));
+
+            var builder = new NpgsqlConnectionStringBuilder(CreateResolver(accessor, registry, CreateOptions()).Resolve());
+
+            Assert.Equal("cafehub_tenant_demo_carlos", builder.Database);
+            Assert.Equal("cafehub_tenant_demo_carlos_app", builder.Username);
+            Assert.Equal(new HmacTenantCredentialDeriver().Derive(MasterKey, tenantId), builder.Password);
+        }
+
+        [Fact]
         public void Resolve_RejectsCredentialReferenceScopedToAnotherTenant()
         {
             var tenantId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");

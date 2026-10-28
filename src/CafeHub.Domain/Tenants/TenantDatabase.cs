@@ -49,7 +49,7 @@ namespace CafeHub.Domain.Tenants
                     nameof(secretReference));
             }
 
-            if (!TenantDatabaseCredentialReference.IsValid(secretReference))
+            if (!TenantDatabaseCredentialReference.IsValidForTenant(secretReference, tenantId))
             {
                 throw new ArgumentException(
                     "The secret reference must start with a lowercase letter or digit and contain only lowercase letters, digits, and hyphens.",
@@ -83,7 +83,7 @@ namespace CafeHub.Domain.Tenants
                     nameof(secretReference));
             }
 
-            if (!TenantDatabaseCredentialReference.IsValid(secretReference))
+            if (!TenantDatabaseCredentialReference.IsValidForTenant(secretReference, TenantId))
             {
                 throw new ArgumentException(
                     "The secret reference must start with a lowercase letter or digit and contain only lowercase letters, digits, and hyphens.",

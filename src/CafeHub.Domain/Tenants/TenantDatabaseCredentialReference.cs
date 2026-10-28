@@ -43,5 +43,16 @@ namespace CafeHub.Domain.Tenants.Credentials
                 || (tenantId != Guid.Empty
                     && string.Equals(reference, CreateV1(tenantId), StringComparison.Ordinal));
         }
+
+        public static bool IsValidForTenant(string? reference, Guid tenantId)
+        {
+            if (!IsValid(reference))
+            {
+                return false;
+            }
+
+            return !reference!.StartsWith("v1-", StringComparison.Ordinal)
+                || IsSupportedForTenant(reference, tenantId);
+        }
     }
 }
