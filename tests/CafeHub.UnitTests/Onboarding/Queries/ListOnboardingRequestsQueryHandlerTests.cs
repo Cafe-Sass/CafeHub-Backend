@@ -52,6 +52,7 @@ namespace CafeHub.UnitTests.Onboarding.Queries
             var page = result.Value!;
             Assert.Single(page.Items);
             Assert.Equal(paid.Id, page.Items[0].RequestId);
+            Assert.Equal(PlanVersionId, page.Items[0].PlanVersionId);
             Assert.Equal(OnboardingRequestStatus.PaidAwaitingReview.ToString(), page.Items[0].State);
             Assert.Equal(1, store.ListCallCount);
         }

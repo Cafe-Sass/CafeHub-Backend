@@ -1,5 +1,6 @@
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Tenancy;
+using CafeHub.Domain.Tenants.Credentials;
 using CafeHub.Infrastructure.Provisioning;
 using Npgsql;
 
@@ -42,10 +43,7 @@ namespace CafeHub.Infrastructure.Tenancy
                 throw new InvalidTenantContextException("The tenant context does not resolve to a usable tenant registration.");
             }
 
-            if (!string.Equals(
-                tenant.SecretReference,
-                TenantDatabaseCreator.CredentialReferenceLabel,
-                StringComparison.Ordinal))
+            if (!TenantDatabaseCredentialReference.IsSupportedForTenant(tenant.SecretReference, tenant.TenantId))
             {
                 throw new TenantConnectionNotConfiguredException("The tenant credential reference is not supported.");
             }

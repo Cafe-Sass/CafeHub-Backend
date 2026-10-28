@@ -133,6 +133,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
 
             Assert.True(result.IsSuccess);
             Assert.NotEqual(Guid.Empty, result.Value!.RequestId);
+            Assert.Equal(PlanVersionId, result.Value.PlanVersionId);
             Assert.Equal(OnboardingRequestStatus.AwaitingPayment, result.Value.State);
             Assert.False(result.Value.IsDuplicate);
 
@@ -229,7 +230,10 @@ namespace CafeHub.UnitTests.Onboarding.Commands
         [InlineData(OnboardingRequestStatus.Cancelled)]
         public async Task Handle_DuplicateEmailDifferentCasing_ReturnsExistingReference(OnboardingRequestStatus status)
         {
-            var existing = RequestInState(status);
+            var existing = OnboardingRequest.CreateForPublicRegistration(
+                Guid.CreateVersion7(), Guid.CreateVersion7(), "owner@example.com", "Owner Name", null, "Cafe Name",
+                "existing-hash", "my-cafe", new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+            existing.Status = status;
             var store = new FakeOnboardingRequestStore(existing);
             var slugAvailability = new FakeSlugAvailability();
             var passwordHasher = new FakeOwnerPasswordHasher();
@@ -252,6 +256,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
 
             Assert.Equal(status, result.Value!.State);
             Assert.True(result.Value.IsDuplicate);
+            Assert.Equal(existing.PlanVersionId, result.Value.PlanVersionId);
 
             Assert.Single(store.Requests);
             Assert.Equal(0, store.AddCallCount);
@@ -343,6 +348,7 @@ namespace CafeHub.UnitTests.Onboarding.Commands
             Assert.True(result.IsSuccess);
             Assert.Equal(existing.Status, result.Value!.State);
             Assert.True(result.Value.IsDuplicate);
+            Assert.Equal(existing.PlanVersionId, result.Value.PlanVersionId);
             Assert.Equal(1, unitOfWork.RollbackCount);
         }
 

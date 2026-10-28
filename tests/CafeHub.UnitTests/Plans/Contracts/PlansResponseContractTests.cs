@@ -35,8 +35,9 @@ namespace CafeHub.UnitTests.Plans.Contracts
                 .ToArray();
 
             Assert.Equal(
-                new[] { "CreatedAt", "Currency", "Entitlements", "Number", "Period", "Price", "UpdatedAt" },
+                new[] { "CreatedAt", "Currency", "Entitlements", "Number", "Period", "PlanVersionId", "Price", "UpdatedAt" },
                 properties.Select(property => property.Name));
+            Assert.Equal(typeof(Guid), Property<PlanVersionResponse>("PlanVersionId").PropertyType);
             Assert.Equal(typeof(int), Property<PlanVersionResponse>("Number").PropertyType);
             Assert.Equal(typeof(decimal), Property<PlanVersionResponse>("Price").PropertyType);
             Assert.Equal(typeof(string), Property<PlanVersionResponse>("Currency").PropertyType);
@@ -83,6 +84,7 @@ namespace CafeHub.UnitTests.Plans.Contracts
             Assert.Equal(PlanTestData.CreatedAt, response.CreatedAt);
             Assert.Equal(PlanTestData.CreatedAt, response.UpdatedAt);
             Assert.Equal(new[] { 2, 1 }, response.Versions.Select(version => version.Number));
+            Assert.Equal(firstVersionId, response.Versions[1].PlanVersionId);
             Assert.Equal("Annual", response.Versions[0].Period);
             Assert.Equal(new[] { "a_key", "z_key" }, response.Versions[1].Entitlements.Select(entitlement => entitlement.Key));
         }

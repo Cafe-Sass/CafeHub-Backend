@@ -20,6 +20,8 @@ namespace CafeHub.Application.Onboarding.DTOs
 
         public required string TenantSlug { get; init; }
 
+        public required Guid PlanVersionId { get; init; }
+
         public required DateTimeOffset CreatedAt { get; init; }
 
         public static OnboardingRequestListItem From(OnboardingRequest request)
@@ -34,6 +36,7 @@ namespace CafeHub.Application.Onboarding.DTOs
                 OwnerFullName = request.OwnerFullName,
                 CafeName = request.CafeName,
                 TenantSlug = request.TenantSlug,
+                PlanVersionId = request.PlanVersionId,
                 CreatedAt = request.CreatedAt,
             };
         }

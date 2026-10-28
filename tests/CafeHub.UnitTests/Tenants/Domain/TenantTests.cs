@@ -1,4 +1,5 @@
 using CafeHub.Domain.Tenants;
+using CafeHub.Domain.Tenants.Credentials;
 
 namespace CafeHub.UnitTests.Tenants.Domain
 {
@@ -207,6 +208,36 @@ namespace CafeHub.UnitTests.Tenants.Domain
             var database = TenantDatabase.Create(DatabaseId, TenantId, "a", TenantDatabaseStatus.Provisioned, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
 
             Assert.Equal("a", database.SecretReference);
+        }
+
+        [Fact]
+        public void Create_AcceptsDemoCarlosTenantScopedReference()
+        {
+            var tenantId = Guid.Parse("01a1807f-8ce3-7fc3-a78f-04d0c485641d");
+            var secretReference = "v1-01a1807f8ce37fc3a78f04d0c485641d";
+
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                tenantId,
+                secretReference,
+                TenantDatabaseStatus.Provisioned,
+                new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Equal(TenantDatabaseCredentialReference.CreateV1(tenantId), database.SecretReference);
+        }
+
+        [Fact]
+        public void Create_RejectsTenantScopedReferenceOwnedByAnotherTenant()
+        {
+            var otherTenantId = Guid.CreateVersion7();
+
+            Assert.Throws<ArgumentException>(() =>
+                TenantDatabase.Create(
+                    DatabaseId,
+                    TenantId,
+                    TenantDatabaseCredentialReference.CreateV1(otherTenantId),
+                    TenantDatabaseStatus.Provisioned,
+                    new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero)));
         }
     }
 }

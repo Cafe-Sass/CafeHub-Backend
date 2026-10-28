@@ -4,6 +4,8 @@ namespace CafeHub.Application.Plans.DTOs
 {
     public sealed class PlanVersionResponse
     {
+        public required Guid PlanVersionId { get; init; }
+
         public required int Number { get; init; }
 
         public required decimal Price { get; init; }
@@ -24,6 +26,7 @@ namespace CafeHub.Application.Plans.DTOs
 
             return new PlanVersionResponse
             {
+                PlanVersionId = version.Id,
                 Number = version.VersionNumber,
                 Price = version.Price,
                 Currency = version.CurrencyCode,

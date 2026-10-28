@@ -9,6 +9,7 @@ using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Domain.Onboarding;
 using CafeHub.Domain.Provisioning;
 using CafeHub.Domain.Tenants;
+using CafeHub.Domain.Tenants.Credentials;
 using Microsoft.Extensions.Logging;
 
 namespace CafeHub.UnitTests.Provisioning.Application
@@ -181,7 +182,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             public int CreateCallCount { get; private set; }
             public Result<TenantDatabaseInfo> Result { get; set; } =
                 global::CafeHub.Application.Abstractions.Results.Result.Success(
-                    new TenantDatabaseInfo("db", "role_owner", "role_app", "v1"));
+                    new TenantDatabaseInfo("db", "role_owner", "role_app", TenantDatabaseCredentialReference.CreateV1(TenantId)));
 
             public Task<Result<TenantDatabaseInfo>> EnsureDatabaseAsync(
                 TenantDatabaseSpec spec,
@@ -382,7 +383,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.Equal(1, _tenantStore.UpdateCallCount);
             Assert.NotNull(_databaseStore.Database);
             Assert.Equal(TenantId, _databaseStore.Database!.TenantId);
-            Assert.Equal("v1", _databaseStore.Database.SecretReference);
+            Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
             Assert.Equal(1, _databaseStore.AddCallCount);
             Assert.Equal(0, _databaseStore.UpdateCallCount);
@@ -396,7 +397,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
         }
 
         [Fact]
-        public async Task HappyPath_WithExistingProvisionedDatabaseMetadata_DoesNotDuplicateMetadata()
+        public async Task HappyPath_WithLegacyProvisionedDatabaseMetadata_UpdatesToScopedReference()
         {
             _tenantStore.Tenant = CreateTenant();
             _jobStore.Job = CreateJobWithLease();
@@ -405,7 +406,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             _databaseStore.Database = TenantDatabase.Create(
                 existingDatabaseId,
                 TenantId,
-                "v1",
+                TenantDatabaseCredentialReference.LegacyV1,
                 TenantDatabaseStatus.Provisioned,
                 FixedNow);
 
@@ -413,8 +414,9 @@ namespace CafeHub.UnitTests.Provisioning.Application
             await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
 
             Assert.Equal(existingDatabaseId, _databaseStore.Database.Id);
+            Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(0, _databaseStore.AddCallCount);
-            Assert.Equal(0, _databaseStore.UpdateCallCount);
+            Assert.Equal(1, _databaseStore.UpdateCallCount);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
             Assert.Equal(1, _tenantStore.UpdateCallCount);
@@ -439,7 +441,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
 
             Assert.Equal(existingDatabaseId, _databaseStore.Database.Id);
-            Assert.Equal("v1", _databaseStore.Database.SecretReference);
+            Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
             Assert.Equal(0, _databaseStore.AddCallCount);
             Assert.Equal(1, _databaseStore.UpdateCallCount);

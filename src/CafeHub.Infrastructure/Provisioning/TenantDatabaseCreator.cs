@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
+using CafeHub.Domain.Tenants.Credentials;
 using Microsoft.Extensions.Logging;
 
 namespace CafeHub.Infrastructure.Provisioning
@@ -13,8 +14,6 @@ namespace CafeHub.Infrastructure.Provisioning
     /// </summary>
     internal sealed class TenantDatabaseCreator : ITenantDatabaseCreator
     {
-        internal const string CredentialReferenceLabel = "v1";
-
         private readonly TenantDatabaseCreatorOptions _options;
         private readonly ITenantCredentialDeriver _credentialDeriver;
         private readonly ITenantProvisioningSqlExecutor _executor;
@@ -106,7 +105,11 @@ namespace CafeHub.Infrastructure.Provisioning
                     cancellationToken);
 
                 return Result.Success(
-                    new TenantDatabaseInfo(databaseName, ownerRoleName, applicationRoleName, CredentialReferenceLabel));
+                    new TenantDatabaseInfo(
+                        databaseName,
+                        ownerRoleName,
+                        applicationRoleName,
+                        TenantDatabaseCredentialReference.CreateV1(spec.TenantId)));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

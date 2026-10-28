@@ -1,5 +1,8 @@
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
+using CafeHub.Application.Onboarding;
+using CafeHub.Domain.Onboarding;
 using CafeHub.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
@@ -8,6 +11,24 @@ namespace CafeHub.UnitTests.Onboarding.Controllers
 {
     public sealed class OnboardingRequestsControllerContractTests
     {
+        [Fact]
+        public void RegistrationResponse_ExposesTheSelectedPlanVersionId()
+        {
+            var property = typeof(OwnerRegistrationResponse).GetProperty(nameof(OwnerRegistrationResponse.PlanVersionId));
+
+            Assert.NotNull(property);
+            Assert.Equal(typeof(Guid), property.PropertyType);
+            var response = new OwnerRegistrationResponse(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                OnboardingRequestStatus.AwaitingPayment,
+                false);
+            var json = JsonSerializer.Serialize(
+                response,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.Contains("\"planVersionId\"", json, StringComparison.Ordinal);
+        }
+
         [Fact]
         public void Post_IsAnonymous_AndHasRateLimitAttribute()
         {
