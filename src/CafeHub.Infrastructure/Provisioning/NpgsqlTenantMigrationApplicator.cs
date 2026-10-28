@@ -1,3 +1,4 @@
+using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,19 @@ namespace CafeHub.Infrastructure.Provisioning
 
             using var context = new TenantDbContext(options);
             await context.Database.MigrateAsync(cancellationToken);
+
+            var applicationRoleName = TenantDatabaseNaming.ApplicationRoleName(databaseName);
+            var quotedRoleName = new NpgsqlCommandBuilder().QuoteIdentifier(applicationRoleName);
+            var connection = context.Database.GetDbConnection();
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"GRANT USAGE ON SCHEMA public TO {quotedRoleName}; " +
+                $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {quotedRoleName}; " +
+                $"GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {quotedRoleName}; " +
+                $"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {quotedRoleName}; " +
+                $"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO {quotedRoleName}";
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }
