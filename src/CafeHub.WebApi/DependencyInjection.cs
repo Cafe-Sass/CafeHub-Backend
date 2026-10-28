@@ -214,6 +214,7 @@ namespace CafeHub.WebApi
             var exposurePolicy = endpointRouteBuilder.ServiceProvider.GetRequiredService<OpenApiExposurePolicy>();
             if (exposurePolicy.IsExposed())
             {
+                endpointRouteBuilder.MapGet("/", () => Results.Redirect("/swagger"));
                 endpointRouteBuilder.MapOpenApi();
                 endpointRouteBuilder.MapSwaggerUI(
                     "swagger",
