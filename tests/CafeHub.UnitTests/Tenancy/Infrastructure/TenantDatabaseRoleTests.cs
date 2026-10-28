@@ -1,6 +1,7 @@
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
+using CafeHub.Domain.Tenants.Credentials;
 using CafeHub.Infrastructure.Provisioning;
 using CafeHub.Infrastructure.Tenancy;
 using Npgsql;
@@ -19,10 +20,10 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
                 tenantId,
                 "demo-cafe-271027e",
                 TenantLifecycleStatus.Active,
-                TenantDatabaseCreator.CredentialReferenceLabel));
+                TenantDatabaseCredentialReference.LegacyV1));
             var accessor = new StubTenantContextAccessor(TenantContext.Create(
                 tenantId,
-                TenantDatabaseCreator.CredentialReferenceLabel,
+                TenantDatabaseCredentialReference.LegacyV1,
                 true,
                 "demo-cafe-271027e"));
             var resolver = new RegistryTenantConnectionResolver(

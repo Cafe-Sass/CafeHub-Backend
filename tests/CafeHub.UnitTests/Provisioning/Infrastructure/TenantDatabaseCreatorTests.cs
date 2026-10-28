@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
+using CafeHub.Domain.Tenants.Credentials;
 using CafeHub.Infrastructure.Provisioning;
 using Microsoft.Extensions.Logging;
 
@@ -90,7 +91,27 @@ namespace CafeHub.UnitTests.Provisioning.Infrastructure
             Assert.Equal(DatabaseName, result.Value!.DatabaseName);
             Assert.Equal(OwnerRole, result.Value.OwnerRoleName);
             Assert.Equal(ApplicationRole, result.Value.ApplicationRoleName);
-            Assert.Equal("v1", result.Value.CredentialReference);
+            Assert.Equal($"v1-{TenantId:N}", result.Value.CredentialReference);
+        }
+
+        [Fact]
+        public async Task EnsureDatabaseAsync_ForDifferentTenants_ReturnsDistinctScopedReferencesAndDatabases()
+        {
+            var creator = CreateCreator();
+            var firstTenantId = Guid.CreateVersion7();
+            var secondTenantId = Guid.CreateVersion7();
+
+            var first = await creator.EnsureDatabaseAsync(
+                new TenantDatabaseSpec(firstTenantId, "first-cafe"), CancellationToken.None);
+            var second = await creator.EnsureDatabaseAsync(
+                new TenantDatabaseSpec(secondTenantId, "second-cafe"), CancellationToken.None);
+
+            Assert.True(first.IsSuccess);
+            Assert.True(second.IsSuccess);
+            Assert.Equal($"v1-{firstTenantId:N}", first.Value!.CredentialReference);
+            Assert.Equal($"v1-{secondTenantId:N}", second.Value!.CredentialReference);
+            Assert.NotEqual(first.Value.CredentialReference, second.Value.CredentialReference);
+            Assert.NotEqual(first.Value.DatabaseName, second.Value.DatabaseName);
         }
 
         [Fact]

@@ -1,6 +1,7 @@
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
+using CafeHub.Domain.Tenants.Credentials;
 using CafeHub.Infrastructure.Provisioning;
 using CafeHub.Infrastructure.Tenancy;
 using Npgsql;
@@ -19,7 +20,7 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
                 tenantId,
                 "cafe-alpha",
                 TenantLifecycleStatus.Active,
-                "v1"));
+                TenantDatabaseCredentialReference.CreateV1(tenantId)));
             var accessor = new TenantContextAccessor();
             accessor.Set(TenantContext.Create(tenantId, "caller-value-is-ignored", true));
             var resolver = CreateResolver(accessor, registry, CreateOptions());
@@ -47,15 +48,15 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
             var firstId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
             var secondId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
             var registry = new TenantRegistryReaderStub(
-                new TenantRegistration(firstId, "cafe-alpha", TenantLifecycleStatus.Active, "v1"),
-                new TenantRegistration(secondId, "cafe-beta", TenantLifecycleStatus.Active, "v1"));
+                new TenantRegistration(firstId, "cafe-alpha", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(firstId)),
+                new TenantRegistration(secondId, "cafe-beta", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(secondId)));
             var accessor = new TenantContextAccessor();
             var resolver = CreateResolver(accessor, registry, CreateOptions());
 
-            accessor.Set(TenantContext.Create(firstId, "v1", true));
+            accessor.Set(TenantContext.Create(firstId, TenantDatabaseCredentialReference.CreateV1(firstId), true));
             var first = new NpgsqlConnectionStringBuilder(resolver.Resolve());
             var firstRepeated = new NpgsqlConnectionStringBuilder(resolver.Resolve());
-            accessor.Set(TenantContext.Create(secondId, "v1", true));
+            accessor.Set(TenantContext.Create(secondId, TenantDatabaseCredentialReference.CreateV1(secondId), true));
             var second = new NpgsqlConnectionStringBuilder(resolver.Resolve());
 
             Assert.NotEqual(first.Database, second.Database);
@@ -67,6 +68,41 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
                 string.Equals(first.ConnectionString, firstRepeated.ConnectionString, StringComparison.Ordinal),
                 "repeated resolution for one tenant should be deterministic");
             Assert.Equal(3, registry.IdLookupCount);
+        }
+
+        [Fact]
+        public void Resolve_ContinuesToSupportLegacyV1Registrations()
+        {
+            var tenantId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+            var registry = new TenantRegistryReaderStub(new TenantRegistration(
+                tenantId,
+                "cafe-alpha",
+                TenantLifecycleStatus.Active,
+                TenantDatabaseCredentialReference.LegacyV1));
+            var accessor = new TenantContextAccessor();
+            accessor.Set(TenantContext.Create(tenantId, TenantDatabaseCredentialReference.LegacyV1, true));
+
+            var builder = new NpgsqlConnectionStringBuilder(CreateResolver(accessor, registry, CreateOptions()).Resolve());
+
+            Assert.Equal("cafehub_tenant_cafe_alpha", builder.Database);
+            Assert.Equal(new HmacTenantCredentialDeriver().Derive(MasterKey, tenantId), builder.Password);
+        }
+
+        [Fact]
+        public void Resolve_RejectsCredentialReferenceScopedToAnotherTenant()
+        {
+            var tenantId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+            var otherTenantId = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+            var accessor = new TenantContextAccessor();
+            accessor.Set(TenantContext.Create(tenantId, "ignored", true));
+            var registry = new TenantRegistryReaderStub(new TenantRegistration(
+                tenantId,
+                "cafe-alpha",
+                TenantLifecycleStatus.Active,
+                TenantDatabaseCredentialReference.CreateV1(otherTenantId)));
+            var resolver = CreateResolver(accessor, registry, CreateOptions());
+
+            Assert.Throws<TenantConnectionNotConfiguredException>(() => resolver.Resolve());
         }
 
         [Fact]

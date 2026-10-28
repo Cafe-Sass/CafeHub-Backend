@@ -1,13 +1,9 @@
-using System.Text.RegularExpressions;
+using CafeHub.Domain.Tenants.Credentials;
 
 namespace CafeHub.Domain.Tenants
 {
     public sealed class TenantDatabase
     {
-        private static readonly Regex SecretReferencePattern = new(
-            "^[a-z0-9][a-z0-9-]*$",
-            RegexOptions.CultureInvariant);
-
         private TenantDatabase()
         {
         }
@@ -53,7 +49,7 @@ namespace CafeHub.Domain.Tenants
                     nameof(secretReference));
             }
 
-            if (!IsWellFormedSecretReference(secretReference))
+            if (!TenantDatabaseCredentialReference.IsValid(secretReference))
             {
                 throw new ArgumentException(
                     "The secret reference must start with a lowercase letter or digit and contain only lowercase letters, digits, and hyphens.",
@@ -87,7 +83,7 @@ namespace CafeHub.Domain.Tenants
                     nameof(secretReference));
             }
 
-            if (!IsWellFormedSecretReference(secretReference))
+            if (!TenantDatabaseCredentialReference.IsValid(secretReference))
             {
                 throw new ArgumentException(
                     "The secret reference must start with a lowercase letter or digit and contain only lowercase letters, digits, and hyphens.",
@@ -97,16 +93,6 @@ namespace CafeHub.Domain.Tenants
             SecretReference = secretReference;
             Status = TenantDatabaseStatus.Provisioned;
             UpdatedAt = now;
-        }
-
-        private static bool IsWellFormedSecretReference(string? secretReference)
-        {
-            if (secretReference is null || secretReference.Length == 0)
-            {
-                return false;
-            }
-
-            return SecretReferencePattern.IsMatch(secretReference);
         }
     }
 }
