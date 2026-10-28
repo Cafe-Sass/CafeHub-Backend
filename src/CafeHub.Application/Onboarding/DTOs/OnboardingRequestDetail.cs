@@ -26,6 +26,8 @@ namespace CafeHub.Application.Onboarding.DTOs
 
         public required string PlanKey { get; init; }
 
+        public required Guid PlanVersionId { get; init; }
+
         public required int PlanVersionNumber { get; init; }
 
         public required string? PaymentStatus { get; init; }
@@ -58,6 +60,7 @@ namespace CafeHub.Application.Onboarding.DTOs
                 CafeName = request.CafeName,
                 TenantSlug = request.TenantSlug,
                 PlanKey = plan?.Code ?? string.Empty,
+                PlanVersionId = request.PlanVersionId,
                 PlanVersionNumber = planVersion?.VersionNumber ?? 0,
                 PaymentStatus = payment?.Status.ToString(),
                 PaidAt = payment?.SettledAt,

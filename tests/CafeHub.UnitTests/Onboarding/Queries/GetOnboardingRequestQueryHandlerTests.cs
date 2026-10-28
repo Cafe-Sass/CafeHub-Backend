@@ -55,5 +55,21 @@ namespace CafeHub.UnitTests.Onboarding.Queries
             Assert.Equal(0, planRepository.FindByIdCallCount);
             Assert.Equal(0, paymentStore.FindByOnboardingRequestIdCallCount);
         }
+
+        [Fact]
+        public async Task Handle_KnownRequestProjectsPersistedPlanVersionId()
+        {
+            var planVersionId = Guid.CreateVersion7();
+            var request = OnboardingRequest.CreateForPublicRegistration(
+                Guid.CreateVersion7(), planVersionId, "owner@example.com", "Owner", null, "Cafe", "hash", "cafe",
+                new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+            var store = new FakeOnboardingRequestStore(request);
+            var handler = new GetOnboardingRequestQueryHandler(store, new FakePlanRepository(), new FakePaymentTransactionStore());
+
+            var result = await handler.Handle(new GetOnboardingRequestQuery(request.Id), CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(planVersionId, result.Value!.PlanVersionId);
+        }
     }
 }
