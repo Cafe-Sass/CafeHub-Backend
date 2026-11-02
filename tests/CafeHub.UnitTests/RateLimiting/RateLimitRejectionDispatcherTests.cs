@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -132,12 +133,18 @@ namespace CafeHub.UnitTests.RateLimiting
 
         private sealed class TestEndpointFeature : IEndpointFeature
         {
+            private Endpoint? _endpoint;
+
             public TestEndpointFeature(Endpoint endpoint)
             {
-                Endpoint = endpoint;
+                _endpoint = endpoint;
             }
 
-            public Endpoint Endpoint { get; set; }
+            Endpoint? IEndpointFeature.Endpoint
+            {
+                get => _endpoint;
+                set => _endpoint = value;
+            }
         }
     }
 }

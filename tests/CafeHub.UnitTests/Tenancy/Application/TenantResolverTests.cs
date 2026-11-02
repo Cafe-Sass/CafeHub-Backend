@@ -119,7 +119,7 @@ namespace CafeHub.UnitTests.Tenancy.Application
 
             await resolver.ResolveAsync(KnownRegistration.Slug, CancellationToken.None);
             await resolver.ResolveAsync("unknown-cafe", CancellationToken.None);
-            resolver.ResolveAsync("with.dot", CancellationToken.None);
+            await resolver.ResolveAsync("with.dot", CancellationToken.None);
 
             Assert.Equal(0, setter.CallCount);
         }
