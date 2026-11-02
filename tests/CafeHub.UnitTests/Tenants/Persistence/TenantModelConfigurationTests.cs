@@ -332,6 +332,12 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Contains(checks, c => c.Name == "ck_branches_address_length");
             Assert.Contains(checks, c => c.Name == "ck_branches_contact_phone_length");
             Assert.Contains(checks, c => c.Name == "ck_branches_opening_hours_summary_length");
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.Equal(typeof(uint), xmin.ClrType);
+            Assert.True(xmin.IsConcurrencyToken);
+            Assert.False(xmin.IsNullable);
         }
 
         [Fact]
