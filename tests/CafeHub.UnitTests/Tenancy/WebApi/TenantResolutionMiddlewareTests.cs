@@ -5,6 +5,7 @@ using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 using CafeHub.WebApi.Tenancy;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace CafeHub.UnitTests.Tenancy.WebApi
 {
@@ -71,6 +72,101 @@ namespace CafeHub.UnitTests.Tenancy.WebApi
             Assert.Equal(0, setter.Count);
         }
 
+        [Fact]
+        public async Task InvokeAsync_MalformedSlug_LogsOnlyCategoryWithoutSlugAndWithoutTenantScope()
+        {
+            var logger = new RecordingLogger();
+            var context = Context("/t/bad.slug");
+            var middleware = new TenantResolutionMiddleware(_ => throw new InvalidOperationException("next must not run"));
+
+            await middleware.InvokeAsync(
+                context,
+                new Resolver(Result.Failure<ResolvedTenant>(TenancyErrors.TenantUnavailable())),
+                new TenantStateGuard(),
+                new Setter(),
+                logger);
+
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Contains("malformed_slug", entry.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("bad.slug", entry.Message, StringComparison.Ordinal);
+            Assert.Equal(0, entry.ActiveScopeCount);
+            Assert.Empty(logger.Scopes);
+        }
+
+        [Fact]
+        public async Task InvokeAsync_UnknownSlug_LogsOnlyUnavailableCategoryWithoutSlugAndWithoutTenantScope()
+        {
+            var logger = new RecordingLogger();
+            var context = Context("/t/unknown");
+            var middleware = new TenantResolutionMiddleware(_ => throw new InvalidOperationException("next must not run"));
+
+            await middleware.InvokeAsync(
+                context,
+                new Resolver(Result.Failure<ResolvedTenant>(TenancyErrors.TenantUnavailable())),
+                new TenantStateGuard(),
+                new Setter(),
+                logger);
+
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Contains("unavailable", entry.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("unknown", entry.Message, StringComparison.Ordinal);
+            Assert.Equal(0, entry.ActiveScopeCount);
+            Assert.Empty(logger.Scopes);
+        }
+
+        [Fact]
+        public async Task InvokeAsync_UnusableTenant_LogsOnlyUnavailableCategoryWithoutSlugAndWithoutTenantScope()
+        {
+            var logger = new RecordingLogger();
+            var context = Context("/t/unusable-cafe/menu");
+            var setter = new Setter();
+            var middleware = new TenantResolutionMiddleware(_ => throw new InvalidOperationException("next must not run"));
+
+            await middleware.InvokeAsync(
+                context,
+                new Resolver(Result.Success(new ResolvedTenant(Guid.NewGuid(), "unusable-cafe", TenantLifecycleStatus.Suspended, "ref"))),
+                new TenantStateGuard(),
+                setter,
+                logger);
+
+            Assert.Equal(0, setter.Count);
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Contains("unavailable", entry.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("unusable-cafe", entry.Message, StringComparison.Ordinal);
+            Assert.Equal(0, entry.ActiveScopeCount);
+            Assert.Empty(logger.Scopes);
+        }
+
+        [Fact]
+        public async Task InvokeAsync_ResolvedTenant_LogsInsideAnOpenTenantIdScopeThatCarriesNoSlug()
+        {
+            var logger = new RecordingLogger();
+            var id = Guid.NewGuid();
+            var resolver = new Resolver(Result.Success(new ResolvedTenant(id, "cafe", TenantLifecycleStatus.Active, "ref")));
+            var setter = new Setter();
+            var middleware = new TenantResolutionMiddleware(_ =>
+            {
+                logger.LogInformation("downstream work");
+                return Task.CompletedTask;
+            });
+
+            await middleware.InvokeAsync(Context("/t/cafe/menu"), resolver, new TenantStateGuard(), setter, logger);
+
+            Assert.Equal(1, setter.Count);
+            var entry = Assert.Single(logger.Entries);
+            Assert.Equal(LogLevel.Information, entry.Level);
+            Assert.Equal(1, entry.ActiveScopeCount);
+            Assert.DoesNotContain("cafe", entry.Message, StringComparison.Ordinal);
+
+            var scope = Assert.Single(logger.Scopes);
+            Assert.True(scope.IsDisposed);
+            var values = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object>>(scope.State);
+            Assert.Equal(id, values["TenantId"]);
+        }
+
         private static DefaultHttpContext Context(string path)
         {
             var context = new DefaultHttpContext();
@@ -94,6 +190,56 @@ namespace CafeHub.UnitTests.Tenancy.WebApi
             public int Count { get; private set; }
             public TenantContext? Context { get; private set; }
             public void Set(TenantContext tenantContext) { Count++; Context = tenantContext; }
+        }
+
+        private sealed record RecordedLogEntry(LogLevel Level, string Message, Exception? Exception, int ActiveScopeCount);
+
+        private sealed class RecordingLogger : ILogger<TenantResolutionMiddleware>
+        {
+            private int activeScopeCount;
+
+            public List<RecordedLogEntry> Entries { get; } = [];
+
+            public List<RecordedScope> Scopes { get; } = [];
+
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+            {
+                var scope = new RecordedScope(state, this);
+                Scopes.Add(scope);
+                activeScopeCount++;
+                return scope;
+            }
+
+            public bool IsEnabled(LogLevel logLevel)
+            {
+                return true;
+            }
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                Entries.Add(new RecordedLogEntry(logLevel, formatter(state, exception), exception, activeScopeCount));
+            }
+
+            private void CloseScope()
+            {
+                activeScopeCount--;
+            }
+
+            public sealed class RecordedScope(object? state, RecordingLogger logger) : IDisposable
+            {
+                public object? State { get; } = state;
+
+                public bool IsDisposed { get; private set; }
+
+                public void Dispose()
+                {
+                    if (!IsDisposed)
+                    {
+                        IsDisposed = true;
+                        logger.CloseScope();
+                    }
+                }
+            }
         }
     }
 }
