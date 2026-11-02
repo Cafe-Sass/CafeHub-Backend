@@ -16,7 +16,10 @@ namespace CafeHub.Application.Branches.Commands
                 .NotEmpty();
 
             RuleFor(command => command.Name)
+                .Cascade(CascadeMode.Stop)
                 .NotEmpty()
+                .Must(name => !string.IsNullOrWhiteSpace(name))
+                .WithMessage("The branch name is required.")
                 .MaximumLength(MaximumNameLength);
 
             RuleFor(command => command.Address)
