@@ -4,6 +4,7 @@ using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.Idempotency;
+using CafeHub.WebApi.Security;
 using CafeHub.WebApi.Transport;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,7 @@ builder.Services.AddSuperAdminSeeding();
 builder.Services.AddCorrelationId();
 builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddTransportSecurity(builder.Configuration);
+builder.Services.AddRequestLimits(builder.Configuration);
 builder.Services.AddPlatformAuthentication();
 builder.Services.AddTenantAuthentication();
 builder.Services.AddPlatformAuthorization();
@@ -31,6 +33,7 @@ _ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 
 app.UseForwardedHeaders();
 app.UseCorrelationId();
+app.UseSecurityHeaders();
 app.UseExceptionHandler();
 app.UseTransportSecurity(app.Environment);
 app.UseRateLimiter();
