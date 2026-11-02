@@ -1,8 +1,11 @@
+using System.Linq;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Branches.Contracts;
 using CafeHub.Application.Branches.DTOs;
+using CafeHub.Application.Branches.Queries;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Pagination;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 
@@ -12,9 +15,13 @@ namespace CafeHub.UnitTests.Branches
     {
         public List<BranchResponseCall> Created { get; } = new();
         public List<UpdateBranchCall> Updated { get; } = new();
+        public List<BranchListRequest> ListRequests { get; } = new();
+        public List<Guid> GetByIdRequests { get; } = new();
         public List<TenantAuditEntry> AuditEntries { get; } = new();
         public BranchResponse? CreatedResponse { get; set; }
         public BranchResponse? UpdatedResponse { get; set; }
+        public BranchResponse? GetByIdResponse { get; set; }
+        public List<BranchResponse> ListResponses { get; } = new();
         public Error? Failure { get; set; }
 
         public Task<Result<BranchResponse>> CreateAsync(
@@ -93,6 +100,20 @@ namespace CafeHub.UnitTests.Branches
             return Task.FromResult(Result.Success(UpdatedResponse ?? BranchResponse.From(
                 Branch.Create(branchId, name, BranchLifecycleStatus.Active, address, contactPhone, openingHoursSummary, DateTimeOffset.UtcNow, actorUserId),
                 "67890")));
+        }
+
+        public Task<BranchResponse?> GetByIdAsync(Guid branchId, CancellationToken cancellationToken)
+        {
+            GetByIdRequests.Add(branchId);
+            return Task.FromResult(GetByIdResponse);
+        }
+
+        public Task<BranchListPage> ListBranchesAsync(BranchListRequest request, CancellationToken cancellationToken)
+        {
+            ListRequests.Add(request);
+            var items = ListResponses.Take(request.PageSize + 1).ToList();
+            var totalCount = request.IncludeTotalCount ? (int?)ListResponses.Count : null;
+            return Task.FromResult(new BranchListPage(items, totalCount));
         }
     }
 
