@@ -50,14 +50,18 @@ namespace CafeHub.UnitTests.Tenancy.Infrastructure
             var registry = new TenantRegistryReaderStub(
                 new TenantRegistration(firstId, "cafe-alpha", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(firstId)),
                 new TenantRegistration(secondId, "cafe-beta", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(secondId)));
-            var accessor = new TenantContextAccessor();
-            var resolver = CreateResolver(accessor, registry, CreateOptions());
+            var options = CreateOptions();
 
-            accessor.Set(TenantContext.Create(firstId, TenantDatabaseCredentialReference.CreateV1(firstId), true));
-            var first = new NpgsqlConnectionStringBuilder(resolver.Resolve());
-            var firstRepeated = new NpgsqlConnectionStringBuilder(resolver.Resolve());
-            accessor.Set(TenantContext.Create(secondId, TenantDatabaseCredentialReference.CreateV1(secondId), true));
-            var second = new NpgsqlConnectionStringBuilder(resolver.Resolve());
+            var firstAccessor = new TenantContextAccessor();
+            firstAccessor.Set(TenantContext.Create(firstId, TenantDatabaseCredentialReference.CreateV1(firstId), true));
+            var firstResolver = CreateResolver(firstAccessor, registry, options);
+            var first = new NpgsqlConnectionStringBuilder(firstResolver.Resolve());
+            var firstRepeated = new NpgsqlConnectionStringBuilder(firstResolver.Resolve());
+
+            var secondAccessor = new TenantContextAccessor();
+            secondAccessor.Set(TenantContext.Create(secondId, TenantDatabaseCredentialReference.CreateV1(secondId), true));
+            var secondResolver = CreateResolver(secondAccessor, registry, options);
+            var second = new NpgsqlConnectionStringBuilder(secondResolver.Resolve());
 
             Assert.NotEqual(first.Database, second.Database);
             Assert.NotEqual(first.Username, second.Username);
