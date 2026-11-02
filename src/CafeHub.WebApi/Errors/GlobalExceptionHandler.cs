@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
 using CafeHub.Application.Abstractions.Correlation;
@@ -92,9 +93,34 @@ namespace CafeHub.WebApi.Errors
                     ErrorProblemDetailsMapper.Map(Error.NotFound(TenantUnavailableCode, TenantUnavailableMessage), traceIdentifier, correlationId),
                 TenantIsolationException =>
                     ErrorProblemDetailsMapper.Map(Error.Validation(TenantContextInvalidCode, TenantContextInvalidMessage), traceIdentifier, correlationId),
+                BadHttpRequestException badRequest when badRequest.StatusCode == StatusCodes.Status413RequestEntityTooLarge =>
+                    MapTooLargeRequest(traceIdentifier, correlationId),
                 _ =>
                     ErrorProblemDetailsMapper.Map(Error.Failure(UnexpectedCode, UnexpectedMessage), traceIdentifier, correlationId),
             };
+        }
+
+        private static ProblemDetails MapTooLargeRequest(string traceIdentifier, string? correlationId)
+        {
+            var problemDetails = new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.13",
+                Title = "Request Entity Too Large",
+                Status = StatusCodes.Status413RequestEntityTooLarge,
+                Detail = "The request body is too large.",
+            };
+            problemDetails.Extensions["code"] = "Request.TooLarge";
+            problemDetails.Extensions["traceId"] = traceIdentifier;
+            AddCorrelationId(problemDetails.Extensions, correlationId);
+            return problemDetails;
+        }
+
+        private static void AddCorrelationId(IDictionary<string, object?> extensions, string? correlationId)
+        {
+            if (!string.IsNullOrWhiteSpace(correlationId))
+            {
+                extensions["correlationId"] = correlationId;
+            }
         }
     }
 }
