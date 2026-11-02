@@ -12,18 +12,15 @@ namespace CafeHub.Application.CafeProfile.Commands
         private readonly ICafeSettingsWriter writer;
         private readonly ICurrentTenantUser currentTenantUser;
         private readonly ITenantContextAccessor tenantContextAccessor;
-        private readonly TimeProvider timeProvider;
 
         public UpdateCafeProfileCommandHandler(
             ICafeSettingsWriter writer,
             ICurrentTenantUser currentTenantUser,
-            ITenantContextAccessor tenantContextAccessor,
-            TimeProvider timeProvider)
+            ITenantContextAccessor tenantContextAccessor)
         {
             this.writer = writer ?? throw new ArgumentNullException(nameof(writer));
             this.currentTenantUser = currentTenantUser ?? throw new ArgumentNullException(nameof(currentTenantUser));
             this.tenantContextAccessor = tenantContextAccessor ?? throw new ArgumentNullException(nameof(tenantContextAccessor));
-            this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
 
         public async Task<Result<CafeProfileResponse>> Handle(UpdateCafeProfileCommand command, CancellationToken cancellationToken)
@@ -51,8 +48,6 @@ namespace CafeHub.Application.CafeProfile.Commands
             var contactEmail = NormalizeOptional(command.ContactEmail);
             var contactAddress = NormalizeOptional(command.ContactAddress);
             var timezone = command.Timezone.Trim();
-
-            var updatedAt = timeProvider.GetUtcNow();
 
             return await writer.UpdateAsync(
                 cafeName,
