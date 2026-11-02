@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
+using CafeHub.Application.CafeProfile.Contracts;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Notifications;
 using CafeHub.Application.Onboarding;
@@ -11,6 +12,7 @@ using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
+using CafeHub.Infrastructure.CafeProfile;
 using CafeHub.Infrastructure.Identity;
 using CafeHub.Infrastructure.Notifications;
 using CafeHub.Infrastructure.Onboarding;
@@ -105,6 +107,7 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(serviceProvider => TenantJwtOptionsBinder.Bind(configuration, serviceProvider.GetRequiredService<JwtOptions>().Audience));
             services.AddSingleton<ITenantAccessTokenIssuer, TenantJwtAccessTokenIssuer>();
             services.AddScoped<ITenantRefreshTokenStore, TenantRefreshTokenStore>();
+            services.AddScoped<ICafeSettingsReader, CafeSettingsStore>();
             services.AddScoped<ITenantRefreshTokenService, TenantRefreshTokenService>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();
             services.AddScoped<ISuperAdminSeeder, SuperAdminSeeder>();
