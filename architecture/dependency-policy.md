@@ -69,3 +69,9 @@ Adding any of the following first requires a PRD- or story-backed requirement an
 ## Updates
 
 - If an automated dependency updater (Dependabot or Renovate) is ever enabled, it must be configured to ignore MediatR versions 13 and above.
+
+## Secret scanning
+
+- Tool: gitleaks v8.30.1 (Proposed, pending owner confirmation). Pinned by exact release tag `v8.30.1`; the Linux x64 binary SHA-256 checksum `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb` is verified in the workflow before use.
+- Workflow: `.github/workflows/security.yml`, job `secret-scan`, runs with `permissions: contents: read`, scans pull requests targeting `development` and pushes to `development`.
+- Allowlist: `.gitleaks.toml` lists only named test-fixture paths under `tests/`, each with a reason; no real secret path is allowlisted.
