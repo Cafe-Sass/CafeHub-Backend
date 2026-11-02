@@ -51,6 +51,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .HasForeignKey(s => s.UpdatedBy)
                 .HasConstraintName("fk_cafe_settings_updated_by")
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property<uint>("xmin").IsRowVersion();
         }
     }
 }
