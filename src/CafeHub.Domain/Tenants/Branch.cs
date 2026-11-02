@@ -132,5 +132,22 @@ namespace CafeHub.Domain.Tenants
             UpdatedAt = updatedAt;
             UpdatedBy = updatedBy;
         }
+
+        public void ChangeLifecycleStatus(
+            BranchLifecycleStatus newStatus,
+            DateTimeOffset updatedAt,
+            Guid? updatedBy)
+        {
+            if (!Enum.IsDefined(newStatus))
+            {
+                throw new ArgumentException(
+                    "The branch lifecycle status is not defined.",
+                    nameof(newStatus));
+            }
+
+            LifecycleStatus = newStatus;
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
+        }
     }
 }
