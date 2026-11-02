@@ -38,6 +38,7 @@ The table below is generated from the real `Directory.Packages.props` and must b
 | Microsoft.Extensions.Logging.Abstractions | 10.0.13 | `ILogger` abstractions for the request pipeline logging behavior (Application) |
 | Microsoft.NET.Test.Sdk | 17.14.1 | xUnit test runner platform |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL database provider for EF Core |
+| Swashbuckle.AspNetCore.SwaggerUI | 10.3.1 | Swagger UI viewer for the OpenAPI document endpoint (proposed, pending owner confirmation; the OpenAPI prompt did not approve a viewer) |
 | xunit | 2.9.3 | Unit test framework |
 | xunit.runner.visualstudio | 3.1.4 | xUnit Visual Studio test adapter |
 
