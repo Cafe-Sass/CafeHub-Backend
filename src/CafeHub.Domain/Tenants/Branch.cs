@@ -88,5 +88,49 @@ namespace CafeHub.Domain.Tenants
                 UpdatedBy = createdBy,
             };
         }
+
+        public void Update(
+            string name,
+            string? address,
+            string? contactPhone,
+            string? openingHoursSummary,
+            DateTimeOffset updatedAt,
+            Guid? updatedBy)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 256)
+            {
+                throw new ArgumentException(
+                    "The branch name must be between 1 and 256 characters.",
+                    nameof(name));
+            }
+
+            if (address is not null && address.Length > 512)
+            {
+                throw new ArgumentException(
+                    "The address must not exceed 512 characters.",
+                    nameof(address));
+            }
+
+            if (contactPhone is not null && contactPhone.Length > 32)
+            {
+                throw new ArgumentException(
+                    "The contact phone must not exceed 32 characters.",
+                    nameof(contactPhone));
+            }
+
+            if (openingHoursSummary is not null && openingHoursSummary.Length > 512)
+            {
+                throw new ArgumentException(
+                    "The opening hours summary must not exceed 512 characters.",
+                    nameof(openingHoursSummary));
+            }
+
+            Name = name;
+            Address = address;
+            ContactPhone = contactPhone;
+            OpeningHoursSummary = openingHoursSummary;
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
+        }
     }
 }
