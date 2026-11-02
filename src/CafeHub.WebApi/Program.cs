@@ -2,8 +2,10 @@ using CafeHub.Application;
 using CafeHub.Infrastructure;
 using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
+using CafeHub.WebApi.Cors;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.Idempotency;
+using CafeHub.WebApi.RateLimiting;
 using CafeHub.WebApi.Security;
 using CafeHub.WebApi.Transport;
 
@@ -22,6 +24,8 @@ builder.Services.AddCorrelationId();
 builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddTransportSecurity(builder.Configuration);
 builder.Services.AddRequestLimits(builder.Configuration);
+builder.Services.AddConfiguredCors(builder.Configuration);
+builder.Services.AddGlobalRateLimiting(builder.Configuration);
 builder.Services.AddPlatformAuthentication();
 builder.Services.AddTenantAuthentication();
 builder.Services.AddPlatformAuthorization();
@@ -37,11 +41,12 @@ app.UseSecurityHeaders();
 app.UseExceptionHandler();
 app.UseTransportSecurity(app.Environment);
 app.UseRateLimiter();
+app.UseConfiguredCors();
 app.UseMiddleware<CafeHub.WebApi.Tenancy.TenantResolutionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapApiDocumentation();
-app.MapControllers();
+app.MapControllers().RequireRateLimiting(GlobalRateLimiting.PolicyName);
 
 app.Run();

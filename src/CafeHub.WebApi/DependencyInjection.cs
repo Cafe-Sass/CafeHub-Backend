@@ -63,6 +63,32 @@ namespace CafeHub.WebApi
             return services;
         }
 
+        public static IServiceCollection AddGlobalRateLimiting(this IServiceCollection services, IConfiguration configuration)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            if (configuration is null)
+            {
+                throw new ArgumentNullException(nameof(configuration));
+            }
+
+            var options = GlobalRateLimitOptionsBinder.Bind(configuration);
+            services.AddSingleton(options);
+            services.AddRateLimiter(rateLimiterOptions =>
+            {
+                rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                rateLimiterOptions.AddPolicy(
+                    GlobalRateLimiting.PolicyName,
+                    httpContext => GlobalRateLimitPolicy.CreatePartition(httpContext, options));
+                rateLimiterOptions.OnRejected = RateLimitRejectionDispatcher.WriteAsync;
+            });
+
+            return services;
+        }
+
         public static IServiceCollection AddSuperAdminSeeding(this IServiceCollection services)
         {
             if (services is null)
