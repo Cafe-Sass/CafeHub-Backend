@@ -76,7 +76,7 @@ namespace CafeHub.UnitTests
             var entity = FindAuditRecordEntity();
 
             var checkConstraints = entity.GetCheckConstraints()
-                .ToDictionary(constraint => constraint.Name, constraint => constraint.Sql);
+                .ToDictionary(constraint => constraint.Name!, constraint => constraint.Sql!);
 
             Assert.Equal(5, checkConstraints.Count);
             Assert.Equal("actor_kind IN ('PlatformAdmin', 'System')", checkConstraints["ck_platform_audit_records_kind"]);

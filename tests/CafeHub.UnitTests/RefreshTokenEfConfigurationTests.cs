@@ -98,7 +98,7 @@ namespace CafeHub.UnitTests
             var entity = FindRefreshTokenEntity();
 
             var checkConstraints = entity.GetCheckConstraints()
-                .ToDictionary(constraint => constraint.Name, constraint => constraint.Sql);
+                .ToDictionary(constraint => constraint.Name!, constraint => constraint.Sql!);
 
             Assert.Equal(5, checkConstraints.Count);
             Assert.Equal(
