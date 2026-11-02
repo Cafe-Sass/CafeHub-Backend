@@ -1,0 +1,31 @@
+[[allowlists]]
+description = "Test fixture: fake secretReference value used in tenant domain tests"
+paths = ["tests/CafeHub.UnitTests/Tenants/Domain/TenantTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake signing key values used in tenant token binding tests"
+paths = ["tests/CafeHub.UnitTests/TenantTokenBindingTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake token hash value used in tenant refresh token tests"
+paths = ["tests/CafeHub.UnitTests/Tenants/Domain/TenantRefreshTokenTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake idempotency key value used in payment command handler tests"
+paths = ["tests/CafeHub.UnitTests/Onboarding/Commands/PayOnboardingRequestCommandHandlerTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake token hash value used in refresh token entity tests"
+paths = ["tests/CafeHub.UnitTests/RefreshTokenEntityTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake signing key value used in platform token validation parameter tests"
+paths = ["tests/CafeHub.UnitTests/PlatformTokenValidationParametersTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake signing key value used in JWT access token issuer tests"
+paths = ["tests/CafeHub.UnitTests/JwtAccessTokenIssuerTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake valid signing key value used in JWT options binder tests"
+paths = ["tests/CafeHub.UnitTests/JwtOptionsBinderTests.cs"]
