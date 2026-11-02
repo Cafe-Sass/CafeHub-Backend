@@ -6,6 +6,7 @@ using CafeHub.Application.Tenancy;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace CafeHub.WebApi.Errors
@@ -47,6 +48,7 @@ namespace CafeHub.WebApi.Errors
             var traceIdentifier = Activity.Current?.Id ?? httpContext.TraceIdentifier;
             var problemDetails = CreateProblemDetails(exception, traceIdentifier, correlationIdAccessor?.CorrelationId);
 
+            using var tenantScope = BeginTenantScope(httpContext);
             logger.LogError(exception, "Request {TraceId} failed with {ExceptionType}", traceIdentifier, exception.GetType().Name);
 
             httpContext.Response.StatusCode = problemDetails.Status!.Value;
@@ -54,6 +56,32 @@ namespace CafeHub.WebApi.Errors
             await JsonSerializer.SerializeAsync(httpContext.Response.Body, problemDetails, ResponseJsonOptions, cancellationToken);
 
             return true;
+        }
+
+        private IDisposable? BeginTenantScope(HttpContext httpContext)
+        {
+            var tenantId = TryGetTenantId(httpContext);
+            return tenantId is null
+                ? null
+                : logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId.Value });
+        }
+
+        private static Guid? TryGetTenantId(HttpContext httpContext)
+        {
+            var tenantContextAccessor = httpContext.RequestServices?.GetService<ITenantContextAccessor>();
+            if (tenantContextAccessor is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return tenantContextAccessor.GetRequired().TenantId;
+            }
+            catch (TenantIsolationException)
+            {
+                return null;
+            }
         }
 
         private static ProblemDetails CreateProblemDetails(Exception exception, string traceIdentifier, string? correlationId)

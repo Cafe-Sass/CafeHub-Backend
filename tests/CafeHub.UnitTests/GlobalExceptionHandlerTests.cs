@@ -3,6 +3,7 @@ using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Tenancy;
 using CafeHub.WebApi.Errors;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace CafeHub.UnitTests
@@ -153,11 +154,93 @@ namespace CafeHub.UnitTests
             Assert.Equal("ctx-trace-omitted", json.RootElement.GetProperty("traceId").GetString());
         }
 
-        private static DefaultHttpContext CreateHttpContext(string traceIdentifier)
+        [Fact]
+        public async Task TryHandleAsync_WhenTenantContextIsResolved_LogsInsideATenantIdScopeThatClosesAfterHandling()
+        {
+            var tenantId = Guid.NewGuid();
+            var listLogger = new ListLogger();
+            var httpContext = CreateHttpContext(
+                "ctx-trace-scope",
+                new StubTenantContextAccessor(TenantContext.Create(tenantId, "tenant-secret-reference", true, "cafe")));
+
+            await new GlobalExceptionHandler(listLogger).TryHandleAsync(httpContext, new InvalidOperationException("internal boom detail"), CancellationToken.None);
+
+            var entry = Assert.Single(listLogger.Entries);
+            Assert.Equal(1, entry.ActiveScopeCount);
+            Assert.DoesNotContain("tenant-secret-reference", entry.Message, StringComparison.OrdinalIgnoreCase);
+
+            var scope = Assert.Single(listLogger.Scopes);
+            Assert.True(scope.IsDisposed);
+            var values = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object>>(scope.State);
+            Assert.Equal(tenantId, values["TenantId"]);
+        }
+
+        [Fact]
+        public async Task TryHandleAsync_WhenTenantContextIsMissing_LogsWithoutATenantIdScope()
+        {
+            var listLogger = new ListLogger();
+            var httpContext = CreateHttpContext("ctx-trace-no-scope");
+
+            await new GlobalExceptionHandler(listLogger).TryHandleAsync(httpContext, new InvalidOperationException("internal boom detail"), CancellationToken.None);
+
+            Assert.Single(listLogger.Entries);
+            Assert.Empty(listLogger.Scopes);
+        }
+
+        [Fact]
+        public async Task TryHandleAsync_WhenTenantContextThrows_LogsWithoutATenantIdScope()
+        {
+            var listLogger = new ListLogger();
+            var httpContext = CreateHttpContext("ctx-trace-no-scope", new MissingTenantContextAccessor());
+
+            await new GlobalExceptionHandler(listLogger).TryHandleAsync(httpContext, new InvalidOperationException("internal boom detail"), CancellationToken.None);
+
+            Assert.Single(listLogger.Entries);
+            Assert.Empty(listLogger.Scopes);
+        }
+
+        [Fact]
+        public async Task TryHandleAsync_UnexpectedTenantDatabaseException_ReturnsGeneric500WithoutDatabaseNameOrRole()
+        {
+            var listLogger = new ListLogger();
+            var exception = new InvalidOperationException(
+                "connection string Host=tenant-db;Database=tenant_a;Username=tenant_a_app;Password=s3cr3t;role=tenant_a_app");
+            var httpContext = CreateHttpContext("ctx-trace-secret");
+
+            var handled = await new GlobalExceptionHandler(listLogger).TryHandleAsync(httpContext, exception, CancellationToken.None);
+
+            Assert.True(handled);
+            Assert.Equal(StatusCodes.Status500InternalServerError, httpContext.Response.StatusCode);
+            var body = await ReadBody(httpContext);
+            using var json = JsonDocument.Parse(body);
+            Assert.Equal(500, json.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal("Server.Unexpected", json.RootElement.GetProperty("code").GetString());
+            Assert.Equal("An unexpected error occurred. Try again later.", json.RootElement.GetProperty("detail").GetString());
+            Assert.DoesNotContain("tenant_a", body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("tenant_a_app", body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("tenant-db", body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("s3cr3t", body, StringComparison.Ordinal);
+
+            var entry = Assert.Single(listLogger.Entries);
+            Assert.DoesNotContain("tenant_a", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("tenant_a_app", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("tenant-db", entry.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("s3cr3t", entry.Message, StringComparison.Ordinal);
+        }
+
+        private static DefaultHttpContext CreateHttpContext(string traceIdentifier, ITenantContextAccessor? tenantContextAccessor = null)
         {
             var httpContext = new DefaultHttpContext();
             httpContext.TraceIdentifier = traceIdentifier;
             httpContext.Response.Body = new MemoryStream();
+
+            if (tenantContextAccessor is not null)
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton(tenantContextAccessor);
+                httpContext.RequestServices = services.BuildServiceProvider();
+            }
+
             return httpContext;
         }
 
@@ -169,24 +252,22 @@ namespace CafeHub.UnitTests
             return await reader.ReadToEndAsync();
         }
 
-        private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
+        private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception, int ActiveScopeCount);
 
         private sealed class ListLogger : ILogger<GlobalExceptionHandler>
         {
+            private int activeScopeCount;
+
             public List<LogEntry> Entries { get; } = new();
 
-            private sealed class NoopDisposable : IDisposable
-            {
-                public static readonly NoopDisposable Instance = new();
-
-                public void Dispose()
-                {
-                }
-            }
+            public List<ScopeEntry> Scopes { get; } = new();
 
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull
             {
-                return NoopDisposable.Instance;
+                var scope = new ScopeEntry(state, this);
+                Scopes.Add(scope);
+                activeScopeCount++;
+                return scope;
             }
 
             public bool IsEnabled(LogLevel logLevel)
@@ -196,7 +277,44 @@ namespace CafeHub.UnitTests
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+                Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception, activeScopeCount));
+            }
+
+            private void CloseScope()
+            {
+                activeScopeCount--;
+            }
+
+            public sealed class ScopeEntry(object? state, ListLogger logger) : IDisposable
+            {
+                public object? State { get; } = state;
+
+                public bool IsDisposed { get; private set; }
+
+                public void Dispose()
+                {
+                    if (!IsDisposed)
+                    {
+                        IsDisposed = true;
+                        logger.CloseScope();
+                    }
+                }
+            }
+        }
+
+        private sealed class StubTenantContextAccessor(TenantContext tenantContext) : ITenantContextAccessor
+        {
+            public TenantContext GetRequired()
+            {
+                return tenantContext;
+            }
+        }
+
+        private sealed class MissingTenantContextAccessor : ITenantContextAccessor
+        {
+            public TenantContext GetRequired()
+            {
+                throw new TenantContextMissingException("missing");
             }
         }
     }

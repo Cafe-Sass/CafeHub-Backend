@@ -48,7 +48,7 @@ namespace CafeHub.WebApi.Authentication
             await WriteProblemAsync(context.HttpContext, Error.Forbidden(ForbiddenCode, ForbiddenMessage));
         }
 
-        private static async Task WriteProblemAsync(HttpContext httpContext, Error error)
+        protected static async Task WriteProblemAsync(HttpContext httpContext, Error error)
         {
             var correlationIdAccessor = httpContext.RequestServices.GetService<ICorrelationIdAccessor>();
             var traceIdentifier = Activity.Current?.Id ?? httpContext.TraceIdentifier;

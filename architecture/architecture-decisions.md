@@ -87,7 +87,9 @@ Unhandled exceptions leave `GlobalExceptionHandler` (`src/CafeHub.WebApi/Errors`
 | `TenantConnectionNotConfiguredException` | 404 | `Tenant.Unavailable` | Same body as inactive tenant |
 
 - The two 404 rows use one identical body so a caller cannot tell whether a tenant exists, is inactive, or has an unconfigured connection (fail closed).
-- Responses never contain tenant identifiers, setting names or values, or connection strings. The server log records the exception object, the exception type name, and the safe trace identifier, at Error level, exactly once per request, and never request bodies or secret values.
+- A tenant bearer token presented on a `/t/{slug}` route whose resolved tenant differs from the token's `tid` claim is treated as an unavailable tenant: 404 `Tenant.Unavailable` with the same body. Authentication events log only the failure category (`token_kind`, `tenant_mismatch`, or `no_tenant_context`), never the token or the tenant identifier.
+- Responses never contain tenant identifiers, setting names or values, or connection strings. The server log records the exception object, the exception type name, and the safe trace identifier, at Error level, exactly once per request, and never request bodies, the requested slug, bearer tokens, connection strings, passwords, or other secret values.
+- Every log written while a resolved tenant context is active carries a `TenantId` logging scope. Logs written before tenant resolution carry no such scope, and tenant-resolution rejections log only a failure category (`malformed_slug` or `unavailable`), never the requested slug.
 - Any other `TenantIsolationException` subtype added later falls back to the `Tenant.ContextInvalid` 400 row (fail closed) until it is mapped explicitly.
 
 ## Testing
