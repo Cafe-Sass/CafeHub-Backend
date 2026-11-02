@@ -21,7 +21,11 @@ namespace CafeHub.UnitTests
 
             await TransformDocumentAsync(document);
 
-            var scheme = Assert.IsType<OpenApiSecurityScheme>(Assert.Single(document.Components!.SecuritySchemes).Value);
+            var components = document.Components;
+            Assert.NotNull(components);
+            var securitySchemes = components.SecuritySchemes;
+            Assert.NotNull(securitySchemes);
+            var scheme = Assert.IsType<OpenApiSecurityScheme>(Assert.Single(securitySchemes).Value);
             Assert.Equal(SecuritySchemeType.Http, scheme.Type);
             Assert.Equal("bearer", scheme.Scheme);
             Assert.Equal("JWT", scheme.BearerFormat);

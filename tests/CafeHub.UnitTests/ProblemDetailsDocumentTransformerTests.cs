@@ -14,11 +14,14 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var components = document.Components!;
-            var schema = Assert.Contains("ProblemDetails", components.Schemas) as OpenApiSchema;
+            var components = document.Components;
+            Assert.NotNull(components);
+            var schemas = components.Schemas;
+            Assert.NotNull(schemas);
+            var schema = Assert.Contains("ProblemDetails", schemas) as OpenApiSchema;
 
             Assert.NotNull(schema);
-            Assert.Equal(JsonSchemaType.Object, schema!.Type);
+            Assert.Equal(JsonSchemaType.Object, schema.Type);
         }
 
         [Fact]
@@ -28,8 +31,14 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var schema = (OpenApiSchema)document.Components!.Schemas["ProblemDetails"];
-            var properties = schema.Properties!;
+            var components = document.Components;
+            Assert.NotNull(components);
+            var schemas = components.Schemas;
+            Assert.NotNull(schemas);
+            var schema = (OpenApiSchema)schemas["ProblemDetails"];
+            Assert.NotNull(schema);
+            var properties = schema.Properties;
+            Assert.NotNull(properties);
 
             var expectedKeys = new[] { "type", "title", "status", "detail", "instance", "code", "traceId", "correlationId" };
             foreach (var key in expectedKeys)
@@ -45,11 +54,19 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var response = (OpenApiResponse)document.Components!.Responses["ProblemDetails"];
-            var mediaType = response.Content!["application/problem+json"];
+            var components = document.Components;
+            Assert.NotNull(components);
+            var responses = components.Responses;
+            Assert.NotNull(responses);
+            var response = (OpenApiResponse)responses["ProblemDetails"];
+            Assert.NotNull(response);
+            var content = response.Content;
+            Assert.NotNull(content);
+            var mediaType = content["application/problem+json"];
+            Assert.NotNull(mediaType);
 
             var schemaReference = Assert.IsType<OpenApiSchemaReference>(mediaType.Schema);
-            Assert.Equal("ProblemDetails", schemaReference.Reference!.Id);
+            Assert.Equal("ProblemDetails", schemaReference.Reference.Id);
         }
 
         [Fact]
@@ -59,7 +76,12 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var schema = (OpenApiSchema)document.Components!.Schemas["ProblemDetails"];
+            var components = document.Components;
+            Assert.NotNull(components);
+            var schemas = components.Schemas;
+            Assert.NotNull(schemas);
+            var schema = (OpenApiSchema)schemas["ProblemDetails"];
+            Assert.NotNull(schema);
 
             Assert.Equal(
                 new HashSet<string> { "type", "title", "status", "detail", "code", "traceId" },
@@ -73,10 +95,17 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var schema = (OpenApiSchema)document.Components!.Schemas["ProblemDetails"];
+            var components = document.Components;
+            Assert.NotNull(components);
+            var schemas = components.Schemas;
+            Assert.NotNull(schemas);
+            var schema = (OpenApiSchema)schemas["ProblemDetails"];
+            Assert.NotNull(schema);
+            Assert.NotNull(schema.Properties);
+            Assert.NotNull(schema.Required);
 
-            Assert.True(schema.Properties!.ContainsKey("correlationId"));
-            Assert.False(schema.Required!.Contains("correlationId"));
+            Assert.True(schema.Properties.ContainsKey("correlationId"));
+            Assert.False(schema.Required.Contains("correlationId"));
         }
 
         [Fact]
@@ -86,13 +115,21 @@ namespace CafeHub.UnitTests
 
             await TransformAsync(document);
 
-            var schema = (OpenApiSchema)document.Components!.Schemas["ProblemDetails"];
-            var status = (OpenApiSchema)schema.Properties!["status"];
-            var instance = (OpenApiSchema)schema.Properties!["instance"];
+            var components = document.Components;
+            Assert.NotNull(components);
+            var schemas = components.Schemas;
+            Assert.NotNull(schemas);
+            var schema = (OpenApiSchema)schemas["ProblemDetails"];
+            Assert.NotNull(schema);
+            Assert.NotNull(schema.Properties);
+            var statusSchema = schema.Properties["status"];
+            Assert.NotNull(statusSchema);
+            var instanceSchema = schema.Properties["instance"];
+            Assert.NotNull(instanceSchema);
 
-            Assert.Equal(JsonSchemaType.Integer, status.Type);
-            Assert.Equal("int32", status.Format);
-            Assert.Equal("uri", instance.Format);
+            Assert.Equal(JsonSchemaType.Integer, statusSchema.Type);
+            Assert.Equal("int32", statusSchema.Format);
+            Assert.Equal("uri", instanceSchema.Format);
         }
 
         private static Task TransformAsync(OpenApiDocument document)
