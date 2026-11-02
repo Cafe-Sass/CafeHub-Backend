@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,25 @@ namespace CafeHub.WebApi.Transport
                 if (options.HttpsPort is not null)
                 {
                     redirectionOptions.HttpsPort = options.HttpsPort;
+                }
+            });
+            services.Configure<ForwardedHeadersOptions>(forwardedHeadersOptions =>
+            {
+                forwardedHeadersOptions.ForwardedHeaders = options.ForwardedHeaders.Enabled
+                    ? ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+                    : ForwardedHeaders.None;
+                forwardedHeadersOptions.ForwardLimit = options.ForwardedHeaders.ForwardLimit;
+                forwardedHeadersOptions.KnownProxies.Clear();
+                forwardedHeadersOptions.KnownIPNetworks.Clear();
+
+                foreach (var proxy in options.ForwardedHeaders.KnownProxies)
+                {
+                    forwardedHeadersOptions.KnownProxies.Add(proxy);
+                }
+
+                foreach (var network in options.ForwardedHeaders.KnownNetworks)
+                {
+                    forwardedHeadersOptions.KnownIPNetworks.Add(network);
                 }
             });
 

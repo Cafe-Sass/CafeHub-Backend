@@ -29,6 +29,7 @@ builder.Services.AddApiDocumentation();
 var app = builder.Build();
 _ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 
+app.UseForwardedHeaders();
 app.UseCorrelationId();
 app.UseExceptionHandler();
 app.UseTransportSecurity(app.Environment);
