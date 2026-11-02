@@ -47,3 +47,37 @@ jobs:
           else
             gitleaks detect --source . --redact --verbose
           fi
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore CafeHub.Backend.sln
+
+      - name: Audit package vulnerabilities
+        run: |
+          OUTPUT_FILE="$RUNNER_TEMP/audit-output.txt"
+          dotnet list CafeHub.Backend.sln package --vulnerable --include-transitive > "$OUTPUT_FILE" 2>&1 || true
+          cat "$OUTPUT_FILE" >> "$GITHUB_STEP_SUMMARY"
+          if grep -Eq 'Severity:\s*(High|Critical)' "$OUTPUT_FILE"; then
+            echo "## Dependency audit FAILED: High or Critical vulnerabilities found" >> "$GITHUB_STEP_SUMMARY"
+            grep -B2 -A4 -E 'Severity:\s*(High|Critical)' "$OUTPUT_FILE" >> "$GITHUB_STEP_SUMMARY" || true
+            echo "::error::Dependency audit detected High or Critical vulnerabilities."
+            exit 1
+          else
+            echo "## Dependency audit passed: no High or Critical vulnerabilities" >> "$GITHUB_STEP_SUMMARY"
+            if grep -Eq 'Severity:\s*(Moderate|Low)' "$OUTPUT_FILE"; then
+              echo "### Lower-severity findings (reported, not failing)" >> "$GITHUB_STEP_SUMMARY"
+              grep -B2 -A4 -E 'Severity:\s*(Moderate|Low)' "$OUTPUT_FILE" >> "$GITHUB_STEP_SUMMARY" || true
+            fi
+            echo "Dependency audit passed."
+          fi
