@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(dependencies)"
+    cooldown:
+      default-days: 14
+    target-branch: "development"
+    ignore: []
+    groups: {}
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(security)"
+    cooldown:
+      default-days: 14
+    target-branch: "development"
+    ignore: []
+    groups: {}
