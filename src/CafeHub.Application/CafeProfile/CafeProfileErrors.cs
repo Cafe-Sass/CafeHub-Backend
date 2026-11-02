@@ -16,5 +16,13 @@ namespace CafeHub.Application.CafeProfile
         {
             return Error.NotFound(NotFoundCode, NotFoundMessage);
         }
+
+        public const string ConcurrencyConflictCode = "CafeProfile.ConcurrencyConflict";
+        public const string ConcurrencyConflictMessage = "The cafe profile was modified by another request. Please reload and try again.";
+
+        public static Error ConcurrencyConflict()
+        {
+            return Error.Conflict(ConcurrencyConflictCode, ConcurrencyConflictMessage);
+        }
     }
 }
