@@ -38,8 +38,20 @@ namespace CafeHub.WebApi.Controllers
 
         [HttpPut]
         [TenantAuthorize(TenantPolicies.TenantOwner)]
-        public async Task<ActionResult<CafeProfileResponse>> Put(UpdateCafeProfileCommand command, CancellationToken cancellationToken)
+        public async Task<ActionResult<CafeProfileResponse>> Put(UpdateCafeProfileRequest request, CancellationToken cancellationToken)
         {
+            var command = new UpdateCafeProfileCommand(
+                request.CafeName,
+                request.LogoMediaReference,
+                request.PrimaryColor,
+                request.SecondaryColor,
+                request.AccentColor,
+                request.ContactPhone,
+                request.ContactEmail,
+                request.ContactAddress,
+                request.Timezone,
+                request.ConcurrencyToken);
+
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsSuccess)
