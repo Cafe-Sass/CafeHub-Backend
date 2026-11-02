@@ -32,5 +32,13 @@ namespace CafeHub.Application.Branches
         {
             return ValidationError.Create(new[] { new FieldError("status", InvalidStatusMessage) });
         }
+
+        public const string IllegalTransitionCode = "Branches.IllegalTransition";
+        public const string IllegalTransitionMessage = "The requested lifecycle transition is not allowed.";
+
+        public static Error IllegalTransition()
+        {
+            return Error.Conflict(IllegalTransitionCode, IllegalTransitionMessage);
+        }
     }
 }

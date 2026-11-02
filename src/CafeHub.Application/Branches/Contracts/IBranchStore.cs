@@ -32,5 +32,13 @@ namespace CafeHub.Application.Branches.Contracts
         Task<BranchResponse?> GetByIdAsync(Guid branchId, CancellationToken cancellationToken);
 
         Task<BranchListPage> ListBranchesAsync(BranchListRequest request, CancellationToken cancellationToken);
+
+        Task<Result<BranchResponse>> ChangeLifecycleStatusAsync(
+            Guid branchId,
+            BranchLifecycleStatus newStatus,
+            string concurrencyToken,
+            Guid actorUserId,
+            string auditAction,
+            CancellationToken cancellationToken);
     }
 }

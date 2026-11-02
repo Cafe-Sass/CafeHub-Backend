@@ -115,6 +115,34 @@ namespace CafeHub.UnitTests.Branches
             var totalCount = request.IncludeTotalCount ? (int?)ListResponses.Count : null;
             return Task.FromResult(new BranchListPage(items, totalCount));
         }
+
+        public List<LifecycleChangeCall> LifecycleChanges { get; } = new();
+
+        public Task<Result<BranchResponse>> ChangeLifecycleStatusAsync(
+            Guid branchId,
+            BranchLifecycleStatus newStatus,
+            string concurrencyToken,
+            Guid actorUserId,
+            string auditAction,
+            CancellationToken cancellationToken)
+        {
+            if (!uint.TryParse(concurrencyToken, out _))
+            {
+                return Task.FromResult(Result.Failure<BranchResponse>(
+                    ValidationError.Create(new[] { new FieldError("concurrencyToken", "The concurrency token is not a valid unsigned integer.") })));
+            }
+
+            if (Failure is { } failure)
+            {
+                return Task.FromResult(Result.Failure<BranchResponse>(failure));
+            }
+
+            LifecycleChanges.Add(new LifecycleChangeCall(branchId, newStatus, concurrencyToken, actorUserId, auditAction));
+
+            return Task.FromResult(Result.Success(UpdatedResponse ?? BranchResponse.From(
+                Branch.Create(branchId, "Branch", newStatus, null, null, null, DateTimeOffset.UtcNow, actorUserId),
+                "67890")));
+        }
     }
 
     internal sealed record BranchResponseCall(
@@ -132,6 +160,13 @@ namespace CafeHub.UnitTests.Branches
         string? OpeningHoursSummary,
         string ConcurrencyToken,
         Guid ActorUserId);
+
+    internal sealed record LifecycleChangeCall(
+        Guid BranchId,
+        BranchLifecycleStatus NewStatus,
+        string ConcurrencyToken,
+        Guid ActorUserId,
+        string AuditAction);
 
     internal sealed class RecordingTenantAuditWriter : ITenantAuditWriter
     {

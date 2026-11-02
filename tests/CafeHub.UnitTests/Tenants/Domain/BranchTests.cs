@@ -208,5 +208,35 @@ namespace CafeHub.UnitTests.Tenants.Domain
                 new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero),
                 ActorId));
         }
+
+        [Fact]
+        public void ChangeLifecycleStatus_ChangesStatusAndTimestamps()
+        {
+            var branch = Branch.Create(
+                Id, "Downtown Cafe", BranchLifecycleStatus.Active,
+                null, null, null, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), ActorId);
+
+            branch.ChangeLifecycleStatus(
+                BranchLifecycleStatus.Suspended,
+                new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero),
+                ActorId);
+
+            Assert.Equal(BranchLifecycleStatus.Suspended, branch.LifecycleStatus);
+            Assert.Equal(new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero), branch.UpdatedAt);
+            Assert.Equal(ActorId, branch.UpdatedBy);
+        }
+
+        [Fact]
+        public void ChangeLifecycleStatus_RejectsUndefinedStatus()
+        {
+            var branch = Branch.Create(
+                Id, "Downtown Cafe", BranchLifecycleStatus.Active,
+                null, null, null, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<ArgumentException>(() => branch.ChangeLifecycleStatus(
+                (BranchLifecycleStatus)99,
+                new DateTimeOffset(2026, 10, 21, 11, 0, 0, TimeSpan.Zero),
+                ActorId));
+        }
     }
 }
