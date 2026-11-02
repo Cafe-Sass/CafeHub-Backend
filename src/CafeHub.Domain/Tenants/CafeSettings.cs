@@ -141,6 +141,95 @@ namespace CafeHub.Domain.Tenants
             };
         }
 
+        public void Update(
+            string cafeName,
+            string? logoMediaReference,
+            string? primaryColor,
+            string? secondaryColor,
+            string? accentColor,
+            string? contactPhone,
+            string? contactEmail,
+            string? contactAddress,
+            string timezone,
+            DateTimeOffset updatedAt,
+            Guid? updatedBy)
+        {
+            if (string.IsNullOrWhiteSpace(cafeName) || cafeName.Length > 256)
+            {
+                throw new ArgumentException(
+                    "The cafe name must be between 1 and 256 characters.",
+                    nameof(cafeName));
+            }
+
+            if (logoMediaReference is not null && logoMediaReference.Length > 512)
+            {
+                throw new ArgumentException(
+                    "The logo media reference must not exceed 512 characters.",
+                    nameof(logoMediaReference));
+            }
+
+            if (primaryColor is not null && !IsWellFormedColor(primaryColor))
+            {
+                throw new ArgumentException(
+                    "The primary color must be a six-digit hex color code prefixed with '#'.",
+                    nameof(primaryColor));
+            }
+
+            if (secondaryColor is not null && !IsWellFormedColor(secondaryColor))
+            {
+                throw new ArgumentException(
+                    "The secondary color must be a six-digit hex color code prefixed with '#'.",
+                    nameof(secondaryColor));
+            }
+
+            if (accentColor is not null && !IsWellFormedColor(accentColor))
+            {
+                throw new ArgumentException(
+                    "The accent color must be a six-digit hex color code prefixed with '#'.",
+                    nameof(accentColor));
+            }
+
+            if (contactPhone is not null && contactPhone.Length > 32)
+            {
+                throw new ArgumentException(
+                    "The contact phone must not exceed 32 characters.",
+                    nameof(contactPhone));
+            }
+
+            if (contactEmail is not null && contactEmail.Length > 320)
+            {
+                throw new ArgumentException(
+                    "The contact email must not exceed 320 characters.",
+                    nameof(contactEmail));
+            }
+
+            if (contactAddress is not null && contactAddress.Length > 512)
+            {
+                throw new ArgumentException(
+                    "The contact address must not exceed 512 characters.",
+                    nameof(contactAddress));
+            }
+
+            if (string.IsNullOrWhiteSpace(timezone) || timezone.Length > 64)
+            {
+                throw new ArgumentException(
+                    "The timezone must be between 1 and 64 characters.",
+                    nameof(timezone));
+            }
+
+            CafeName = cafeName;
+            LogoMediaReference = logoMediaReference;
+            PrimaryColor = primaryColor;
+            SecondaryColor = secondaryColor;
+            AccentColor = accentColor;
+            ContactPhone = contactPhone;
+            ContactEmail = contactEmail;
+            ContactAddress = contactAddress;
+            Timezone = timezone;
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
+        }
+
         private static bool IsWellFormedColor(string? color)
         {
             if (color is null)
