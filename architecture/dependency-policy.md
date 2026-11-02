@@ -75,3 +75,9 @@ Adding any of the following first requires a PRD- or story-backed requirement an
 - Tool: gitleaks v8.30.1 (Proposed, pending owner confirmation). Pinned by exact release tag `v8.30.1`; the Linux x64 binary SHA-256 checksum `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb` is verified in the workflow before use.
 - Workflow: `.github/workflows/security.yml`, job `secret-scan`, runs with `permissions: contents: read`, scans pull requests targeting `development` and pushes to `development`.
 - Allowlist: `.gitleaks.toml` lists only named test-fixture paths under `tests/`, each with a reason; no real secret path is allowlisted.
+
+## Dependency audit and update
+
+- Gate: `.github/workflows/security.yml`, job `dependency-audit`, runs with `permissions: contents: read`, restores the solution and runs `dotnet list CafeHub.Backend.sln package --vulnerable --include-transitive`. The job fails on any package (direct or transitive) with severity High or Critical; Moderate and Low findings are printed without failing.
+- Update automation: `.github/dependabot.yml`, version 2, proposes NuGet and GitHub Actions updates weekly, `open-pull-requests-limit` of 5 each, and a cooldown of 14 days (`cooldown.default-days: 14`) so a release younger than 14 days is not proposed. Commit message prefix `build(dependencies)` for NuGet and `ci(security)` for actions. Auto-merge is not enabled.
+- Policy: any dependency change proposed by automation still requires the owner's review and approval in the PR conversation before it is merged.
