@@ -90,6 +90,14 @@ Queries and unmarked commands are never wrapped in a transaction. Application re
 - Handlers never connect to a database and never choose a connection: they consume `IMasterUnitOfWork` / `ITenantUnitOfWork` (commit saves pending changes and commits the transaction) plus the module's persistence ports, which are Application interfaces added together with the first approved entity and implemented in Infrastructure.
 - Tenant data access always goes through the validated tenant context: Infrastructure resolves each tenant connection from `ITenantContextAccessor.GetRequired()` through `ITenantConnectionResolver`. A missing, invalid, or inactive context throws, and there is no fallback to the Master database, a shared database, or another tenant's database (fail closed).
 
+## Tenant isolation rules
+
+These rules are binding for every module and implement FR-PLT-002:
+
+- A tenant identifier never comes from request input: no header, query string, body field, or token may select the tenant. The only source is the resolved `/t/{slug}` route through `TenantResolutionMiddleware`.
+- An identifier that belongs to another tenant produces the same plain `NotFound` result as an identifier that does not exist; a response must not reveal that the resource exists in another tenant.
+- Commands, queries, and handlers never accept a tenant identifier parameter. Tenant data is reached only through the write-once tenant context set by the resolution middleware.
+
 ## Test layout
 
 - The repository has exactly one test project, `tests/CafeHub.UnitTests` (xUnit, hand-written fakes, no database or network; see `architecture/dependency-policy.md`).

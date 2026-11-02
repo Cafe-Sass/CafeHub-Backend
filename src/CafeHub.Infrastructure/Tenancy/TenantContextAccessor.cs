@@ -18,7 +18,14 @@ namespace CafeHub.Infrastructure.Tenancy
 
         public void Set(TenantContext tenantContext)
         {
-            _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
+            ArgumentNullException.ThrowIfNull(tenantContext);
+
+            if (_tenantContext is not null)
+            {
+                throw new InvalidTenantContextException("Tenant context is write-once per request and has already been set.");
+            }
+
+            _tenantContext = tenantContext;
         }
     }
 }

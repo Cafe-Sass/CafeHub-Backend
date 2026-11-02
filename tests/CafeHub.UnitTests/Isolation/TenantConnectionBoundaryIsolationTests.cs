@@ -26,14 +26,13 @@ namespace CafeHub.UnitTests.Isolation
                 new TenantRegistration(TenantAId, "cafe-a", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(TenantAId)),
                 new TenantRegistration(TenantBId, "cafe-b", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(TenantBId)));
 
-            var accessor = new TenantContextAccessor();
-            var resolver = CreateResolver(accessor, registry);
+            var firstAccessor = new TenantContextAccessor();
+            firstAccessor.Set(TenantContext.Create(TenantAId, TenantDatabaseCredentialReference.CreateV1(TenantAId), true, "cafe-a"));
+            var connectionA = new NpgsqlConnectionStringBuilder(CreateResolver(firstAccessor, registry).Resolve());
 
-            accessor.Set(TenantContext.Create(TenantAId, TenantDatabaseCredentialReference.CreateV1(TenantAId), true, "cafe-a"));
-            var connectionA = new NpgsqlConnectionStringBuilder(resolver.Resolve());
-
-            accessor.Set(TenantContext.Create(TenantBId, TenantDatabaseCredentialReference.CreateV1(TenantBId), true, "cafe-b"));
-            var connectionB = new NpgsqlConnectionStringBuilder(resolver.Resolve());
+            var secondAccessor = new TenantContextAccessor();
+            secondAccessor.Set(TenantContext.Create(TenantBId, TenantDatabaseCredentialReference.CreateV1(TenantBId), true, "cafe-b"));
+            var connectionB = new NpgsqlConnectionStringBuilder(CreateResolver(secondAccessor, registry).Resolve());
 
             Assert.NotEqual(connectionA.Database, connectionB.Database);
             Assert.NotEqual(connectionA.Username, connectionB.Username);
@@ -47,14 +46,13 @@ namespace CafeHub.UnitTests.Isolation
                 new TenantRegistration(TenantAId, "cafe-a", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(TenantAId)),
                 new TenantRegistration(TenantBId, "cafe-b", TenantLifecycleStatus.Active, TenantDatabaseCredentialReference.CreateV1(TenantBId)));
 
-            var accessor = new TenantContextAccessor();
-            var resolver = CreateResolver(accessor, registry);
+            var firstAccessor = new TenantContextAccessor();
+            firstAccessor.Set(TenantContext.Create(TenantAId, TenantDatabaseCredentialReference.CreateV1(TenantAId), true, "cafe-a"));
+            var connectionA = new NpgsqlConnectionStringBuilder(CreateResolver(firstAccessor, registry).Resolve());
 
-            accessor.Set(TenantContext.Create(TenantAId, TenantDatabaseCredentialReference.CreateV1(TenantAId), true, "cafe-a"));
-            var connectionA = new NpgsqlConnectionStringBuilder(resolver.Resolve());
-
-            accessor.Set(TenantContext.Create(TenantBId, TenantDatabaseCredentialReference.CreateV1(TenantBId), true, "cafe-b"));
-            var connectionB = new NpgsqlConnectionStringBuilder(resolver.Resolve());
+            var secondAccessor = new TenantContextAccessor();
+            secondAccessor.Set(TenantContext.Create(TenantBId, TenantDatabaseCredentialReference.CreateV1(TenantBId), true, "cafe-b"));
+            var connectionB = new NpgsqlConnectionStringBuilder(CreateResolver(secondAccessor, registry).Resolve());
 
             Assert.DoesNotContain("cafe_a", connectionB.Database, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("cafe_a", connectionB.Username, StringComparison.OrdinalIgnoreCase);
