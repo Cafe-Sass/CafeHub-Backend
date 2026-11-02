@@ -239,7 +239,7 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
-        public async Task BindingFailureUsesGeneric401ProblemDetailsAndDoesNotEchoToken()
+        public async Task BindingFailureUsesUniformTenantUnavailable404ProblemDetailsAndDoesNotEchoToken()
         {
             var token = CreateTenantToken(tenantId: OtherTenantId);
             var logger = new ListLogger();
@@ -249,12 +249,16 @@ namespace CafeHub.UnitTests
 
             await tenant.Events.Challenge(challengeContext);
 
-            Assert.Equal(StatusCodes.Status401Unauthorized, context.HttpContext.Response.StatusCode);
+            Assert.Equal(StatusCodes.Status404NotFound, context.HttpContext.Response.StatusCode);
             Assert.Equal("application/problem+json", context.HttpContext.Response.ContentType);
             var stream = Assert.IsType<MemoryStream>(context.HttpContext.Response.Body);
             stream.Position = 0;
             using var json = await JsonDocument.ParseAsync(stream);
-            Assert.Equal("Identity.NotAuthenticated", json.RootElement.GetProperty("code").GetString());
+            Assert.Equal(404, json.RootElement.GetProperty("status").GetInt32());
+            Assert.Equal("Not Found", json.RootElement.GetProperty("title").GetString());
+            Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.5", json.RootElement.GetProperty("type").GetString());
+            Assert.Equal("Tenant.Unavailable", json.RootElement.GetProperty("code").GetString());
+            Assert.Equal("The requested tenant is not available.", json.RootElement.GetProperty("detail").GetString());
             stream.Position = 0;
             using var reader = new StreamReader(stream, leaveOpen: true);
             var response = await reader.ReadToEndAsync();
