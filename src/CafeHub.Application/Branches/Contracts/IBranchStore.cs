@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Branches.DTOs;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Branches.Contracts
 {
@@ -27,5 +28,9 @@ namespace CafeHub.Application.Branches.Contracts
             string concurrencyToken,
             Guid actorUserId,
             CancellationToken cancellationToken);
+
+        Task<BranchResponse?> GetByIdAsync(Guid branchId, CancellationToken cancellationToken);
+
+        Task<BranchListPage> ListBranchesAsync(BranchListRequest request, CancellationToken cancellationToken);
     }
 }

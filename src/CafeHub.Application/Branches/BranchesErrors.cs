@@ -24,5 +24,13 @@ namespace CafeHub.Application.Branches
         {
             return Error.Conflict(ConcurrencyConflictCode, ConcurrencyConflictMessage);
         }
+
+        public const string InvalidStatusCode = "Branches.InvalidStatus";
+        public const string InvalidStatusMessage = "The status is not valid.";
+
+        public static ValidationError InvalidStatus()
+        {
+            return ValidationError.Create(new[] { new FieldError("status", InvalidStatusMessage) });
+        }
     }
 }
