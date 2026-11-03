@@ -106,6 +106,13 @@ Migration conventions, contexts, commands, and the design-time connection contra
 
 The `CI` workflow (`.github/workflows/ci.yml`) runs on pull requests to `development` and on pushes to `development`. It checks out the code, sets up the .NET SDK from `global.json`, restores, verifies formatting, builds Release, runs `CafeHub.UnitTests` with a TRX report, appends Total/Passed/Failed into the run summary, and uploads `TestResults/` as an artifact even when tests fail. It requires no secrets and runs with read-only repository permissions. The unit-test step runs in seconds (no database services are involved), and the job carries a 15-minute timeout.
 
+## Delivery documentation
+
+- `architecture/run-guide.md` — local setup (PostgreSQL, secrets, migrations, host, worker) and the admin-to-tenant journey.
+- `architecture/api-and-configuration-reference.md` — endpoint reference (method, route, policy, purpose, source file:line) and configuration reference (key, meaning, default, secret flag).
+- `architecture/verification-report.md` — verification results and open-items register (added by CFMD-355).
+- `architecture/open-items-register.md` — open-items register (added by CFMD-355).
+
 ## Private documentation
 
 `Docs/` is local-only, gitignored, and never committed. Its contents (the PRD and related material) are not reproduced in the repository; tracked files cite PRD requirement identifiers instead.
