@@ -16,6 +16,8 @@ namespace CafeHub.Domain.Tenants
 
         public TenantDatabaseStatus Status { get; private set; }
 
+        public string? SchemaMigrationId { get; private set; }
+
         public DateTimeOffset CreatedAt { get; private set; }
 
         public DateTimeOffset UpdatedAt { get; private set; }
@@ -92,6 +94,19 @@ namespace CafeHub.Domain.Tenants
 
             SecretReference = secretReference;
             Status = TenantDatabaseStatus.Provisioned;
+            UpdatedAt = now;
+        }
+
+        public void RecordAppliedMigration(string? migrationId, DateTimeOffset now)
+        {
+            if (migrationId is not null && (string.IsNullOrWhiteSpace(migrationId) || migrationId.Length > 150))
+            {
+                throw new ArgumentException(
+                    "The schema migration id must be between 1 and 150 characters.",
+                    nameof(migrationId));
+            }
+
+            SchemaMigrationId = migrationId;
             UpdatedAt = now;
         }
     }

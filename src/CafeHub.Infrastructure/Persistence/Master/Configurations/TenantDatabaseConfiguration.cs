@@ -13,6 +13,7 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             {
                 table.HasCheckConstraint("ck_tenant_databases_secret_reference_format", "secret_reference ~ '^[a-z0-9][a-z0-9-]*$'");
                 table.HasCheckConstraint("ck_tenant_databases_secret_reference_length", "length(secret_reference) >= 1 AND length(secret_reference) <= 128");
+                table.HasCheckConstraint("ck_tenant_databases_schema_migration_id_length", "schema_migration_id IS NULL OR (length(schema_migration_id) >= 1 AND length(schema_migration_id) <= 150)");
                 table.HasCheckConstraint("ck_tenant_databases_status", "status IN ('Pending', 'Provisioned', 'Failed')");
             });
 
@@ -21,6 +22,7 @@ namespace CafeHub.Infrastructure.Persistence.Master.Configurations
             builder.Property(database => database.TenantId).HasColumnName("tenant_id").HasColumnType("uuid").IsRequired();
             builder.Property(database => database.SecretReference).HasColumnName("secret_reference").HasColumnType("text").IsRequired();
             builder.Property(database => database.Status).HasColumnName("status").HasColumnType("text").HasConversion<string>().IsRequired();
+            builder.Property(database => database.SchemaMigrationId).HasColumnName("schema_migration_id").HasColumnType("text").IsRequired(false);
             builder.Property(database => database.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
             builder.Property(database => database.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz").IsRequired();
             builder.Property(database => database.CreatedBy).HasColumnName("created_by").HasColumnType("uuid").IsRequired(false);

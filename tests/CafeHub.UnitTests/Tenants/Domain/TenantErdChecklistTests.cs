@@ -24,7 +24,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             var entityTypes = typeof(TenantUser).Assembly
                 .GetTypes()
                 .Where(t => t.Namespace == "CafeHub.Domain.Tenants" && t.IsClass && !t.IsAbstract && !t.IsEnum)
-                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase))
+                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun))
                 .ToList();
 
             var entityNames = entityTypes

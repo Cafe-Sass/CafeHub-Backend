@@ -49,6 +49,7 @@ namespace CafeHub.UnitTests
                 "subscription_periods",
                 "subscriptions",
                 "tenant_databases",
+                "tenant_schema_upgrade_runs",
                 "tenants",
                 "provisioning_jobs",
                 "provisioning_job_attempts",
@@ -56,7 +57,7 @@ namespace CafeHub.UnitTests
 
             Assert.Equal(expectedTables, tableNames);
             Assert.DoesNotContain(tableNames, t => t != null && t != "refresh_tokens" && (t.Contains("login") || t.Contains("token")));
-            Assert.DoesNotContain(tableNames, t => t != null && t != "tenants" && t != "tenant_databases" && t.Contains("tenant"));
+            Assert.DoesNotContain(tableNames, t => t != null && t != "tenants" && t != "tenant_databases" && t != "tenant_schema_upgrade_runs" && t.Contains("tenant"));
         }
 
         [Fact]

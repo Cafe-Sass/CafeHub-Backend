@@ -9,5 +9,9 @@ namespace CafeHub.Application.Provisioning.Contracts
     public interface ITenantMigrationApplicator
     {
         Task ApplyAsync(string databaseName, CancellationToken cancellationToken);
+
+        Task<string?> GetLatestAppliedMigrationIdAsync(string databaseName, CancellationToken cancellationToken);
+
+        Task<string?> GetLatestMigrationIdAsync(CancellationToken cancellationToken);
     }
 }

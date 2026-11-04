@@ -208,6 +208,37 @@ namespace CafeHub.UnitTests.Provisioning.Application
             }
         }
 
+        private sealed class FakeMigrationApplicator : ITenantMigrationApplicator
+        {
+            public string? LatestAppliedMigrationId { get; set; }
+            public Exception? FailureToThrow { get; set; }
+            public List<string> ReadDatabases { get; } = [];
+
+            public Task ApplyAsync(string databaseName, CancellationToken cancellationToken)
+            {
+                return Task.CompletedTask;
+            }
+
+            public Task<string?> GetLatestAppliedMigrationIdAsync(
+                string databaseName,
+                CancellationToken cancellationToken)
+            {
+                ReadDatabases.Add(databaseName);
+
+                if (FailureToThrow is not null)
+                {
+                    throw FailureToThrow;
+                }
+
+                return Task.FromResult(LatestAppliedMigrationId);
+            }
+
+            public Task<string?> GetLatestMigrationIdAsync(CancellationToken cancellationToken)
+            {
+                return Task.FromResult<string?>("latest");
+            }
+        }
+
         private sealed class FakeUnitOfWork : IMasterUnitOfWork
         {
             public int BeginCount { get; private set; }
@@ -308,6 +339,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
         private readonly FakeOnboardingRequestStore _requestStore = new();
         private readonly FakeDatabaseCreator _databaseCreator = new();
         private readonly FakeSchemaInitializer _schemaInitializer = new();
+        private readonly FakeMigrationApplicator _migrationApplicator = new();
         private readonly FakeUnitOfWork _unitOfWork = new();
         private readonly FakeAuditWriter _auditWriter = new();
         private readonly FakeCurrentUser _currentUser = new();
@@ -325,6 +357,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
                 _requestStore,
                 _databaseCreator,
                 _schemaInitializer,
+                _migrationApplicator,
                 _unitOfWork,
                 _auditWriter,
                 _notificationSender,
@@ -371,6 +404,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             _tenantStore.Tenant = CreateTenant();
             _jobStore.Job = CreateJobWithLease();
             _requestStore.Request = CreateRequest();
+            _migrationApplicator.LatestAppliedMigrationId = "20261104120000_AddTenantSchemaUpgradeTracking";
 
             var orchestrator = CreateOrchestrator();
             await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
@@ -386,7 +420,8 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
             Assert.Equal(1, _databaseStore.AddCallCount);
-            Assert.Equal(0, _databaseStore.UpdateCallCount);
+            Assert.Equal(1, _databaseStore.UpdateCallCount);
+            Assert.Equal("20261104120000_AddTenantSchemaUpgradeTracking", _databaseStore.Database.SchemaMigrationId);
             Assert.Equal(1, _unitOfWork.CommitCount);
             Assert.Equal(1, _unitOfWork.BeginCount);
             Assert.Equal(0, _unitOfWork.RollbackCount);
@@ -416,7 +451,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.Equal(existingDatabaseId, _databaseStore.Database.Id);
             Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(0, _databaseStore.AddCallCount);
-            Assert.Equal(1, _databaseStore.UpdateCallCount);
+            Assert.Equal(2, _databaseStore.UpdateCallCount);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
             Assert.Equal(1, _tenantStore.UpdateCallCount);
@@ -444,7 +479,7 @@ namespace CafeHub.UnitTests.Provisioning.Application
             Assert.Equal(TenantDatabaseCredentialReference.CreateV1(TenantId), _databaseStore.Database.SecretReference);
             Assert.Equal(TenantDatabaseStatus.Provisioned, _databaseStore.Database.Status);
             Assert.Equal(0, _databaseStore.AddCallCount);
-            Assert.Equal(1, _databaseStore.UpdateCallCount);
+            Assert.Equal(2, _databaseStore.UpdateCallCount);
             Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.PersistedLifecycleStatus);
             Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
         }
@@ -531,6 +566,45 @@ namespace CafeHub.UnitTests.Provisioning.Application
             await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
 
             Assert.NotEqual(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+        }
+
+        [Fact]
+        public async Task ProvisioningSuccess_RecordsTheLatestAppliedMigrationId()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            _migrationApplicator.LatestAppliedMigrationId = "20261104120000_AddTenantSchemaUpgradeTracking";
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Equal(
+                "20261104120000_AddTenantSchemaUpgradeTracking",
+                _databaseStore.Database!.SchemaMigrationId);
+            Assert.Equal("cafehub_tenant_my_cafe", Assert.Single(_migrationApplicator.ReadDatabases));
+        }
+
+        [Fact]
+        public async Task MigrationReadFailure_LeavesSchemaMigrationIdNull_AndProvisioningSucceeds()
+        {
+            _tenantStore.Tenant = CreateTenant();
+            _jobStore.Job = CreateJobWithLease();
+            _requestStore.Request = CreateRequest();
+            _migrationApplicator.FailureToThrow = new InvalidOperationException(
+                "Host=db;Password=secret;something failed");
+
+            var orchestrator = CreateOrchestrator();
+            await orchestrator.RunAsync(new ClaimedProvisioningJob(JobId, TenantId), CancellationToken.None);
+
+            Assert.Null(_databaseStore.Database!.SchemaMigrationId);
+            Assert.Equal(TenantLifecycleStatus.Active, _tenantStore.Tenant!.LifecycleStatus);
+            Assert.Equal(ProvisioningJobStatus.Succeeded, _jobStore.Job!.Status);
+            Assert.Contains(_logger.Entries, entry =>
+                entry.Level == LogLevel.Warning
+                && entry.Message.Contains(TenantId.ToString(), StringComparison.Ordinal)
+                && !entry.Message.Contains("Password=", StringComparison.Ordinal)
+                && !entry.Message.Contains("Host=", StringComparison.Ordinal));
         }
 
         [Fact]
