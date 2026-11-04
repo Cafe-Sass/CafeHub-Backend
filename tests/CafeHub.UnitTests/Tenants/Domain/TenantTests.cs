@@ -239,5 +239,83 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     TenantDatabaseStatus.Provisioned,
                     new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero)));
         }
+
+        [Fact]
+        public void Create_LeavesSchemaMigrationIdUnknown()
+        {
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                TenantId,
+                "cafe-db-ref",
+                TenantDatabaseStatus.Provisioned,
+                new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Null(database.SchemaMigrationId);
+        }
+
+        [Fact]
+        public void RecordAppliedMigration_StoresTheMigrationIdAndUpdatesTheTimestamp()
+        {
+            var createdAt = new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero);
+            var updatedAt = createdAt.AddHours(1);
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                TenantId,
+                "cafe-db-ref",
+                TenantDatabaseStatus.Provisioned,
+                createdAt);
+
+            database.RecordAppliedMigration("20261104120000_AddTenantSchemaUpgradeTracking", updatedAt);
+
+            Assert.Equal("20261104120000_AddTenantSchemaUpgradeTracking", database.SchemaMigrationId);
+            Assert.Equal(updatedAt, database.UpdatedAt);
+        }
+
+        [Fact]
+        public void RecordAppliedMigration_AllowsNullToRepresentAnUnknownVersion()
+        {
+            var createdAt = new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero);
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                TenantId,
+                "cafe-db-ref",
+                TenantDatabaseStatus.Provisioned,
+                createdAt);
+            database.RecordAppliedMigration("20261104120000_AddTenantSchemaUpgradeTracking", createdAt);
+
+            database.RecordAppliedMigration(null, createdAt.AddHours(1));
+
+            Assert.Null(database.SchemaMigrationId);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void RecordAppliedMigration_RejectsBlankMigrationIds(string migrationId)
+        {
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                TenantId,
+                "cafe-db-ref",
+                TenantDatabaseStatus.Provisioned,
+                new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<ArgumentException>(() =>
+                database.RecordAppliedMigration(migrationId, new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero)));
+        }
+
+        [Fact]
+        public void RecordAppliedMigration_RejectsOverlyLongMigrationIds()
+        {
+            var database = TenantDatabase.Create(
+                DatabaseId,
+                TenantId,
+                "cafe-db-ref",
+                TenantDatabaseStatus.Provisioned,
+                new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero));
+
+            Assert.Throws<ArgumentException>(() =>
+                database.RecordAppliedMigration(new string('a', 151), new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero)));
+        }
     }
 }
