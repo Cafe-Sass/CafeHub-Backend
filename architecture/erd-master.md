@@ -92,6 +92,7 @@ erDiagram
         uuid tenant_id FK
         text secret_reference UK
         text status
+        text schema_migration_id
     }
     subscriptions {
         uuid id PK
@@ -143,6 +144,19 @@ erDiagram
         text status
         text error_code
     }
+    tenant_schema_upgrade_runs {
+        uuid id PK
+        uuid tenant_id FK
+        text target_migration_id
+        text status
+        text failure_code
+        int attempt_count
+        uuid requested_by FK
+        timestamptz started_at
+        timestamptz finished_at
+        timestamptz lease_expires_at
+        text leased_by
+    }
     platform_audit_records {
         uuid id PK
         uuid actor_platform_admin_id FK
@@ -178,6 +192,8 @@ erDiagram
     onboarding_requests |o--o{ platform_payment_transactions : "initial payments"
     subscription_renewal_requests |o--o{ platform_payment_transactions : "renewal payments"
     provisioning_jobs ||--o{ provisioning_job_attempts : "attempts"
+    tenants ||--o{ tenant_schema_upgrade_runs : "schema upgrades"
+    platform_admins |o--o{ tenant_schema_upgrade_runs : "requested by"
     platform_admins |o--o{ platform_audit_records : "actor"
 ```
 
@@ -193,7 +209,7 @@ The owner-approved provisioning model keeps four states strictly separate — pa
 4. The request turns `PaidAwaitingReview` and awaits CafeHub Admin review; the UI may state that the request is being processed (FR-ONB-003). **No `tenants` row and no Tenant Database exist at this point.**
 5. After explicit Admin approval (`onboarding_status = 'Approved'`, `reviewed_by`/`reviewed_at` set), the `tenants` row is created from the request — `tenants.onboarding_request_id` points at it, the slug is carried over from the request's `tenant_slug`, and `lifecycle_status` starts at `Provisioning`; the subscription is then associated with the tenant (`subscriptions.tenant_id`). A rejected paid request creates no registry record and no Tenant Database; its subscription transition and any refund must follow the TBD-03/TBD-04 policies once they are approved — never an invented outcome (FR-ONB-005).
 6. A background provisioning job runs for the tenant, creating/preparing the dedicated Tenant Database, applying migrations and seed data, and recording every attempt and failure (`provisioning_jobs`, `provisioning_job_attempts`; FR-ONB-006, FR-ONB-007).
-7. The environment is marked ready (`Tenant Database` status `Provisioned`, tenant `lifecycle_status = 'Active'`) only after successful provisioning.
+7. The environment is marked ready (`Tenant Database` status `Provisioned`, tenant `lifecycle_status = 'Active'`, applied version recorded in `tenant_databases.schema_migration_id`) only after successful provisioning.
 8. The owner is notified and signs in to the Tenant Application; the readiness notification is a later story (FR-ONB-008, FR-IAM-001, PRD TBD-09).
 
 A successful initial payment is never treated as Admin approval, and approval is never treated as proof that provisioning succeeded (FR-ONB-003).
@@ -336,6 +352,7 @@ Purpose: the per-tenant database reference. The reference stores a **secret refe
 - `tenant_id uuid NOT NULL FK tenants.id` with `uq_tenant_databases_tenant_id` — one reference per tenant, never two.
 - `secret_reference text NOT NULL` (CHECK length 1..128 and format `^[a-z0-9][a-z0-9-]*$`, `ck_tenant_databases_secret_reference_format`) with `uq_tenant_databases_secret_reference` — the value is the configuration key tail, not a secret; per-tenant uniqueness avoids accidental key collisions across `TenantConnections:` settings.
 - `status text NOT NULL` — `ck_tenant_databases_status` over `('Pending', 'Provisioned', 'Failed')` (Proposed): the row is created while provisioning prepares the database, and `Provisioned` is set only after successful completion so resume/reconcile logic can trust it (FR-ONB-007).
+- `schema_migration_id text NULL` (CHECK length 1..150 when present, `ck_tenant_databases_schema_migration_id_length`) — the Tenant migration identifier last applied to this database, recorded by provisioning on success and updated by the tenant schema upgrade service. `NULL` means the applied version is unknown and later code treats the tenant as behind. Existing rows keep `NULL`; no backfill from tenant databases is performed by this story.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK platform_admins.id`, `updated_by uuid NULL FK platform_admins.id` (provisioning system writes leave actor columns NULL; actions are captured in `platform_audit_records`).
 - Separate-table choice (Proposed, pending owner confirmation): keeping the database reference out of `tenants` isolates sensitive provisioning metadata from ordinary tenant inspection, gives the row its own maintenance lifecycle (status, later rotation metadata if any), and keeps the "database exists and which key resolves it" question easy to audit. A single column on `tenants` was rejected as the alternative: it mixes registry identity with infrastructure detail and leaves no natural place for provisioning state without widening the main table.
 
@@ -484,6 +501,22 @@ Purpose: the execution history of one provisioning job (FR-ONB-007 retries and f
 - `started_at timestamptz NOT NULL`; `finished_at timestamptz NULL` (NULL while running).
 - `error_code text NULL` (CHECK length 0..128 when present) — machine error code only. Failure detail never includes secrets, connection strings, or raw provider messages (the prompt requirement and the conventions document; the error text that a human needs is logged inside the task, not persisted as a secret-bearing column).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`.
+
+### tenant_schema_upgrade_runs
+
+Purpose: the durable work item and execution history for upgrading one tenant database to the latest Tenant migration (FR-PLT-001, FR-PLT-002). A run is queued per tenant, claimed by the upgrade worker, and finished with a closed failure code; one tenant may keep a history of runs while at most one of them is active (Pending or Running).
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_tenant_schema_upgrade_runs`.
+- `tenant_id uuid NOT NULL FK tenants.id` with `ix_tenant_schema_upgrade_runs_tenant_id` (R1) — the tenant database being upgraded. A tenant may have many historical runs, so this index is not unique.
+- `target_migration_id text NOT NULL` (CHECK length 1..150, `ck_tenant_schema_upgrade_runs_target_migration_id_length`) — the Tenant migration identifier the run intends to apply; it is captured when the run is queued so the work item stays meaningful even when a newer migration is published later.
+- `status text NOT NULL` — `ck_tenant_schema_upgrade_runs_status` over `('Pending', 'Running', 'Succeeded', 'Failed')` (Proposed), mapped as text exactly like the other Master status columns. `Pending` is the queued state, `Running` the claimed state, and `Succeeded`/`Failed` are terminal for the run.
+- `failure_code text NULL` (CHECK length 1..64 when present, `ck_tenant_schema_upgrade_runs_failure_code_length`) — a closed machine code of the form `Upgrade.<Reason>` (`Upgrade.TenantNotReady`, `Upgrade.ConnectionFailed`, `Upgrade.MigrationFailed`, `Upgrade.Unexpected`); no raw exception text, connection string, or credential is stored.
+- `attempt_count integer NOT NULL` (CHECK `attempt_count >= 0`, `ck_tenant_schema_upgrade_runs_attempt_count_not_negative`) — incremented on every claim, never decreased, so a reclaimed stale lease remains visible in the history.
+- `requested_by uuid NULL FK platform_admins.id` (`fk_tenant_schema_upgrade_runs_requested_by`) — the Super Admin who started the run; `NULL` for system-initiated work. Standard audit columns below stay the generic actor record of the row.
+- `started_at timestamptz NULL` — first claim time; `finished_at timestamptz NULL` — terminal time, set together with `Succeeded` or `Failed`.
+- `lease_expires_at timestamptz NULL`, `leased_by text NULL` — the same claim-lease shape the provisioning jobs use; an expired lease may be reclaimed by another worker, while a live lease must not be.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK platform_admins.id`, `updated_by uuid NULL FK platform_admins.id`.
+- `uq_tenant_schema_upgrade_runs_active` — a partial unique index over `(tenant_id) WHERE status IN ('Pending', 'Running')` (Proposed): at most one active run per tenant, so duplicate start requests cannot queue the same database twice. It is the final guard behind the application's skip-active rule.
 
 ### platform_audit_records
 
