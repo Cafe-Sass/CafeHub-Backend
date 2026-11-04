@@ -34,6 +34,8 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `TenantOwner` | Suspend a branch | TenantBranchesController.cs:105 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `TenantOwner` | Reactivate a branch | TenantBranchesController.cs:124 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `TenantOwner` | Retire a branch | TenantBranchesController.cs:143 |
+| GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
+| GET | `health/ready` | Anonymous | Readiness probe; Master database connectivity | Health check middleware (Program.cs:68) |
 
 ### Policy names
 
@@ -97,5 +99,5 @@ Secret keys (shown by name only; values are placeholders, never committed): `Con
 
 ### How each row was verified
 
-- Endpoint table: grep of `src/CafeHub.WebApi/Controllers/*.cs` for `[Route]`, `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[TenantAuthorize]`, `[Authorize]`, `[AllowAnonymous]`; route templates and policy names read directly from each action and controller.
+- Endpoint table: grep of `src/CafeHub.WebApi/Controllers/*.cs` for `[Route]`, `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[TenantAuthorize]`, `[Authorize]`, `[AllowAnonymous]`; route templates and policy names read directly from each action and controller. Health endpoints are mapped in `src/CafeHub.WebApi/Program.cs` via `MapHealthChecks` and verified by unit tests in `tests/CafeHub.UnitTests`.
 - Configuration table: `src/CafeHub.WebApi/appsettings.template.json` (all keys and defaults) cross-checked against options binder classes in `src/CafeHub.Infrastructure` and `src/CafeHub.Application` (e.g. `JwtOptionsBinder`, `PaginationOptionsBinder`, `PaginationConfigurationKeys`, `GlobalRateLimitOptionsBinder`, `AuthRateLimitOptionsBinder`, `CorsOptionsBinder`, `RequestLimitsOptionsBinder`, `TransportSecurityOptionsBinder`, `PlatformSeedOptionsBinder`, `PaymentOptionsBinder`, `NotificationOptionsBinder`).

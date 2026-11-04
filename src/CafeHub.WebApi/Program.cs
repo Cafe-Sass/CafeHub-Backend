@@ -4,10 +4,16 @@ using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
 using CafeHub.WebApi.Cors;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.HealthChecks;
 using CafeHub.WebApi.Idempotency;
 using CafeHub.WebApi.RateLimiting;
 using CafeHub.WebApi.Security;
 using CafeHub.WebApi.Transport;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +38,10 @@ builder.Services.AddPlatformAuthorization();
 builder.Services.AddTenantAuthorization();
 builder.Services.AddApiDocumentation();
 
+builder.Services.AddScoped<MasterDatabaseHealthCheck>();
+builder.Services.AddHealthChecks()
+    .AddCheck<MasterDatabaseHealthCheck>("master", tags: new[] { "ready" });
+
 var app = builder.Build();
 _ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 
@@ -48,5 +58,21 @@ app.UseAuthorization();
 
 app.MapApiDocumentation();
 app.MapControllers().RequireRateLimiting(GlobalRateLimiting.PolicyName);
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+}).ExcludeFromDescription().WithMetadata(new DisableRateLimitingAttribute());
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+    ResultStatusCodes =
+    {
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    },
+}).ExcludeFromDescription().WithMetadata(new DisableRateLimitingAttribute());
 
 app.Run();
