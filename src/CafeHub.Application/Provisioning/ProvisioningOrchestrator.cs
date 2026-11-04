@@ -33,6 +33,7 @@ namespace CafeHub.Application.Provisioning
         private readonly IOnboardingRequestStore onboardingRequestStore;
         private readonly ITenantDatabaseCreator databaseCreator;
         private readonly ITenantSchemaInitializer schemaInitializer;
+        private readonly ITenantMigrationApplicator migrationApplicator;
         private readonly IMasterUnitOfWork unitOfWork;
         private readonly IPlatformAuditWriter auditWriter;
         private readonly INotificationSender notificationSender;
@@ -49,6 +50,7 @@ namespace CafeHub.Application.Provisioning
             IOnboardingRequestStore onboardingRequestStore,
             ITenantDatabaseCreator databaseCreator,
             ITenantSchemaInitializer schemaInitializer,
+            ITenantMigrationApplicator migrationApplicator,
             IMasterUnitOfWork unitOfWork,
             IPlatformAuditWriter auditWriter,
             INotificationSender notificationSender,
@@ -64,6 +66,7 @@ namespace CafeHub.Application.Provisioning
             this.onboardingRequestStore = onboardingRequestStore;
             this.databaseCreator = databaseCreator;
             this.schemaInitializer = schemaInitializer;
+            this.migrationApplicator = migrationApplicator;
             this.unitOfWork = unitOfWork;
             this.auditWriter = auditWriter;
             this.notificationSender = notificationSender;
@@ -232,6 +235,8 @@ namespace CafeHub.Application.Provisioning
         {
             var firstTransition = tenant.LifecycleStatus != TenantLifecycleStatus.Active;
 
+            await RecordAppliedMigrationAsync(tenant, now, cancellationToken);
+
             await unitOfWork.BeginTransactionAsync(cancellationToken);
             try
             {
@@ -257,6 +262,39 @@ namespace CafeHub.Application.Provisioning
             if (firstTransition)
             {
                 await RequestReadinessNotificationAsync(tenant, request, cancellationToken);
+            }
+        }
+
+        private async Task RecordAppliedMigrationAsync(
+            Tenant tenant,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var databaseName = TenantDatabaseNaming.DatabaseName(tenant.Slug);
+                var latestMigrationId = await migrationApplicator.GetLatestAppliedMigrationIdAsync(
+                    databaseName,
+                    cancellationToken);
+
+                var tenantDatabase = await tenantDatabaseStore.FindByTenantIdAsync(
+                    tenant.Id,
+                    cancellationToken);
+
+                if (tenantDatabase is null)
+                {
+                    return;
+                }
+
+                tenantDatabase.RecordAppliedMigration(latestMigrationId, now);
+                await tenantDatabaseStore.UpdateAsync(tenantDatabase, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(
+                    "The applied migration of tenant {TenantId} could not be recorded ({ExceptionType}).",
+                    tenant.Id,
+                    exception.GetType().Name);
             }
         }
 

@@ -11,7 +11,6 @@ namespace CafeHub.Infrastructure.Persistence.Master.Onboarding
             CancellationToken cancellationToken)
         {
             return await context.TenantDatabases
-                .AsNoTracking()
                 .FirstOrDefaultAsync(database => database.TenantId == tenantId, cancellationToken);
         }
 

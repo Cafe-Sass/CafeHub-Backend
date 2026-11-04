@@ -164,6 +164,18 @@ namespace CafeHub.UnitTests.Provisioning.Infrastructure
 
                 return Task.CompletedTask;
             }
+
+            public Task<string?> GetLatestAppliedMigrationIdAsync(
+                string databaseName,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult<string?>(null);
+            }
+
+            public Task<string?> GetLatestMigrationIdAsync(CancellationToken cancellationToken)
+            {
+                return Task.FromResult<string?>(null);
+            }
         }
 
         private sealed class FakeSeeder : ITenantSeeder
