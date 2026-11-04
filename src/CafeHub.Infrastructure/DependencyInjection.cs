@@ -52,6 +52,7 @@ namespace CafeHub.Infrastructure
                 var connectionStringResolver = serviceProvider.GetRequiredService<MasterConnectionStringResolver>();
                 options.UseNpgsql(connectionStringResolver.Resolve());
             });
+            services.AddScoped<IMasterDatabaseProbe, MasterDatabaseProbe>();
 
             services.AddSingleton(typeof(ISecretReferenceResolver), typeof(ConfigurationSecretReferenceResolver));
             services.AddScoped<ITenantRegistryReader, TenantRegistryReader>();
