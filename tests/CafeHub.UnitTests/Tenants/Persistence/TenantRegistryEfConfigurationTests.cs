@@ -157,6 +157,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             AssertColumn(entity, nameof(TenantDatabase.TenantId), "tenant_id", typeof(Guid), nullable: false);
             AssertColumn(entity, nameof(TenantDatabase.SecretReference), "secret_reference", typeof(string), nullable: false);
             AssertColumn(entity, nameof(TenantDatabase.Status), "status", typeof(TenantDatabaseStatus), nullable: false);
+            AssertColumn(entity, nameof(TenantDatabase.SchemaMigrationId), "schema_migration_id", typeof(string), nullable: true);
             AssertColumn(entity, nameof(TenantDatabase.CreatedAt), "created_at", typeof(DateTimeOffset), nullable: false);
             AssertColumn(entity, nameof(TenantDatabase.UpdatedAt), "updated_at", typeof(DateTimeOffset), nullable: false);
             AssertColumn(entity, nameof(TenantDatabase.CreatedBy), "created_by", typeof(Guid?), nullable: true);
@@ -188,6 +189,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Contains(checks, c => c.Key == "ck_tenant_databases_secret_reference_format" && c.Value == "secret_reference ~ '^[a-z0-9][a-z0-9-]*$'");
             Assert.Contains(checks, c => c.Key == "ck_tenant_databases_secret_reference_length" && c.Value == "length(secret_reference) >= 1 AND length(secret_reference) <= 128");
             Assert.Contains(checks, c => c.Key == "ck_tenant_databases_status" && c.Value == "status IN ('Pending', 'Provisioned', 'Failed')");
+            Assert.Contains(checks, c => c.Key == "ck_tenant_databases_schema_migration_id_length" && c.Value == "schema_migration_id IS NULL OR (length(schema_migration_id) >= 1 AND length(schema_migration_id) <= 150)");
         }
 
         [Fact]

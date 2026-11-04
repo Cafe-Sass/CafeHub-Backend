@@ -30,6 +30,7 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<global::CafeHub.Domain.Tenants.TenantDatabase> TenantDatabases => Set<global::CafeHub.Domain.Tenants.TenantDatabase>();
         public DbSet<global::CafeHub.Domain.Provisioning.ProvisioningJob> ProvisioningJobs => Set<global::CafeHub.Domain.Provisioning.ProvisioningJob>();
         public DbSet<global::CafeHub.Domain.Provisioning.ProvisioningJobAttempt> ProvisioningJobAttempts => Set<global::CafeHub.Domain.Provisioning.ProvisioningJobAttempt>();
+        public DbSet<global::CafeHub.Domain.Tenants.TenantSchemaUpgradeRun> TenantSchemaUpgradeRuns => Set<global::CafeHub.Domain.Tenants.TenantSchemaUpgradeRun>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
