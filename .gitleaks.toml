@@ -29,3 +29,7 @@ paths = ["tests/CafeHub.UnitTests/JwtAccessTokenIssuerTests.cs"]
 [[allowlists]]
 description = "Test fixture: fake valid signing key value used in JWT options binder tests"
 paths = ["tests/CafeHub.UnitTests/JwtOptionsBinderTests.cs"]
+
+[[allowlists]]
+description = "Test fixture: fake connection string in an exception message asserted not to leak into health check results"
+paths = ["tests/CafeHub.UnitTests/MasterDatabaseHealthCheckTests.cs"]
