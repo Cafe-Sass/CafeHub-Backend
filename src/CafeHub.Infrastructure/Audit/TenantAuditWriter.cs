@@ -44,6 +44,20 @@ namespace CafeHub.Infrastructure.Audit
                 return Task.FromResult(Result.Failure(TenantAuditErrors.InvalidEntry()));
             }
 
+            string? beforeState = null;
+            string? afterState = null;
+            if (entry.Changes is not null)
+            {
+                var snapshotResult = TenantAuditSnapshotSerializer.Create(entry.TargetType, entry.Changes);
+                if (snapshotResult.IsFailure)
+                {
+                    return Task.FromResult(Result.Failure(snapshotResult.Error!));
+                }
+
+                beforeState = snapshotResult.Value.BeforeState;
+                afterState = snapshotResult.Value.AfterState;
+            }
+
             var tenantContext = tenantContextAccessor.GetRequired();
             var actorId = tenantContext.IsActive
                 && currentTenantUser.IsAuthenticated
@@ -61,8 +75,8 @@ namespace CafeHub.Infrastructure.Audit
                 entry.Action,
                 entry.TargetType,
                 entry.TargetId,
-                null,
-                null));
+                beforeState,
+                afterState));
 
             return Task.FromResult(Result.Success());
         }

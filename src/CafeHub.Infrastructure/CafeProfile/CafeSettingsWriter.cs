@@ -6,6 +6,7 @@ using CafeHub.Application.CafeProfile.Contracts;
 using CafeHub.Application.CafeProfile.DTOs;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
+using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,6 +50,13 @@ namespace CafeHub.Infrastructure.CafeProfile
             }
 
             context.Entry(settings).Property<uint>("xmin").OriginalValue = token;
+            var changes = TenantAuditChangeSets.CafeProfileUpdate(
+                settings,
+                cafeName,
+                primaryColor,
+                secondaryColor,
+                accentColor,
+                timezone);
 
             settings.Update(
                 cafeName,
@@ -69,6 +77,7 @@ namespace CafeHub.Infrastructure.CafeProfile
                 TargetType = "cafe_settings",
                 TargetId = settings.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
             if (auditResult.IsFailure)
             {

@@ -77,6 +77,26 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task Handle_TenantMarkedCommand_FailedResult_RollbackOnce_NoCommit()
+        {
+            var expectedError = Error.Failure("Audit.SnapshotTooLarge", "The audit snapshot could not be represented.");
+            var unitOfWork = new RecordingTenantUnitOfWork();
+            using var services = new ServiceCollection()
+                .AddSingleton<ITenantUnitOfWork>(unitOfWork)
+                .BuildServiceProvider();
+            var behavior = new TenantTransactionBehavior<TestTenantMarkedCommand, Result>(services);
+            RequestHandlerDelegate<Result> next = (_) => Task.FromResult(Result.Failure(expectedError));
+
+            var result = await behavior.Handle(new TestTenantMarkedCommand(), next, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Same(expectedError, result.Error);
+            Assert.Equal(1, unitOfWork.BeginCount);
+            Assert.Equal(0, unitOfWork.CommitCount);
+            Assert.Equal(1, unitOfWork.RollbackCount);
+        }
+
+        [Fact]
         public async Task Send_MasterMarkedCommand_TouchesOnlyMasterUnitOfWork()
         {
             var masterUnitOfWork = new RecordingMasterUnitOfWork();

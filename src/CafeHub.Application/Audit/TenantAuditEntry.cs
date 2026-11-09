@@ -11,5 +11,7 @@ namespace CafeHub.Application.Audit
         public Guid? ActorUserId { get; init; }
 
         public TenantAuditReason? Reason { get; init; }
+
+        public TenantAuditChanges? Changes { get; init; }
     }
 }
