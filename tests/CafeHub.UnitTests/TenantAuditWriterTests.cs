@@ -144,6 +144,24 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task WriteAsync_InvalidDuplicateSnapshotFields_ReturnsFailureWithoutAddingRecord()
+        {
+            var (writer, context) = CreateWriter();
+            using (context)
+            {
+                var result = await writer.WriteAsync(Entry("branches", TenantAuditChanges.Update(new[]
+                {
+                    new TenantAuditChanges.FieldChange("Name", "old", "new"),
+                    new TenantAuditChanges.FieldChange("Name", "previous", "current"),
+                })), CancellationToken.None);
+
+                Assert.True(result.IsFailure);
+                Assert.Equal("Audit.InvalidSnapshotChanges", result.Error!.Code);
+                Assert.Empty(context.ChangeTracker.Entries<TenantAuditRecord>());
+            }
+        }
+
+        [Fact]
         public async Task WriteAsync_UnknownTargetWithoutChanges_PreservesMetadataOnlyBehavior()
         {
             var (writer, context) = CreateWriter();
