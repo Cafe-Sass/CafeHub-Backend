@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Branches.Contracts;
+using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.CafeProfile.Contracts;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Notifications;
@@ -16,6 +17,7 @@ using CafeHub.Application.Upgrades.Contracts;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Branches;
+using CafeHub.Infrastructure.Staff;
 using CafeHub.Infrastructure.CafeProfile;
 using CafeHub.Infrastructure.Identity;
 using CafeHub.Infrastructure.Notifications;
@@ -117,6 +119,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ICafeSettingsReader, CafeSettingsStore>();
             services.AddScoped<ICafeSettingsWriter, CafeSettingsWriter>();
             services.AddScoped<IBranchStore, BranchStore>();
+            services.AddScoped<IStaffStore, StaffStore>();
             services.AddScoped<ITenantRefreshTokenService, TenantRefreshTokenService>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();
             services.AddScoped<ISuperAdminSeeder, SuperAdminSeeder>();
