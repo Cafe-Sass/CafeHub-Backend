@@ -11,6 +11,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.ToTable("tenant_users", t =>
             {
                 t.HasCheckConstraint("ck_tenant_users_kind", "user_kind IN ('Owner', 'Staff')");
+                t.HasCheckConstraint("ck_tenant_users_branch_scope", "(user_kind = 'Staff' AND branch_id IS NOT NULL) OR (user_kind = 'Owner' AND branch_id IS NULL)");
                 t.HasCheckConstraint("ck_tenant_users_user_name_length", "length(user_name) >= 1 AND length(user_name) <= 256");
                 t.HasCheckConstraint("ck_tenant_users_normalized_user_name_length", "length(normalized_user_name) >= 1 AND length(normalized_user_name) <= 256");
                 t.HasCheckConstraint("ck_tenant_users_full_name_length", "length(full_name) >= 1 AND length(full_name) <= 256");
@@ -26,6 +27,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(u => u.Id).HasColumnName("id").HasColumnType("uuid").ValueGeneratedNever();
 
             builder.Property(u => u.UserKind).HasColumnName("user_kind").HasColumnType("text").HasConversion<string>().IsRequired();
+            builder.Property(u => u.BranchId).HasColumnName("branch_id").HasColumnType("uuid").IsRequired(false);
             builder.Property(u => u.UserName).HasColumnName("user_name").HasColumnType("text").IsRequired();
             builder.Property(u => u.NormalizedUserName).HasColumnName("normalized_user_name").HasColumnType("text").IsRequired();
             builder.Property(u => u.FullName).HasColumnName("full_name").HasColumnType("text").IsRequired();
@@ -49,11 +51,20 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(u => u.CreatedBy).HasColumnName("created_by").HasColumnType("uuid").IsRequired(false);
             builder.Property(u => u.UpdatedBy).HasColumnName("updated_by").HasColumnType("uuid").IsRequired(false);
 
+            builder.Property<uint>("xmin").IsRowVersion();
+
             builder.HasIndex(u => u.NormalizedUserName).IsUnique().HasDatabaseName("uq_tenant_users_normalized_user_name");
             builder.HasIndex(u => u.NormalizedEmail).HasDatabaseName("ix_tenant_users_normalized_email");
+            builder.HasIndex(u => u.BranchId).HasDatabaseName("ix_tenant_users_branch_id");
             builder.HasIndex(u => u.CreatedBy).HasDatabaseName("ix_tenant_users_created_by");
             builder.HasIndex(u => u.UpdatedBy).HasDatabaseName("ix_tenant_users_updated_by");
             builder.HasIndex(u => u.DeletedBy).HasDatabaseName("ix_tenant_users_deleted_by");
+
+            builder.HasOne<Branch>()
+                .WithMany()
+                .HasForeignKey(u => u.BranchId)
+                .HasConstraintName("fk_tenant_users_branch_id")
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne<TenantUser>()
                 .WithMany()
