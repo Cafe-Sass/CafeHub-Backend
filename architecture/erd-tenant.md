@@ -13,6 +13,7 @@ erDiagram
     tenant_users {
         uuid id PK
         text user_kind
+        uuid branch_id FK
         text full_name
         text normalized_user_name UK
         text password_hash
@@ -77,6 +78,7 @@ erDiagram
     tenant_roles ||--o{ tenant_role_claims : "role claim"
     tenant_users |o--o{ tenant_audit_records : "actor"
     tenant_users ||--o{ refresh_tokens : "sessions"
+    branches ||--o{ tenant_users : "staff branch"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one. `branches` draws no relationship line because all of its current foreign keys are audit actor columns, which the note above omits.
@@ -116,6 +118,7 @@ Purpose: owner and staff authentication and authorization subjects in this cafe'
 
 - `id uuid NOT NULL` — entity identity; `pk_tenant_users` (Identity keyed by GUID; the default string key is intentionally not used because all identities are UUIDv7).
 - `user_kind text NOT NULL` — `ck_tenant_users_kind` over `('Owner', 'Staff')` (Proposed): the seeded cafe owner versus staff accounts; role claims stay the authoritative authorization input (FR-IAM-002). Owner versus staff matters for audit derivation (see `tenant_audit_records`); it is not duplicated into audit rows.
+- `branch_id uuid NULL FK branches.id` (`fk_tenant_users_branch_id`, ON DELETE RESTRICT) — the staff member's assigned branch; NULL for Owner accounts. Indexed via `ix_tenant_users_branch_id`. CHECK constraint `ck_tenant_users_branch_scope`: `((user_kind = 'Staff' AND branch_id IS NOT NULL) OR (user_kind = 'Owner' AND branch_id IS NULL))`.
 - `user_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_user_name_length`); `normalized_user_name text NOT NULL` (CHECK length 1..256) with `uq_tenant_users_normalized_user_name` — the mechanism's own case-normalized column and the uniqueness enforcement.
 - `full_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_full_name_length`) — **Proposed, pending owner confirmation**: every account holder (the Owner now, staff later) is a person whose name audit display and staff screens need (FR-IAM-005 audit attribution, FR-IAM-003 staff views). The rejected alternative is a nullable column: accounts could exist with no human-readable name, and both audit records and staff screens would need fallback rules instead. The Owner seed fills it from the onboarding request's `owner_full_name` (see the seeding section above).
 - `email text NULL` (CHECK length 1..320) and `normalized_email text NULL` (CHECK length 1..320) — `ix_tenant_users_normalized_email`, not unique: staff addresses are not identity-critical in the MVP; the normalization style follows the mechanism.
@@ -123,7 +126,7 @@ Purpose: owner and staff authentication and authorization subjects in this cafe'
 - `password_hash text NOT NULL` (CHECK length 1..512) — set and verified only by the mechanism's hasher (PRD section 11.1); the seeded owner's hash arrives with the provisioning copy (see the seeding section above).
 - `two_factor_enabled boolean NOT NULL` default `false` (persisting second-factor data needs the excluded token tables and is designed explicitly when enabled).
 - `lockout_enabled boolean NOT NULL` default `true` — the Identity default, so lockout protection against password guessing is active from creation (PRD section 11.1); `lockout_end_at timestamptz NULL`; `access_failed_count integer NOT NULL` default `0`.
-- `security_stamp text NOT NULL` (CHECK length 1..64) and `concurrency_stamp text NOT NULL` (CHECK length 1..64) — mechanism columns; the mechanism's stamp-based concurrency intentionally replaces the general `xmin` rule here (the documented exception).
+- `security_stamp text NOT NULL` (CHECK length 1..64) and `concurrency_stamp text NOT NULL` (CHECK length 1..64) — mechanism columns; the mechanism's stamp-based concurrency is augmented with the PostgreSQL system column `xmin` mapped as a row version on `tenant_users` for optimistic concurrency on staff updates (Task 41).
 - `deleted_at timestamptz NULL`, `deleted_by uuid NULL FK tenant_users.id` — the logical-deletion marker: a deactivated staff account keeps the row (FKs of history stay resolvable) while every authorization check treats a non-null `deleted_at` as unauthorized (FR-IAM-003 acceptance criteria).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id` (the seeded owner account is bootstrapped outside a user action; `created_by` is NULL there).
 
