@@ -24,6 +24,8 @@ namespace CafeHub.Domain.Tenants
 
         public TenantUserKind UserKind { get; private set; }
 
+        public Guid? BranchId { get; private set; }
+
         public string UserName { get; private set; } = string.Empty;
 
         public string NormalizedUserName { get; private set; } = string.Empty;
@@ -171,6 +173,149 @@ namespace CafeHub.Domain.Tenants
                 CreatedBy = createdBy,
                 UpdatedBy = createdBy,
             };
+        }
+
+        public static TenantUser CreateStaff(
+            Guid id,
+            string userName,
+            string normalizedUserName,
+            string fullName,
+            string email,
+            string normalizedEmail,
+            string? phoneNumber,
+            string passwordHash,
+            string securityStamp,
+            string concurrencyStamp,
+            Guid branchId,
+            DateTimeOffset createdAt,
+            Guid? createdBy = null)
+        {
+            if (branchId == Guid.Empty)
+            {
+                throw new ArgumentException("The staff branch id is required.", nameof(branchId));
+            }
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                throw new ArgumentException("The staff email is required.", nameof(email));
+            }
+
+            var user = Create(
+                id,
+                TenantUserKind.Staff,
+                userName,
+                normalizedUserName,
+                fullName,
+                email,
+                normalizedEmail,
+                phoneNumber,
+                passwordHash,
+                securityStamp,
+                concurrencyStamp,
+                createdAt,
+                createdBy);
+
+            user.BranchId = branchId;
+            return user;
+        }
+
+        public void UpdateStaffProfile(
+            string fullName,
+            string? phoneNumber,
+            Guid branchId,
+            DateTimeOffset updatedAt,
+            Guid updatedBy)
+        {
+            if (UserKind != TenantUserKind.Staff)
+            {
+                throw new InvalidOperationException("Only staff profiles can be updated through this operation.");
+            }
+
+            if (branchId == Guid.Empty)
+            {
+                throw new ArgumentException("The staff branch id is required.", nameof(branchId));
+            }
+
+            if (string.IsNullOrWhiteSpace(fullName) || fullName.Length > 256)
+            {
+                throw new ArgumentException("The full name must be between 1 and 256 characters.", nameof(fullName));
+            }
+
+            if (phoneNumber is not null && (string.IsNullOrWhiteSpace(phoneNumber) || phoneNumber.Length > 64))
+            {
+                throw new ArgumentException("The phone number, when present, must be between 1 and 64 characters.", nameof(phoneNumber));
+            }
+
+            FullName = fullName;
+            PhoneNumber = phoneNumber;
+            BranchId = branchId;
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
+        }
+
+        public void Deactivate(DateTimeOffset deactivatedAt, Guid deactivatedBy)
+        {
+            if (UserKind != TenantUserKind.Staff)
+            {
+                throw new InvalidOperationException("Only staff accounts can be deactivated through this operation.");
+            }
+
+            if (DeletedAt is not null)
+            {
+                return;
+            }
+
+            DeletedAt = deactivatedAt;
+            DeletedBy = deactivatedBy;
+            UpdatedAt = deactivatedAt;
+            UpdatedBy = deactivatedBy;
+        }
+
+        public void Reactivate(DateTimeOffset reactivatedAt, Guid reactivatedBy)
+        {
+            if (UserKind != TenantUserKind.Staff)
+            {
+                throw new InvalidOperationException("Only staff accounts can be reactivated through this operation.");
+            }
+
+            if (DeletedAt is null)
+            {
+                return;
+            }
+
+            DeletedAt = null;
+            DeletedBy = null;
+            UpdatedAt = reactivatedAt;
+            UpdatedBy = reactivatedBy;
+        }
+
+        public void SetPasswordHash(
+            string newPasswordHash,
+            string newSecurityStamp,
+            string newConcurrencyStamp,
+            DateTimeOffset updatedAt,
+            Guid updatedBy)
+        {
+            if (string.IsNullOrWhiteSpace(newPasswordHash) || newPasswordHash.Length > 512)
+            {
+                throw new ArgumentException("The password hash must be between 1 and 512 characters.", nameof(newPasswordHash));
+            }
+
+            if (string.IsNullOrWhiteSpace(newSecurityStamp) || newSecurityStamp.Length > 64)
+            {
+                throw new ArgumentException("The security stamp must be between 1 and 64 characters.", nameof(newSecurityStamp));
+            }
+
+            if (string.IsNullOrWhiteSpace(newConcurrencyStamp) || newConcurrencyStamp.Length > 64)
+            {
+                throw new ArgumentException("The concurrency stamp must be between 1 and 64 characters.", nameof(newConcurrencyStamp));
+            }
+
+            PasswordHash = newPasswordHash;
+            SecurityStamp = newSecurityStamp;
+            ConcurrencyStamp = newConcurrencyStamp;
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
         }
 
         private static bool IsWellFormedUserName(string? userName)
