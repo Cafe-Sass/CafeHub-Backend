@@ -34,6 +34,14 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `TenantOwner` | Suspend a branch | TenantBranchesController.cs:105 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `TenantOwner` | Reactivate a branch | TenantBranchesController.cs:124 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `TenantOwner` | Retire a branch | TenantBranchesController.cs:143 |
+| POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create a staff member (201 + Location header) | TenantStaffController.cs:28 |
+| GET | `t/{slug}/api/v1/staff` | `TenantOwner` | List staff members (paginated, optional branchId/isActive filter) | TenantStaffController.cs:52 |
+| GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Get one staff member | TenantStaffController.cs:68 |
+| PUT | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Update a staff member profile | TenantStaffController.cs:84 |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/deactivate` | `TenantOwner` | Deactivate a staff member (idempotent, revokes tokens) | TenantStaffController.cs:104 |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reactivate` | `TenantOwner` | Reactivate a deactivated staff member (idempotent) | TenantStaffController.cs:120 |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reset-password` | `TenantOwner` | Owner resets a staff member's password (revokes tokens) | TenantStaffController.cs:136 |
+| POST | `t/{slug}/api/v1/me/password` | `TenantUser` | Staff member changes their own password (revokes tokens) | TenantMeController.cs:40 |
 | GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
 | GET | `health/ready` | Anonymous | Readiness probe; Master database connectivity | Health check middleware (Program.cs:68) |
 
