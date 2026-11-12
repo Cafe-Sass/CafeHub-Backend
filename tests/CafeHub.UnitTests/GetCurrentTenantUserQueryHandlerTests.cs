@@ -163,6 +163,8 @@ namespace CafeHub.UnitTests
             public Guid? TenantId { get; set; }
 
             public IReadOnlyCollection<string> Roles { get; set; } = Array.Empty<string>();
+
+            public Guid? BranchId { get; set; }
         }
 
         private sealed class StubTenantUserAuthenticator : ITenantUserAuthenticator

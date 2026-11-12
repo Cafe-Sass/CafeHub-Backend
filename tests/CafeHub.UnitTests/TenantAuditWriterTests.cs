@@ -135,6 +135,8 @@ namespace CafeHub.UnitTests
 
             public IReadOnlyCollection<string> Roles => Array.Empty<string>();
 
+            public Guid? BranchId => null;
+
             private static Guid TenantIdValue => Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         }
 

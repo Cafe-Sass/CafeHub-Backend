@@ -9,5 +9,7 @@ namespace CafeHub.Application.Identity
         Guid? TenantId { get; }
 
         IReadOnlyCollection<string> Roles { get; }
+
+        Guid? BranchId { get; }
     }
 }

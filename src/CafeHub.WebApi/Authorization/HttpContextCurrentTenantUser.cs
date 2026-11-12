@@ -1,10 +1,13 @@
 using CafeHub.Application.Identity;
+using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.WebApi.Authorization
 {
     public sealed class HttpContextCurrentTenantUser : ICurrentTenantUser
     {
+        private const string BranchIdCacheKey = "CurrentTenantUser_BranchId";
         private readonly IHttpContextAccessor httpContextAccessor;
 
         public HttpContextCurrentTenantUser(IHttpContextAccessor httpContextAccessor)
@@ -35,6 +38,42 @@ namespace CafeHub.WebApi.Authorization
                     .SelectMany(identity => identity.FindAll(identity.RoleClaimType))
                     .Select(claim => claim.Value)
                     .ToArray();
+            }
+        }
+
+        public Guid? BranchId
+        {
+            get
+            {
+                if (!IsAuthenticated || UserId is null)
+                {
+                    return null;
+                }
+
+                var httpContext = httpContextAccessor.HttpContext;
+                if (httpContext is null)
+                {
+                    return null;
+                }
+
+                if (httpContext.Items.TryGetValue(BranchIdCacheKey, out var cached))
+                {
+                    return cached as Guid?;
+                }
+
+                var dbContext = httpContext.RequestServices.GetService<TenantDbContext>();
+                if (dbContext is null)
+                {
+                    return null;
+                }
+
+                var branchId = dbContext.TenantUsers
+                    .Where(u => u.Id == UserId.Value && u.DeletedAt == null)
+                    .Select(u => u.BranchId)
+                    .FirstOrDefault();
+
+                httpContext.Items[BranchIdCacheKey] = branchId;
+                return branchId;
             }
         }
     }
