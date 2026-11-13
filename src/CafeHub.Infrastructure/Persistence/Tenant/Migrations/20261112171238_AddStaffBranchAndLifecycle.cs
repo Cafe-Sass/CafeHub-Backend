@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -17,13 +17,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                 type: "uuid",
                 nullable: true);
 
-            migrationBuilder.AddColumn<uint>(
-                name: "xmin",
-                table: "tenant_users",
-                type: "xid",
-                rowVersion: true,
-                nullable: false,
-                defaultValue: 0u);
+            // Note: `xmin` is a PostgreSQL system column that already exists on every table;
+            // mapping it as a row version reads it without adding any column or DDL.
 
             migrationBuilder.CreateIndex(
                 name: "ix_tenant_users_branch_id",
@@ -61,10 +56,6 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             migrationBuilder.DropColumn(
                 name: "branch_id",
-                table: "tenant_users");
-
-            migrationBuilder.DropColumn(
-                name: "xmin",
                 table: "tenant_users");
         }
     }
