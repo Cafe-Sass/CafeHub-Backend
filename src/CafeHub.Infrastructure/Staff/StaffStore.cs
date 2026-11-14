@@ -6,6 +6,7 @@ using CafeHub.Application.Staff;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Staff.DTOs;
 using CafeHub.Domain.Tenants;
+using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -95,6 +96,7 @@ namespace CafeHub.Infrastructure.Staff
                 TargetType = TargetType,
                 TargetId = user.Id,
                 ActorUserId = actorUserId,
+                Changes = TenantAuditChangeSets.StaffCreate(user, branch),
             }, cancellationToken);
 
             if (auditResult.IsFailure)
@@ -152,6 +154,8 @@ namespace CafeHub.Infrastructure.Staff
                 return Result.Failure<StaffResponse>(StaffErrors.BranchNotActive());
             }
 
+            var changes = TenantAuditChangeSets.StaffUpdate(user, fullName, branchId);
+
             user.UpdateStaffProfile(fullName, phoneNumber, branchId, timeProvider.GetUtcNow(), actorUserId);
 
             var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
@@ -160,6 +164,7 @@ namespace CafeHub.Infrastructure.Staff
                 TargetType = TargetType,
                 TargetId = user.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
 
             if (auditResult.IsFailure)
@@ -281,6 +286,7 @@ namespace CafeHub.Infrastructure.Staff
             }
 
             var now = timeProvider.GetUtcNow();
+            var changes = TenantAuditChangeSets.StaffLifecycleStatus(user, false);
             user.Deactivate(now, actorUserId);
 
             var activeTokens = await context.TenantRefreshTokens
@@ -298,6 +304,7 @@ namespace CafeHub.Infrastructure.Staff
                 TargetType = TargetType,
                 TargetId = user.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
 
             if (auditResult.IsFailure)
@@ -319,6 +326,7 @@ namespace CafeHub.Infrastructure.Staff
             }
 
             var now = timeProvider.GetUtcNow();
+            var changes = TenantAuditChangeSets.StaffLifecycleStatus(user, true);
             user.Reactivate(now, actorUserId);
 
             var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
@@ -327,6 +335,7 @@ namespace CafeHub.Infrastructure.Staff
                 TargetType = TargetType,
                 TargetId = user.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
 
             if (auditResult.IsFailure)

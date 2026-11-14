@@ -219,6 +219,26 @@ namespace CafeHub.UnitTests
                     new[] { "LifecycleStatus", "Name", "OpeningHoursSummary" },
                     json.RootElement.EnumerateObject().Select(property => property.Name).ToArray());
             }
+
+            var staffChanges = TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange("FullName", null, "Jane Doe"),
+                new TenantAuditChanges.FieldChange("BranchId", null, Guid.Empty.ToString()),
+                new TenantAuditChanges.FieldChange("IsActive", null, "True"),
+                new TenantAuditChanges.FieldChange("Email", null, "excluded"),
+                new TenantAuditChanges.FieldChange("PhoneNumber", null, "excluded"),
+                new TenantAuditChanges.FieldChange("UserName", null, "excluded"),
+            });
+            var (staffWriter, staffContext) = CreateWriter();
+            using (staffContext)
+            {
+                Assert.True((await staffWriter.WriteAsync(Entry("tenant_users", staffChanges), CancellationToken.None)).IsSuccess);
+                var record = Assert.Single(staffContext.ChangeTracker.Entries<TenantAuditRecord>()).Entity;
+                using var json = JsonDocument.Parse(record.AfterState!);
+                Assert.Equal(
+                    new[] { "BranchId", "FullName", "IsActive" },
+                    json.RootElement.EnumerateObject().Select(property => property.Name).ToArray());
+            }
         }
 
         [Theory]
@@ -435,6 +455,39 @@ namespace CafeHub.UnitTests
 
             Assert.True(result.IsFailure);
             Assert.Equal("Audit.SnapshotTooLarge", result.Error!.Code);
+        }
+
+        [Fact]
+        public async Task WriteAsync_TenantUsers_AllowListPermitsOnlyBranchIdFullNameIsActive()
+        {
+            var staffChanges = TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange("FullName", "Jane Doe", "Jane Smith"),
+                new TenantAuditChanges.FieldChange("BranchId", Guid.Empty.ToString(), Guid.NewGuid().ToString()),
+                new TenantAuditChanges.FieldChange("IsActive", "True", "False"),
+                new TenantAuditChanges.FieldChange("Email", "old@test.com", "new@test.com"),
+                new TenantAuditChanges.FieldChange("PhoneNumber", "old", "new"),
+                new TenantAuditChanges.FieldChange("PasswordHash", "old-hash", "new-hash"),
+            });
+            var (writer, context) = CreateWriter();
+            using (context)
+            {
+                var result = await writer.WriteAsync(Entry("tenant_users", staffChanges), CancellationToken.None);
+
+                Assert.True(result.IsSuccess);
+                var record = Assert.Single(context.ChangeTracker.Entries<TenantAuditRecord>()).Entity;
+                using var before = JsonDocument.Parse(record.BeforeState!);
+                using var after = JsonDocument.Parse(record.AfterState!);
+                Assert.Equal(
+                    new[] { "BranchId", "FullName", "IsActive" },
+                    before.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+                Assert.Equal(
+                    new[] { "BranchId", "FullName", "IsActive" },
+                    after.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+                Assert.False(before.RootElement.TryGetProperty("Email", out _));
+                Assert.False(before.RootElement.TryGetProperty("PhoneNumber", out _));
+                Assert.False(before.RootElement.TryGetProperty("PasswordHash", out _));
+            }
         }
 
         private static TenantAuditEntry Entry(string targetType, TenantAuditChanges? changes = null) => new()

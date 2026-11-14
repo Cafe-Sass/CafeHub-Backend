@@ -59,5 +59,40 @@ namespace CafeHub.Infrastructure.Audit
                     newStatus.ToString()),
             });
         }
+
+        public static TenantAuditChanges StaffCreate(TenantUser user, Branch branch)
+        {
+            ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(branch);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(TenantUser.FullName), null, user.FullName),
+                new TenantAuditChanges.FieldChange(nameof(TenantUser.BranchId), null, branch.Id.ToString()),
+                new TenantAuditChanges.FieldChange("IsActive", null, bool.TrueString),
+            });
+        }
+
+        public static TenantAuditChanges StaffUpdate(
+            TenantUser user,
+            string fullName,
+            Guid newBranchId)
+        {
+            ArgumentNullException.ThrowIfNull(user);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(TenantUser.FullName), user.FullName, fullName),
+                new TenantAuditChanges.FieldChange(nameof(TenantUser.BranchId), user.BranchId?.ToString(), newBranchId.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges StaffLifecycleStatus(TenantUser user, bool newIsActive)
+        {
+            ArgumentNullException.ThrowIfNull(user);
+            var currentIsActive = user.DeletedAt is null;
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange("IsActive", currentIsActive.ToString(), newIsActive.ToString()),
+            });
+        }
     }
 }
