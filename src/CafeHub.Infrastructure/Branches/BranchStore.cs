@@ -9,6 +9,7 @@ using CafeHub.Application.Branches.DTOs;
 using CafeHub.Application.Branches.Queries;
 using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
+using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +38,7 @@ namespace CafeHub.Infrastructure.Branches
                 openingHoursSummary,
                 now,
                 actorUserId);
+            var changes = TenantAuditChangeSets.BranchCreate(branch);
 
             context.Branches.Add(branch);
 
@@ -46,6 +48,7 @@ namespace CafeHub.Infrastructure.Branches
                 TargetType = "branches",
                 TargetId = branch.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
             if (auditResult.IsFailure)
             {
@@ -86,6 +89,7 @@ namespace CafeHub.Infrastructure.Branches
             }
 
             context.Entry(branch).Property<uint>("xmin").OriginalValue = token;
+            var changes = TenantAuditChangeSets.BranchUpdate(branch, name, openingHoursSummary);
 
             branch.Update(
                 name,
@@ -101,6 +105,7 @@ namespace CafeHub.Infrastructure.Branches
                 TargetType = "branches",
                 TargetId = branch.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
             if (auditResult.IsFailure)
             {
@@ -146,6 +151,7 @@ namespace CafeHub.Infrastructure.Branches
             }
 
             context.Entry(branch).Property<uint>("xmin").OriginalValue = token;
+            var changes = TenantAuditChangeSets.BranchLifecycleStatus(branch, newStatus);
 
             branch.ChangeLifecycleStatus(newStatus, timeProvider.GetUtcNow(), actorUserId);
 
@@ -155,6 +161,7 @@ namespace CafeHub.Infrastructure.Branches
                 TargetType = "branches",
                 TargetId = branch.Id,
                 ActorUserId = actorUserId,
+                Changes = changes,
             }, cancellationToken);
             if (auditResult.IsFailure)
             {
