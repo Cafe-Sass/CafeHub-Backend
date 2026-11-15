@@ -97,6 +97,72 @@ namespace CafeHub.Infrastructure.Tables
             return Result.Failure<TableResponse>(TablesErrors.QrCodeConflict());
         }
 
+        public async Task<Result<TableBulkResult>> AddBulkAsync(
+            Guid branchId,
+            int count,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            await context.LockBranchesAsync(cancellationToken, branchId);
+            var branch = await context.Branches
+                .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
+            if (branch is null)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.BranchNotFound());
+            }
+
+            if (branch.LifecycleStatus != BranchLifecycleStatus.Active)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.BranchNotActive());
+            }
+
+            var maxNumber = await MaxActiveNumberAsync(branchId, cancellationToken);
+            var startNumber = maxNumber is null ? 0 : maxNumber.Value;
+            var fromNumber = startNumber + 1;
+            var toNumber = startNumber + count;
+            if (toNumber > BranchTable.MaximumNumber)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.NumberRangeExceeded());
+            }
+
+            var now = timeProvider.GetUtcNow();
+            for (var i = 0; i < count; i++)
+            {
+                var number = fromNumber + i;
+                var table = BranchTable.Create(
+                    Guid.CreateVersion7(),
+                    branchId,
+                    number,
+                    null,
+                    qrCodeGenerator.Generate(),
+                    now,
+                    actorUserId);
+                context.BranchTables.Add(table);
+            }
+
+            var changes = TenantAuditChangeSets.TableBulkCreate(count, fromNumber, toNumber);
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "tables.created.succeeded",
+                TargetType = TargetType,
+                TargetId = branchId,
+                ActorUserId = actorUserId,
+                Changes = changes,
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure<TableBulkResult>(auditResult.Error!);
+            }
+
+            var saveError = await TrySaveAsync(cancellationToken);
+            if (saveError is not null)
+            {
+                return Result.Failure<TableBulkResult>(saveError);
+            }
+
+            return Result.Success(new TableBulkResult(count, fromNumber, toNumber));
+        }
+
         public async Task<Result<TableResponse>> UpdateLabelAsync(
             Guid tableId,
             Guid? scopeBranchId,
@@ -151,15 +217,6 @@ namespace CafeHub.Infrastructure.Tables
             return Result.Success(TableResponse.From(table, ConcurrencyToken(table), table.QrCode));
         }
 
-        public Task<Result<TableBulkResult>> AddBulkAsync(
-            Guid branchId,
-            int count,
-            Guid actorUserId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(Result.Failure<TableBulkResult>(Error.Failure(
-                "Tables.NotImplemented",
-                "Bulk add is not implemented yet.")));
-
         public Task<Result<TableResponse>> DeactivateAsync(
             Guid tableId,
             Guid? scopeBranchId,
@@ -180,14 +237,67 @@ namespace CafeHub.Infrastructure.Tables
                 "Tables.NotImplemented",
                 "Reactivate is not implemented yet.")));
 
-        public Task<Result<TableBulkResult>> DeactivateHighestAsync(
+        public async Task<Result<TableBulkResult>> DeactivateHighestAsync(
             Guid branchId,
             int count,
             Guid actorUserId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(Result.Failure<TableBulkResult>(Error.Failure(
-                "Tables.NotImplemented",
-                "Bulk deactivate is not implemented yet.")));
+            CancellationToken cancellationToken)
+        {
+            var activeCount = await CountActiveAsync(branchId, cancellationToken);
+            if (count < 1 || count > activeCount)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.BulkCountUnavailable());
+            }
+
+            await context.LockBranchesAsync(cancellationToken, branchId);
+            var branch = await context.Branches
+                .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
+            if (branch is null)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.BranchNotFound());
+            }
+
+            if (branch.LifecycleStatus != BranchLifecycleStatus.Active)
+            {
+                return Result.Failure<TableBulkResult>(TablesErrors.BranchNotActive());
+            }
+
+            var now = timeProvider.GetUtcNow();
+            var tables = await context.BranchTables
+                .Where(table => table.BranchId == branchId && table.Status == BranchTableStatus.Active)
+                .OrderByDescending(table => table.Number)
+                .Take(count)
+                .ToListAsync(cancellationToken);
+
+            var fromNumber = tables[tables.Count - 1].Number;
+            var toNumber = tables[0].Number;
+            foreach (var table in tables)
+            {
+                table.Deactivate(now, actorUserId);
+            }
+
+            var changes = TenantAuditChangeSets.TableBulkDeactivate(count, fromNumber, toNumber);
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "tables.deactivated.succeeded",
+                TargetType = TargetType,
+                TargetId = branchId,
+                ActorUserId = actorUserId,
+                Changes = changes,
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure<TableBulkResult>(auditResult.Error!);
+            }
+
+            var saveError = await TrySaveAsync(cancellationToken);
+            if (saveError is not null)
+            {
+                return Result.Failure<TableBulkResult>(saveError);
+            }
+
+            return Result.Success(new TableBulkResult(count, fromNumber, toNumber));
+        }
 
         public Task<TableResponse?> GetByIdAsync(
             Guid tableId,

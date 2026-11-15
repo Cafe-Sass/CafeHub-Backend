@@ -57,6 +57,9 @@ namespace CafeHub.Infrastructure.Audit
                     "Label",
                     "Status",
                     "BranchId",
+                    "count",
+                    "fromNumber",
+                    "toNumber",
                 },
             };
 
