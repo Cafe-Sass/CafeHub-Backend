@@ -429,6 +429,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("access_failed_count");
 
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -529,8 +533,17 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("text")
                         .HasColumnName("user_name");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_tenant_users");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_tenant_users_branch_id");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_tenant_users_created_by");
@@ -550,6 +563,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                     b.ToTable("tenant_users", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tenant_users_branch_scope", "(user_kind = 'Staff' AND branch_id IS NOT NULL) OR (user_kind = 'Owner' AND branch_id IS NULL)");
+
                             t.HasCheckConstraint("ck_tenant_users_concurrency_stamp_length", "length(concurrency_stamp) >= 1 AND length(concurrency_stamp) <= 64");
 
                             t.HasCheckConstraint("ck_tenant_users_email_length", "email IS NULL OR (length(email) >= 1 AND length(email) <= 320)");
@@ -715,6 +730,12 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.TenantUser", b =>
                 {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_users_branch_id");
+
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")

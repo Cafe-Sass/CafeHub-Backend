@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Identity.DTOs;
 using CafeHub.Application.Identity.Queries;
+using CafeHub.Application.Staff.Commands;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
 using MediatR;
@@ -30,6 +31,24 @@ namespace CafeHub.WebApi.Controllers
             if (result.IsSuccess)
             {
                 return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("password")]
+        [TenantAuthorize(TenantPolicies.TenantUser)]
+        public async Task<ActionResult> ChangePassword(
+            [FromBody] ChangePasswordRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new ChangePasswordCommand(request.CurrentPassword, request.NewPassword),
+                cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok();
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);

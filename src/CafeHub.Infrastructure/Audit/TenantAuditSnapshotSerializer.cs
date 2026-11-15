@@ -11,6 +11,7 @@ namespace CafeHub.Infrastructure.Audit
         private const string TruncationMarker = "...[truncated]";
         private const string CafeSettingsTarget = "cafe_settings";
         private const string BranchesTarget = "branches";
+        private const string TenantUsersTarget = "tenant_users";
 
         private static readonly IReadOnlyDictionary<string, HashSet<string>> AllowLists =
             new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
@@ -28,6 +29,12 @@ namespace CafeHub.Infrastructure.Audit
                     "Name",
                     "OpeningHoursSummary",
                     "LifecycleStatus",
+                },
+                [TenantUsersTarget] = new(StringComparer.Ordinal)
+                {
+                    "BranchId",
+                    "FullName",
+                    "IsActive",
                 },
             };
 

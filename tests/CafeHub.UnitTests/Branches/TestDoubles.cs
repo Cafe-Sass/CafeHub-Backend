@@ -186,6 +186,7 @@ namespace CafeHub.UnitTests.Branches
         public Guid? UserId { get; set; } = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         public Guid? TenantId { get; set; } = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         public IReadOnlyCollection<string> Roles { get; set; } = new[] { "Owner" };
+        public Guid? BranchId { get; set; }
     }
 
     internal sealed class StubTenantContextAccessor(TenantContext tenantContext) : ITenantContextAccessor
