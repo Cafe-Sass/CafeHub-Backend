@@ -28,6 +28,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "tenant_user_claims",
             "tenant_role_claims",
             "branches",
+            "branch_tables",
             "stations",
             "cafe_settings",
             "tenant_audit_records",
@@ -492,6 +493,94 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             var actorFk = entity.GetForeignKeys().SingleOrDefault(fk => fk.GetConstraintName() == "fk_tenant_audit_records_actor_user_id");
             Assert.NotNull(actorFk);
             Assert.Equal(typeof(TenantUser), actorFk.PrincipalEntityType.ClrType);
+        }
+
+        [Fact]
+        public void BranchTablesTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(BranchTable));
+            Assert.NotNull(entity);
+
+            Assert.Equal("branch_tables", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_branch_tables", pk.GetName());
+            Assert.Equal("id", Assert.Single(pk.Properties).GetColumnName());
+
+            var branchId = entity.FindProperty(nameof(BranchTable.BranchId));
+            Assert.NotNull(branchId);
+            Assert.Equal("branch_id", branchId.GetColumnName());
+            Assert.False(branchId.IsNullable);
+
+            var number = entity.FindProperty(nameof(BranchTable.Number));
+            Assert.NotNull(number);
+            Assert.Equal("number", number.GetColumnName());
+            Assert.False(number.IsNullable);
+
+            var label = entity.FindProperty(nameof(BranchTable.Label));
+            Assert.NotNull(label);
+            Assert.Equal("label", label.GetColumnName());
+            Assert.True(label.IsNullable);
+
+            var qrCode = entity.FindProperty(nameof(BranchTable.QrCode));
+            Assert.NotNull(qrCode);
+            Assert.Equal("qr_code", qrCode.GetColumnName());
+            Assert.False(qrCode.IsNullable);
+
+            var status = entity.FindProperty(nameof(BranchTable.Status));
+            Assert.NotNull(status);
+            Assert.Equal("status", status.GetColumnName());
+            Assert.False(status.IsNullable);
+
+            var createdAt = entity.FindProperty(nameof(BranchTable.CreatedAt));
+            Assert.NotNull(createdAt);
+            Assert.Equal("created_at", createdAt.GetColumnName());
+            Assert.False(createdAt.IsNullable);
+
+            var updatedAt = entity.FindProperty(nameof(BranchTable.UpdatedAt));
+            Assert.NotNull(updatedAt);
+            Assert.Equal("updated_at", updatedAt.GetColumnName());
+            Assert.False(updatedAt.IsNullable);
+
+            var createdBy = entity.FindProperty(nameof(BranchTable.CreatedBy));
+            Assert.NotNull(createdBy);
+            Assert.Equal("created_by", createdBy.GetColumnName());
+            Assert.True(createdBy.IsNullable);
+
+            var updatedBy = entity.FindProperty(nameof(BranchTable.UpdatedBy));
+            Assert.NotNull(updatedBy);
+            Assert.Equal("updated_by", updatedBy.GetColumnName());
+            Assert.True(updatedBy.IsNullable);
+
+            var branchIndex = entity.GetIndexes().SingleOrDefault(index =>
+                index.GetDatabaseName() == "ix_branch_tables_branch_id");
+            Assert.NotNull(branchIndex);
+            Assert.Equal("branch_id", Assert.Single(branchIndex.Properties).GetColumnName());
+
+            var qrCodeIndex = entity.GetIndexes().SingleOrDefault(index =>
+                index.GetDatabaseName() == "uq_branch_tables_qr_code");
+            Assert.NotNull(qrCodeIndex);
+            Assert.True(qrCodeIndex.IsUnique);
+            Assert.Equal("qr_code", Assert.Single(qrCodeIndex.Properties).GetColumnName());
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_branch_tables_number_range");
+            Assert.Contains(checks, c => c.Name == "ck_branch_tables_label_length");
+            Assert.Contains(checks, c => c.Name == "ck_branch_tables_qr_code_format");
+            Assert.Contains(checks, c => c.Name == "ck_branch_tables_status");
+
+            var branchFk = entity.GetForeignKeys().SingleOrDefault(fk => fk.GetConstraintName() == "fk_branch_tables_branch_id");
+            Assert.NotNull(branchFk);
+            Assert.Equal(typeof(Branch), branchFk.PrincipalEntityType.ClrType);
+            Assert.Equal(DeleteBehavior.Restrict, branchFk.DeleteBehavior);
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.Equal(typeof(uint), xmin.ClrType);
+            Assert.True(xmin.IsConcurrencyToken);
+            Assert.False(xmin.IsNullable);
         }
     }
 }
