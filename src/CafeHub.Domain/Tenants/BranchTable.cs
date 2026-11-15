@@ -125,7 +125,7 @@ namespace CafeHub.Domain.Tenants
         {
             if (qrCode is null
                 || qrCode.Length != QrCodeLength
-                || !qrCode.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+                || !qrCode.All(IsValidQrCodeCharacter))
             {
                 throw new ArgumentException(
                     "The table QR code must be 22 URL-safe base64url characters.",
@@ -134,5 +134,8 @@ namespace CafeHub.Domain.Tenants
 
             return qrCode;
         }
+
+        private static bool IsValidQrCodeCharacter(char character) =>
+            char.IsAsciiLetterOrDigit(character) || character is '-' or '_';
     }
 }
