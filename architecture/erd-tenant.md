@@ -175,6 +175,19 @@ Purpose: the cafe's branch(es) — branch state, opening hours, contact/address 
 - `opening_hours_summary text NULL` (CHECK length 0..512) — freeform summary of configured opening hours; structured per-day hours are not PRD-mandated and are deferred until an approved shape exists (Proposed).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
 
+### stations
+
+Purpose: preparation stations within one branch (FR-IAM-002) — named, ordered units such as Bar or Kitchen that limit which items a station sees. Stations are managed data and are never physically deleted.
+
+- `id uuid NOT NULL` — `pk_stations`.
+- `branch_id uuid NOT NULL` — `fk_stations_branch_id` foreign key to `branches.id` (ON DELETE RESTRICT); `ix_stations_branch_id` supports the per-branch list.
+- `name text NOT NULL` (CHECK length 1..64, `ck_stations_name_length`) — application validation trims the value and rejects control characters.
+- `status text NOT NULL` — `ck_stations_status` over `('Active', 'Inactive')`; deactivation changes the status instead of deleting the row, and staff assignments are ignored while a station is inactive.
+- `sort_order integer NOT NULL` (CHECK `sort_order >= 0`, `ck_stations_sort_order`) — the branch station list orders by `sort_order`, then `name`, then `id`, so equal orders stay deterministic.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
+- The PostgreSQL system column `xmin` is mapped as a row version for optimistic concurrency on station updates.
+- `uq_stations_branch_active_name` — unique expression index on `(branch_id, lower(name))` WHERE `status = 'Active'`; a name is unique among a branch's active stations, case-insensitively, while an inactive duplicate stays allowed. The expression index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
+
 ### cafe_settings
 
 Purpose: the cafe's profile and branding configuration (FR-CAF-001) and the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition). A singleton row: created once by provisioning (see the seeding section above) with no acting user.
@@ -215,7 +228,7 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 
 ## Explicitly out of scope (later stories)
 
-- Staff assignment extras — station catalogs and per-user branch limits (FR-IAM-002 configured branch/station restrictions) arrive with the staff management story; this ERD keeps only the seeded role membership.
+- Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — physical tables, their QR references and reprint flows, and the customer table QR journeys (FR-CAF-003, FR-CAF-004).
 - Menu management — categories, products, sizes, add-ons, per-branch availability, OCR-assisted import, and promotional banners (FR-MENU-001 through FR-MENU-006).
 - Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).

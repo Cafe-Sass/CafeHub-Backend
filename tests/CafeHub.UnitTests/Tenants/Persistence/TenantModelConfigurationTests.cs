@@ -28,6 +28,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "tenant_user_claims",
             "tenant_role_claims",
             "branches",
+            "stations",
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",
@@ -339,6 +340,61 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(typeof(uint), xmin.ClrType);
             Assert.True(xmin.IsConcurrencyToken);
             Assert.False(xmin.IsNullable);
+        }
+
+        [Fact]
+        public void StationsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(Station));
+            Assert.NotNull(entity);
+
+            Assert.Equal("stations", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_stations", pk.GetName());
+            Assert.Equal("id", Assert.Single(pk.Properties).GetColumnName());
+
+            var branchId = entity.FindProperty(nameof(Station.BranchId));
+            Assert.NotNull(branchId);
+            Assert.Equal("branch_id", branchId.GetColumnName());
+            Assert.False(branchId.IsNullable);
+
+            var name = entity.FindProperty(nameof(Station.Name));
+            Assert.NotNull(name);
+            Assert.Equal("name", name.GetColumnName());
+            Assert.False(name.IsNullable);
+
+            var status = entity.FindProperty(nameof(Station.Status));
+            Assert.NotNull(status);
+            Assert.Equal("status", status.GetColumnName());
+            Assert.False(status.IsNullable);
+
+            var sortOrder = entity.FindProperty(nameof(Station.SortOrder));
+            Assert.NotNull(sortOrder);
+            Assert.Equal("sort_order", sortOrder.GetColumnName());
+            Assert.False(sortOrder.IsNullable);
+
+            var branchIndex = entity.GetIndexes().SingleOrDefault(index =>
+                index.GetDatabaseName() == "ix_stations_branch_id");
+            Assert.NotNull(branchIndex);
+            Assert.Equal("branch_id", Assert.Single(branchIndex.Properties).GetColumnName());
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_stations_name_length");
+            Assert.Contains(checks, c => c.Name == "ck_stations_status");
+            Assert.Contains(checks, c => c.Name == "ck_stations_sort_order");
+
+            var branchFk = entity.GetForeignKeys().SingleOrDefault(fk => fk.GetConstraintName() == "fk_stations_branch_id");
+            Assert.NotNull(branchFk);
+            Assert.Equal(typeof(Branch), branchFk.PrincipalEntityType.ClrType);
+            Assert.Equal(DeleteBehavior.Restrict, branchFk.DeleteBehavior);
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.Equal(typeof(uint), xmin.ClrType);
+            Assert.True(xmin.IsConcurrencyToken);
         }
 
         [Fact]

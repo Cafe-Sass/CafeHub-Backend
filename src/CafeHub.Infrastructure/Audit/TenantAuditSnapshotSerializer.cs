@@ -44,6 +44,13 @@ namespace CafeHub.Infrastructure.Audit
                     "Status",
                     "PermissionCodes",
                 },
+                ["stations"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "SortOrder",
+                    "Status",
+                    "BranchId",
+                },
             };
 
         private static readonly HashSet<string> DeniedNames = new(StringComparer.Ordinal)
