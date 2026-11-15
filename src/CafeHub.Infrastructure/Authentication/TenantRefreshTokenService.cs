@@ -29,17 +29,25 @@ namespace CafeHub.Infrastructure.Authentication
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken)
+        public async Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken, string? expectedSessionVersion = null)
         {
             if (userId == Guid.Empty)
             {
                 throw new ArgumentException("The tenant user id is required.", nameof(userId));
             }
 
+            await unitOfWork.BeginTransactionAsync(cancellationToken);
+            await store.LockUserAsync(userId, cancellationToken);
+            var account = await store.FindActiveAccountAsync(userId, cancellationToken);
+            if (account is null || account.SessionVersion != expectedSessionVersion)
+            {
+                await unitOfWork.RollbackTransactionAsync(cancellationToken);
+                return Result.Failure<IssuedTenantRefreshToken>(AuthErrors.InvalidCredentials());
+            }
+
             var now = timeProvider.GetUtcNow();
             var raw = generator.Generate();
             var expires = now.AddDays(options.LifetimeDays);
-            await unitOfWork.BeginTransactionAsync(cancellationToken);
             var familyId = Guid.CreateVersion7();
             store.Add(TenantRefreshToken.Issue(Guid.CreateVersion7(), userId, familyId, hasher.Hash(raw), now, expires));
             await unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -55,14 +63,21 @@ namespace CafeHub.Infrastructure.Authentication
             }
 
             var tokenHash = hasher.Hash(rawToken);
-            var now = timeProvider.GetUtcNow();
             await unitOfWork.BeginTransactionAsync(cancellationToken);
-            var token = await store.FindByTokenHashAsync(tokenHash, cancellationToken);
+            var token = await FindTokenUnderUserLockAsync(tokenHash, cancellationToken);
 
             if (token is null)
             {
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
                 LogRejection("unknown_token");
+                return InvalidRefreshTokenResult<RotatedTenantRefreshToken>();
+            }
+
+            var account = await store.FindActiveAccountAsync(token.UserId, cancellationToken);
+            if (account is null)
+            {
+                await unitOfWork.RollbackTransactionAsync(cancellationToken);
+                LogRejection("inactive_account");
                 return InvalidRefreshTokenResult<RotatedTenantRefreshToken>();
             }
 
@@ -73,6 +88,7 @@ namespace CafeHub.Infrastructure.Authentication
                 return InvalidRefreshTokenResult<RotatedTenantRefreshToken>();
             }
 
+            var now = timeProvider.GetUtcNow();
             if (token.ExpiresAt <= now)
             {
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
@@ -104,11 +120,9 @@ namespace CafeHub.Infrastructure.Authentication
             }
             catch (DbUpdateConcurrencyException)
             {
-                var familyId = token.FamilyId;
                 await unitOfWork.RollbackTransactionAsync(cancellationToken);
                 store.ClearTracking();
-                await unitOfWork.BeginTransactionAsync(cancellationToken);
-                await RevokeFamilyAndCommitAsync(familyId, timeProvider.GetUtcNow(), RefreshTokenRevocationReasons.ReuseDetected, cancellationToken);
+                await RevokeFamilyAsync(rawToken, RefreshTokenRevocationReasons.ReuseDetected, cancellationToken);
                 LogRejection("reuse_detected");
                 return InvalidRefreshTokenResult<RotatedTenantRefreshToken>();
             }
@@ -118,6 +132,7 @@ namespace CafeHub.Infrastructure.Authentication
                 RawToken = replacementRawToken,
                 ExpiresAt = replacement.ExpiresAt,
                 UserId = token.UserId,
+                SessionVersion = account.SessionVersion,
             });
         }
 
@@ -136,7 +151,7 @@ namespace CafeHub.Infrastructure.Authentication
 
             var tokenHash = hasher.Hash(rawToken);
             await unitOfWork.BeginTransactionAsync(cancellationToken);
-            var token = await store.FindByTokenHashAsync(tokenHash, cancellationToken);
+            var token = await FindTokenUnderUserLockAsync(tokenHash, cancellationToken);
 
             if (token is null)
             {
@@ -147,6 +162,17 @@ namespace CafeHub.Infrastructure.Authentication
 
             await RevokeFamilyAndCommitAsync(token.FamilyId, timeProvider.GetUtcNow(), reason, cancellationToken);
             return Result.Success();
+        }
+
+        private async Task<TenantRefreshToken?> FindTokenUnderUserLockAsync(string tokenHash, CancellationToken cancellationToken)
+        {
+            if (await store.FindUserIdByTokenHashAsync(tokenHash, cancellationToken) is not { } userId)
+            {
+                return null;
+            }
+
+            await store.LockUserAsync(userId, cancellationToken);
+            return await store.FindByTokenHashAsync(tokenHash, cancellationToken);
         }
 
         private async Task RevokeFamilyAndCommitAsync(Guid familyId, DateTimeOffset revokedAt, string reason, CancellationToken cancellationToken)

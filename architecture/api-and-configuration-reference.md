@@ -27,19 +27,19 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | GET | `t/{slug}/api/v1/me` | `TenantUser` (`[TenantAuthorize(TenantPolicies.TenantUser)]`) | Current tenant user profile | TenantMeController.cs:24 |
 | GET | `t/{slug}/api/v1/cafe-profile` | `TenantUser` | Get cafe profile | TenantCafeProfileController.cs:25 |
 | PUT | `t/{slug}/api/v1/cafe-profile` | `TenantOwner` (`[TenantAuthorize(TenantPolicies.TenantOwner)]`) | Update cafe profile | TenantCafeProfileController.cs:39 |
-| GET | `t/{slug}/api/v1/branches` | `TenantUser` | List branches (paginated, optional status filter) | TenantBranchesController.cs:26 |
-| GET | `t/{slug}/api/v1/branches/{branchId:guid}` | `TenantUser` | Get one branch | TenantBranchesController.cs:42 |
+| GET | `t/{slug}/api/v1/branches` | `TenantBranchReader` | List branches (paginated, optional status filter) | TenantBranchesController.cs:26 |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}` | `TenantBranchReader` | Get one branch | TenantBranchesController.cs:42 |
 | POST | `t/{slug}/api/v1/branches` | `TenantOwner` | Create a branch (201 + Location header) | TenantBranchesController.cs:58 |
 | PUT | `t/{slug}/api/v1/branches/{branchId:guid}` | `TenantOwner` | Update a branch | TenantBranchesController.cs:80 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `TenantOwner` | Suspend a branch | TenantBranchesController.cs:105 |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `TenantOwner` | Reactivate a branch | TenantBranchesController.cs:124 |
-| POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `TenantOwner` | Retire a branch | TenantBranchesController.cs:143 |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `TenantOwner` | Retire a branch. Returns Conflict while active staff are assigned. | TenantBranchesController.cs:143 |
 | POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create a staff member (201 + Location header) | TenantStaffController.cs:28 |
 | GET | `t/{slug}/api/v1/staff` | `TenantOwner` | List staff members (paginated, optional branchId/isActive filter) | TenantStaffController.cs:52 |
 | GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Get one staff member | TenantStaffController.cs:68 |
 | PUT | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Update a staff member profile | TenantStaffController.cs:84 |
-| POST | `t/{slug}/api/v1/staff/{staffId:guid}/deactivate` | `TenantOwner` | Deactivate a staff member (idempotent, revokes tokens) | TenantStaffController.cs:104 |
-| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reactivate` | `TenantOwner` | Reactivate a deactivated staff member (idempotent) | TenantStaffController.cs:120 |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/deactivate` | `TenantOwner` | Deactivate a staff member (idempotent, invalidates access and refresh tokens) | TenantStaffController.cs:104 |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reactivate` | `TenantOwner` | Reactivate a staff member assigned to an active branch. Fresh sign-in is required after deactivation. | TenantStaffController.cs:120 |
 | POST | `t/{slug}/api/v1/staff/{staffId:guid}/reset-password` | `TenantOwner` | Owner resets a staff member's password (revokes tokens) | TenantStaffController.cs:136 |
 | POST | `t/{slug}/api/v1/me/password` | `TenantUser` | Staff member changes their own password (revokes tokens) | TenantMeController.cs:40 |
 | GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
@@ -51,6 +51,7 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 |---|---|---|
 | `PlatformAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Platform administrator |
 | `SuperAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Super administrator |
+| `TenantBranchReader` | `CafeHub.WebApi.Authorization.TenantPolicies` | Active Owner, or active Staff whose assigned branch is Active |
 | `TenantUser` | `CafeHub.WebApi.Authorization.TenantPolicies` | Authenticated tenant user (owner or staff) |
 | `TenantOwner` | `CafeHub.WebApi.Authorization.TenantPolicies` | Tenant owner only |
 

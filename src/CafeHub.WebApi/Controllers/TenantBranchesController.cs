@@ -24,7 +24,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet]
-        [TenantAuthorize(TenantPolicies.TenantUser)]
+        [TenantAuthorize(TenantPolicies.TenantBranchReader)]
         public async Task<ActionResult<OffsetPage<BranchResponse>>> List(
             [FromQuery] ListBranchesQuery query,
             CancellationToken cancellationToken)
@@ -40,7 +40,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet("{branchId:guid}")]
-        [TenantAuthorize(TenantPolicies.TenantUser)]
+        [TenantAuthorize(TenantPolicies.TenantBranchReader)]
         public async Task<ActionResult<BranchResponse>> Get(
             Guid branchId,
             CancellationToken cancellationToken)

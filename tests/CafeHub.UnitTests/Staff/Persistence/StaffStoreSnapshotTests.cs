@@ -1,6 +1,7 @@
 using CafeHub.Application.Audit;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
+using CafeHub.Infrastructure.Staff;
 
 namespace CafeHub.UnitTests.Staff.Persistence
 {
@@ -8,6 +9,16 @@ namespace CafeHub.UnitTests.Staff.Persistence
     {
         private static readonly Guid BranchId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
         private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        [Fact]
+        public void GeneratedUserNamesUseTheWholeAccountId()
+        {
+            var first = Guid.Parse("019a0000-0000-7000-8000-000000000001");
+            var second = Guid.Parse("019a0000-0000-7000-8000-000000000002");
+
+            Assert.Equal($"staff-{first:N}", StaffStore.GenerateUserName(first));
+            Assert.NotEqual(StaffStore.GenerateUserName(first), StaffStore.GenerateUserName(second));
+        }
 
         [Fact]
         public void StaffCreate_CapturesApprovedNewValuesOnly()

@@ -108,8 +108,9 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             var normalizedEmailIndex = entity.GetIndexes().FirstOrDefault(i =>
                 i.Properties.Count == 1 && i.Properties.Any(p => p.Name == nameof(TenantUser.NormalizedEmail)));
             Assert.NotNull(normalizedEmailIndex);
-            Assert.False(normalizedEmailIndex.IsUnique);
-            Assert.Equal("ix_tenant_users_normalized_email", normalizedEmailIndex.GetDatabaseName());
+            Assert.True(normalizedEmailIndex.IsUnique);
+            Assert.Equal("normalized_email IS NOT NULL", normalizedEmailIndex.GetFilter());
+            Assert.Equal("uq_tenant_users_normalized_email", normalizedEmailIndex.GetDatabaseName());
 
             var passwordHash = entity.FindProperty(nameof(TenantUser.PasswordHash));
             Assert.NotNull(passwordHash);

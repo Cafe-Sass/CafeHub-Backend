@@ -45,7 +45,7 @@ namespace CafeHub.Application.Identity.Commands
 
             var rotated = rotation.Value;
             var user = await userAuthenticator.FindByIdAsync(rotated.UserId, cancellationToken);
-            if (user is null)
+            if (user is null || user.SessionVersion != rotated.SessionVersion)
             {
                 await refreshTokenService.RevokeFamilyAsync(rotated.RawToken, RefreshTokenRevocationReasons.AdminRevoked, cancellationToken);
                 await AuditAsync("tenant.refresh.failed", rotated.UserId, "tenant_user", rotated.UserId, cancellationToken);
@@ -57,6 +57,7 @@ namespace CafeHub.Application.Identity.Commands
                 UserId = user.Id,
                 Email = user.Email,
                 Roles = user.Roles,
+                StaffSessionVersion = user.UserKind == "Staff" ? rotated.SessionVersion : null,
                 TenantId = tenantContextAccessor.GetRequired().TenantId,
             });
 

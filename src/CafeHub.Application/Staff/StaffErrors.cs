@@ -28,6 +28,9 @@ namespace CafeHub.Application.Staff
             return Error.NotFound(BranchNotFoundCode, BranchNotFoundMessage);
         }
 
+        public static Error ReactivationBranchNotActive() =>
+            Error.Conflict("Staff.ReactivationBranchNotActive", "The assigned branch must be active to reactivate this account.");
+
         public const string BranchNotActiveCode = "Staff.BranchNotActive";
         public const string BranchNotActiveMessage = "The selected branch is not active.";
 

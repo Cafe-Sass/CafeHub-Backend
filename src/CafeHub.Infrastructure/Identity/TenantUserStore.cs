@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CafeHub.Domain.Identity;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Identity;
@@ -51,11 +52,11 @@ namespace CafeHub.Infrastructure.Identity
 
         public Task SetEmailAsync(TenantUser user, string? email, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.Email), email);
         public Task<string?> GetEmailAsync(TenantUser user, CancellationToken cancellationToken) => Task.FromResult(user.Email);
-        public Task SetNormalizedEmailAsync(TenantUser user, string? normalizedEmail, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.NormalizedEmail), normalizedEmail?.ToLowerInvariant());
+        public Task SetNormalizedEmailAsync(TenantUser user, string? normalizedEmail, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.NormalizedEmail), normalizedEmail is null ? null : TenantUserEmail.Normalize(normalizedEmail));
         public Task<string?> GetNormalizedEmailAsync(TenantUser user, CancellationToken cancellationToken) => Task.FromResult(user.NormalizedEmail);
         public Task<bool> GetEmailConfirmedAsync(TenantUser user, CancellationToken cancellationToken) => Task.FromResult(user.EmailConfirmed);
         public Task SetEmailConfirmedAsync(TenantUser user, bool confirmed, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.EmailConfirmed), confirmed);
-        public Task<TenantUser?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) => context.TenantUsers.SingleOrDefaultAsync(user => user.NormalizedEmail == normalizedEmail.ToLowerInvariant(), cancellationToken);
+        public Task<TenantUser?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) => context.TenantUsers.SingleOrDefaultAsync(user => user.NormalizedEmail == TenantUserEmail.Normalize(normalizedEmail), cancellationToken);
 
         public Task SetPasswordHashAsync(TenantUser user, string? passwordHash, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.PasswordHash), passwordHash ?? string.Empty);
         public Task<string?> GetPasswordHashAsync(TenantUser user, CancellationToken cancellationToken) => Task.FromResult<string?>(user.PasswordHash);

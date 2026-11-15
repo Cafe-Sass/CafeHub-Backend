@@ -137,6 +137,7 @@ namespace CafeHub.Infrastructure.Branches
             string auditAction,
             CancellationToken cancellationToken)
         {
+            await context.LockBranchesAsync(cancellationToken, branchId);
             var branch = await context.Branches
                 .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
             if (branch is null)
@@ -150,7 +151,30 @@ namespace CafeHub.Infrastructure.Branches
                     ValidationError.Create(new[] { new FieldError("concurrencyToken", "The concurrency token is not a valid unsigned integer.") }));
             }
 
-            context.Entry(branch).Property<uint>("xmin").OriginalValue = token;
+            var version = context.Entry(branch).Property<uint>("xmin");
+            if (branch.LifecycleStatus == newStatus)
+            {
+                return Result.Success(BranchResponse.From(branch, version.CurrentValue.ToString(CultureInfo.InvariantCulture)));
+            }
+
+            if (version.CurrentValue != token)
+            {
+                return Result.Failure<BranchResponse>(BranchesErrors.ConcurrencyConflict());
+            }
+
+            if (!BranchLifecycleTransitions.IsLegalTransition(branch.LifecycleStatus, newStatus))
+            {
+                return Result.Failure<BranchResponse>(BranchesErrors.IllegalTransition());
+            }
+
+            if (newStatus == BranchLifecycleStatus.Retired && await context.TenantUsers.AnyAsync(
+                user => user.BranchId == branchId && user.UserKind == TenantUserKind.Staff && user.DeletedAt == null,
+                cancellationToken))
+            {
+                return Result.Failure<BranchResponse>(BranchesErrors.ActiveStaffAssigned());
+            }
+
+            version.OriginalValue = token;
             var changes = TenantAuditChangeSets.BranchLifecycleStatus(branch, newStatus);
 
             branch.ChangeLifecycleStatus(newStatus, timeProvider.GetUtcNow(), actorUserId);
@@ -187,19 +211,14 @@ namespace CafeHub.Infrastructure.Branches
 
         public async Task<BranchResponse?> GetByIdAsync(Guid branchId, CancellationToken cancellationToken)
         {
-            var branch = await context.Branches
-                .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
-            if (branch is null)
-            {
-                return null;
-            }
+            var row = await context.Branches.AsNoTracking()
+                .Where(branch => branch.Id == branchId)
+                .Select(branch => new { Branch = branch, Version = EF.Property<uint>(branch, "xmin") })
+                .SingleOrDefaultAsync(cancellationToken);
 
-            var token = context.Entry(branch)
-                .Property<uint>("xmin")
-                .CurrentValue
-                .ToString(CultureInfo.InvariantCulture);
-
-            return BranchResponse.From(branch, token);
+            return row is null
+                ? null
+                : BranchResponse.From(row.Branch, row.Version.ToString(CultureInfo.InvariantCulture));
         }
 
         public async Task<BranchListPage> ListBranchesAsync(

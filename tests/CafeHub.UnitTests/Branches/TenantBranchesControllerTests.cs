@@ -106,14 +106,14 @@ namespace CafeHub.UnitTests.Branches
         }
 
         [Fact]
-        public void ReadActions_RequireTenantUserPolicy()
+        public void ReadActions_RequireTenantBranchReaderPolicy()
         {
             foreach (var name in new[] { nameof(TenantBranchesController.List), nameof(TenantBranchesController.Get) })
             {
                 var action = Action(name);
                 var authorize = action.GetCustomAttribute<TenantAuthorizeAttribute>();
                 Assert.NotNull(authorize);
-                Assert.Equal(TenantPolicies.TenantUser, authorize!.Policy);
+                Assert.Equal(TenantPolicies.TenantBranchReader, authorize!.Policy);
                 Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
                 Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
             }

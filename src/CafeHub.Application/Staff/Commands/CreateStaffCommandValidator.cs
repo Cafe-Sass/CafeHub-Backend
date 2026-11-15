@@ -1,3 +1,4 @@
+using CafeHub.Application.Identity;
 using FluentValidation;
 
 namespace CafeHub.Application.Staff.Commands
@@ -5,9 +6,8 @@ namespace CafeHub.Application.Staff.Commands
     public sealed class CreateStaffCommandValidator : AbstractValidator<CreateStaffCommand>
     {
         public const int MaximumFullNameLength = 256;
-        public const int MaximumEmailLength = 320;
+        public const int MaximumEmailLength = CafeHub.Application.Identity.Commands.LoginTenantUserCommandValidator.MaximumEmailLength;
         public const int MaximumPhoneNumberLength = 64;
-        public const int MinimumPasswordLength = 6;
 
         public CreateStaffCommandValidator()
         {
@@ -38,8 +38,8 @@ namespace CafeHub.Application.Staff.Commands
                 .Cascade(CascadeMode.Stop)
                 .NotEmpty()
                 .WithMessage("The password is required.")
-                .MinimumLength(MinimumPasswordLength)
-                .WithMessage($"The password must be at least {MinimumPasswordLength} characters.");
+                .Must(NewPasswordPolicy.IsValid)
+                .WithMessage(NewPasswordPolicy.Requirements);
         }
     }
 }

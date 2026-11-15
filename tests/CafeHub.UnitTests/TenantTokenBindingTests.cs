@@ -62,7 +62,8 @@ namespace CafeHub.UnitTests
             DateTimeOffset? issuedAt = null,
             bool includeTenantId = true,
             string? tenantIdValue = null,
-            string algorithm = SecurityAlgorithms.HmacSha256)
+            string algorithm = SecurityAlgorithms.HmacSha256,
+            string? sessionVersion = null)
         {
             var now = issuedAt ?? Now;
             var claims = new Dictionary<string, object>
@@ -73,6 +74,7 @@ namespace CafeHub.UnitTests
             };
             if (includeTenantId) claims["tid"] = tenantIdValue ?? (tenantId ?? TenantId).ToString();
             if (tokenKind is not null) claims["token_kind"] = tokenKind;
+            if (sessionVersion is not null) claims[TenantSessionVersion.Claim] = sessionVersion;
 
             var descriptor = new SecurityTokenDescriptor
             {
@@ -94,7 +96,8 @@ namespace CafeHub.UnitTests
             string rawToken,
             JwtBearerOptions options,
             ITenantContextAccessor? accessor = null,
-            ListLogger? logger = null)
+            ListLogger? logger = null,
+            ITenantAccountReader? accounts = null)
         {
             var validation = await new JsonWebTokenHandler().ValidateTokenAsync(rawToken, options.TokenValidationParameters);
             Assert.True(validation.IsValid, validation.Exception?.ToString());
@@ -103,6 +106,7 @@ namespace CafeHub.UnitTests
             var services = new ServiceCollection();
             services.AddSingleton<ITenantContextAccessor>(accessor ?? new StubTenantContextAccessor(TenantContext.Create(TenantId, "tenant-secret-ref", true)));
             if (logger is not null) services.AddSingleton<ILogger<TenantJwtBearerEvents>>(logger);
+            services.AddSingleton(accounts ?? new AccountReader(new TenantAccountAccess(false, null, false)));
             httpContext.RequestServices = services.BuildServiceProvider();
             var context = new TokenValidatedContext(
                 httpContext,
@@ -131,6 +135,25 @@ namespace CafeHub.UnitTests
             Assert.True(parameters.RequireExpirationTime);
             Assert.Equal(TimeSpan.FromSeconds(30), parameters.ClockSkew);
             Assert.Equal(SecurityAlgorithms.HmacSha256, Assert.Single(parameters.ValidAlgorithms!));
+        }
+
+        private sealed class AccountReader(TenantAccountAccess? account) : ITenantAccountReader
+        {
+            public Task<TenantAccountAccess?> FindActiveAsync(Guid userId, CancellationToken cancellationToken) =>
+                Task.FromResult(account);
+        }
+
+        [Theory]
+        [InlineData(false, "current", false)]
+        [InlineData(true, null, false)]
+        [InlineData(true, "old", false)]
+        [InlineData(true, "current", true)]
+        public async Task StaffToken_RequiresActiveAccountAndCurrentSession(bool active, string? version, bool accepted)
+        {
+            var (tenant, _, _) = RegisterSchemes();
+            var accounts = new AccountReader(active ? new TenantAccountAccess(true, "current", true) : null);
+            var result = await ValidateAndBindAsync(CreateTenantToken(sessionVersion: version), tenant, accounts: accounts);
+            Assert.Equal(accepted, result.Result?.Failure is null);
         }
 
         [Fact]

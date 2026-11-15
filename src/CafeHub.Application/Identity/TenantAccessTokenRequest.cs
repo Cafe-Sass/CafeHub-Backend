@@ -2,6 +2,8 @@ namespace CafeHub.Application.Identity
 {
     public sealed class TenantAccessTokenRequest
     {
+        public string? StaffSessionVersion { get; init; }
+
         public required Guid UserId { get; init; }
 
         public required string Email { get; init; }

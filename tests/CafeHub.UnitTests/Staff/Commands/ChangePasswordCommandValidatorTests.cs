@@ -9,7 +9,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [Fact]
         public async Task Validate_ReturnsValid_ForWellFormedCommand()
         {
-            var command = new ChangePasswordCommand("OldPass123!", "NewPass456!");
+            var command = new ChangePasswordCommand("OldPass123!", "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -19,7 +19,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [Fact]
         public async Task Validate_ReturnsInvalid_WhenCurrentPasswordIsEmpty()
         {
-            var command = new ChangePasswordCommand("", "NewPass456!");
+            var command = new ChangePasswordCommand("", "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 

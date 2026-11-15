@@ -33,6 +33,9 @@ namespace CafeHub.Application.Branches
             return ValidationError.Create(new[] { new FieldError("status", InvalidStatusMessage) });
         }
 
+        public static Error ActiveStaffAssigned() =>
+            Error.Conflict("Branches.ActiveStaffAssigned", "Reassign or deactivate active staff before retiring this branch.");
+
         public const string IllegalTransitionCode = "Branches.IllegalTransition";
         public const string IllegalTransitionMessage = "The requested lifecycle transition is not allowed.";
 

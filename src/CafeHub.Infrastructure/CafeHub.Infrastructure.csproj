@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="CafeHub.UnitTests" />
+    <EmbeddedResource Include="..\..\database\scripts\NormalizeTenantUserEmail.Backfill.sql" LogicalName="CafeHub.NormalizeTenantUserEmail.Backfill.sql" />
   </ItemGroup>
 
 </Project>

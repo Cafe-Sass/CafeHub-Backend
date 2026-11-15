@@ -2,6 +2,8 @@ namespace CafeHub.Application.Identity
 {
     public sealed class AuthenticatedTenantUser
     {
+        public string? SessionVersion { get; init; }
+
         public required Guid Id { get; init; }
 
         public required string Email { get; init; }

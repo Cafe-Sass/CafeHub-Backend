@@ -10,7 +10,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [Fact]
         public async Task Validate_ReturnsValid_ForWellFormedCommand()
         {
-            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", "+966500000001", BranchId, "Secret123!");
+            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", "+966500000001", BranchId, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -22,7 +22,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [InlineData("   ")]
         public async Task Validate_ReturnsInvalid_WhenFullNameIsEmptyOrWhitespace(string name)
         {
-            var command = new CreateStaffCommand(name, "jane@test.com", null, BranchId, "Secret123!");
+            var command = new CreateStaffCommand(name, "jane@test.com", null, BranchId, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -33,7 +33,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [Fact]
         public async Task Validate_ReturnsInvalid_WhenFullNameTooLong()
         {
-            var command = new CreateStaffCommand(new string('A', CreateStaffCommandValidator.MaximumFullNameLength + 1), "jane@test.com", null, BranchId, "Secret123!");
+            var command = new CreateStaffCommand(new string('A', CreateStaffCommandValidator.MaximumFullNameLength + 1), "jane@test.com", null, BranchId, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -47,7 +47,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [InlineData("missing@")]
         public async Task Validate_ReturnsInvalid_WhenEmailIsInvalid(string email)
         {
-            var command = new CreateStaffCommand("Jane Doe", email, null, BranchId, "Secret123!");
+            var command = new CreateStaffCommand("Jane Doe", email, null, BranchId, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -58,7 +58,7 @@ namespace CafeHub.UnitTests.Staff.Commands
         [Fact]
         public async Task Validate_ReturnsInvalid_WhenBranchIdIsEmpty()
         {
-            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", null, Guid.Empty, "Secret123!");
+            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", null, Guid.Empty, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 
@@ -79,10 +79,22 @@ namespace CafeHub.UnitTests.Staff.Commands
             Assert.Contains(result.Errors, e => e.PropertyName == "Password");
         }
 
+        [Theory]
+        [InlineData(254, true)]
+        [InlineData(255, false)]
+        public async Task Validate_UsesTenantLoginEmailLimit(int length, bool valid)
+        {
+            const string domain = "@example.test";
+            var email = new string('a', length - domain.Length) + domain;
+            var result = await new CreateStaffCommandValidator().ValidateAsync(
+                new CreateStaffCommand("Jane Doe", email, null, BranchId, "ExamplePass42!"));
+            Assert.Equal(valid, result.IsValid);
+        }
+
         [Fact]
         public async Task Validate_AllowsNullPhoneNumber()
         {
-            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", null, BranchId, "Secret123!");
+            var command = new CreateStaffCommand("Jane Doe", "jane@test.com", null, BranchId, "ExamplePass42!");
 
             var result = await validator.ValidateAsync(command);
 

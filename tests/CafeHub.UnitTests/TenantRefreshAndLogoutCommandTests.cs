@@ -139,7 +139,7 @@ namespace CafeHub.UnitTests
         {
             public string? RotatedRawToken { get; private set; }
             public (string Token, string Reason)? Revocation { get; private set; }
-            public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken) => throw new NotImplementedException();
+            public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken, string? expectedSessionVersion = null) => throw new NotImplementedException();
             public Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken) { RotatedRawToken = rawToken; return Task.FromResult(rotationResult); }
             public Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) { Revocation = (rawToken, reason); return Task.FromResult(Result.Failure(AuthErrors.InvalidRefreshToken())); }
         }
