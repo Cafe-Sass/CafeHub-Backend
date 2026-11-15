@@ -28,10 +28,12 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<TenantRoleResponse>> Create(CreateTenantRole request, CancellationToken cancellationToken)
+        public async Task<ActionResult<TenantRoleResponse>> Create([FromRoute] string slug, CreateTenantRole request, CancellationToken cancellationToken)
         {
             var result = await sender.Send(request, cancellationToken);
-            return result.IsSuccess ? CreatedAtAction(nameof(Get), new { roleId = result.Value.Id }, result.Value) : result.ToProblemResult(HttpContext, correlation);
+            return result.IsSuccess
+                ? CreatedAtAction(nameof(Get), new { slug, roleId = result.Value.Id }, result.Value)
+                : result.ToProblemResult(HttpContext, correlation);
         }
 
         [HttpPut("{roleId:guid}")]

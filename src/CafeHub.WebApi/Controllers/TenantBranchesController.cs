@@ -59,6 +59,7 @@ namespace CafeHub.WebApi.Controllers
         [HttpPost]
         [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Create(
+            [FromRoute] string slug,
             [FromBody] CreateBranchRequest request,
             CancellationToken cancellationToken)
         {
@@ -72,7 +73,7 @@ namespace CafeHub.WebApi.Controllers
 
             if (result.IsSuccess)
             {
-                return CreatedAtAction(nameof(Get), new { branchId = result.Value.Id }, result.Value);
+                return CreatedAtAction(nameof(Get), new { slug, branchId = result.Value.Id }, result.Value);
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);

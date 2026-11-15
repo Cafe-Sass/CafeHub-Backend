@@ -28,6 +28,7 @@ namespace CafeHub.WebApi.Controllers
         [HttpPost]
         [TenantAuthorize(TenantPolicies.TenantOwner)]
         public async Task<ActionResult<StaffResponse>> Create(
+            [FromRoute] string slug,
             [FromBody] CreateStaffRequest request,
             CancellationToken cancellationToken)
         {
@@ -42,7 +43,7 @@ namespace CafeHub.WebApi.Controllers
 
             if (result.IsSuccess)
             {
-                return CreatedAtAction(nameof(GetById), new { staffId = result.Value.Id }, result.Value);
+                return CreatedAtAction(nameof(GetById), new { slug, staffId = result.Value.Id }, result.Value);
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);

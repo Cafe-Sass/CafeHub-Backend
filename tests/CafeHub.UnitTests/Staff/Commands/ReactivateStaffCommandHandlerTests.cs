@@ -47,7 +47,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(new ReactivateStaffCommand(StaffId), CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.NotFoundCode, result.Error.Code);
+            Assert.Equal(StaffErrors.NotFound(), result.Error);
         }
 
         [Fact]
