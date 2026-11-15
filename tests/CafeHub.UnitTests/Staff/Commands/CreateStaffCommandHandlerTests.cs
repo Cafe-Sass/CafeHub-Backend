@@ -71,7 +71,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(command, CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.EmailConflictCode, result.Error.Code);
+            Assert.Equal(StaffErrors.EmailConflict(), result.Error);
         }
 
         [Fact]

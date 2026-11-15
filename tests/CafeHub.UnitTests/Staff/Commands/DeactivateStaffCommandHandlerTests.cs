@@ -48,7 +48,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(new DeactivateStaffCommand(StaffId), CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.CannotModifyOwnerCode, result.Error.Code);
+            Assert.Equal(StaffErrors.CannotModifyOwner(), result.Error);
         }
 
         [Fact]

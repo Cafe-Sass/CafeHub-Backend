@@ -150,12 +150,14 @@ namespace CafeHub.UnitTests.Branches
             var controller = CreateController(sender, new TestCorrelationIdAccessor("corr-branches-create"));
             var request = new CreateBranchRequest("Downtown Cafe", "123 Main St", "+1-555-0100", "Mon-Fri 8am-6pm");
 
-            var actionResult = await controller.Create(request, CancellationToken.None);
+            var actionResult = await controller.Create("fixture-cafe", request, CancellationToken.None);
 
             var created = Assert.IsType<CreatedAtActionResult>(actionResult.Result);
             Assert.Equal(nameof(TenantBranchesController.Get), created.ActionName);
-            Assert.NotNull(created.RouteValues);
-            Assert.Equal(response.Id, created.RouteValues!["branchId"]);
+            var routeValues = created.RouteValues;
+            Assert.NotNull(routeValues);
+            Assert.Equal("fixture-cafe", routeValues["slug"]);
+            Assert.Equal(response.Id, routeValues["branchId"]);
             Assert.Same(response, created.Value);
             var command = Assert.IsType<CreateBranchCommand>(sender.LastRequest);
             Assert.Equal("Downtown Cafe", command.Name);
@@ -168,7 +170,7 @@ namespace CafeHub.UnitTests.Branches
             var sender = new RecordingSender { Response = Result.Failure<BranchResponse>(validationError) };
             var controller = CreateController(sender);
 
-            var actionResult = await controller.Create(new CreateBranchRequest("", null, null, null), CancellationToken.None);
+            var actionResult = await controller.Create("fixture-cafe", new CreateBranchRequest("", null, null, null), CancellationToken.None);
 
             var objectResult = Assert.IsType<ObjectResult>(actionResult.Result);
             Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);

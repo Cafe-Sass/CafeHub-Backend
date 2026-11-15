@@ -1,6 +1,7 @@
 using CafeHub.Application.Identity;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Identity;
+using CafeHub.Infrastructure.Onboarding;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -97,8 +98,7 @@ namespace CafeHub.UnitTests
 
         private static TenantUser CreateUser(string password)
         {
-            var hasher = new PasswordHasher<object>();
-            var hash = hasher.HashPassword(new object(), password);
+            var hash = new OwnerPasswordHasher().Hash(password);
             return TenantUser.Create(Guid.NewGuid(), TenantUserKind.Owner, "owner-user", "owner-user", "Cafe Owner", Email, Email, null, hash, Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow);
         }
 

@@ -49,7 +49,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(command, CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.ConcurrencyConflictCode, result.Error.Code);
+            Assert.Equal(StaffErrors.ConcurrencyConflict(), result.Error);
         }
 
         [Fact]
@@ -61,7 +61,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(command, CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.NotFoundCode, result.Error.Code);
+            Assert.Equal(StaffErrors.NotFound(), result.Error);
         }
 
         [Fact]
@@ -73,7 +73,7 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(command, CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.CannotModifyOwnerCode, result.Error.Code);
+            Assert.Equal(StaffErrors.CannotModifyOwner(), result.Error);
         }
 
         [Fact]

@@ -38,8 +38,8 @@ namespace CafeHub.UnitTests.Staff.Commands
             var result = await handler.Handle(new ChangePasswordCommand("WrongPass!", "NewPass456!"), CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(ErrorType.Validation, result.Error.Type);
             var validationError = Assert.IsType<ValidationError>(result.Error);
+            Assert.Equal(ErrorType.Validation, validationError.Type);
             Assert.Contains(validationError.Errors, e => e.Field == "currentPassword");
         }
 
