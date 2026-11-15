@@ -8,8 +8,8 @@ using CafeHub.Domain.Identity;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
-using Microsoft.AspNetCore.Identity;
 using CafeHub.Infrastructure.Persistence.Tenant.Configurations;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -123,7 +123,7 @@ namespace CafeHub.Infrastructure.Staff
                 await context.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-                { SqlState: PostgresErrorCodes.UniqueViolation } violation)
+            { SqlState: PostgresErrorCodes.UniqueViolation } violation)
             {
                 if (violation.ConstraintName == TenantUserConfiguration.UniqueEmailIndex)
                 {

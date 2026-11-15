@@ -1,5 +1,5 @@
-using CafeHub.Application.Tenancy;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
