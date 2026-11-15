@@ -12,6 +12,8 @@ namespace CafeHub.Application.Identity
     /// </summary>
     public static class AuthErrors
     {
+        public static Error Forbidden() => Error.Forbidden("Identity.Forbidden", "You are not allowed to use this resource.");
+
         public const string InvalidCredentialsCode = "Auth.InvalidCredentials";
         public const string InvalidCredentialsMessage = "The credentials are not valid.";
         public const string InvalidRefreshTokenCode = "Auth.InvalidRefreshToken";

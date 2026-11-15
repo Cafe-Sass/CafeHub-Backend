@@ -2,6 +2,7 @@ using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Branches.Commands;
 using CafeHub.Application.Branches.DTOs;
 using CafeHub.Application.Branches.Queries;
+using CafeHub.Application.Identity;
 using CafeHub.Application.Pagination;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
@@ -24,7 +25,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet]
-        [TenantAuthorize(TenantPolicies.TenantBranchReader)]
+        [TenantAuthorize(TenantPermissions.BranchesRead)]
         public async Task<ActionResult<OffsetPage<BranchResponse>>> List(
             [FromQuery] ListBranchesQuery query,
             CancellationToken cancellationToken)
@@ -40,7 +41,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet("{branchId:guid}")]
-        [TenantAuthorize(TenantPolicies.TenantBranchReader)]
+        [TenantAuthorize(TenantPermissions.BranchesRead)]
         public async Task<ActionResult<BranchResponse>> Get(
             Guid branchId,
             CancellationToken cancellationToken)
@@ -56,7 +57,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Create(
             [FromBody] CreateBranchRequest request,
             CancellationToken cancellationToken)
@@ -78,7 +79,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPut("{branchId:guid}")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Put(
             Guid branchId,
             [FromBody] UpdateBranchRequest request,
@@ -103,7 +104,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost("{branchId:guid}/suspend")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Suspend(
             Guid branchId,
             [FromBody] BranchLifecycleRequest request,
@@ -122,7 +123,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost("{branchId:guid}/reactivate")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Reactivate(
             Guid branchId,
             [FromBody] BranchLifecycleRequest request,
@@ -141,7 +142,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost("{branchId:guid}/retire")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.BranchesManage)]
         public async Task<ActionResult<BranchResponse>> Retire(
             Guid branchId,
             [FromBody] BranchLifecycleRequest request,

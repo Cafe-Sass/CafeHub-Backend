@@ -13,5 +13,9 @@ namespace CafeHub.Application.Identity.DTOs
         public required IReadOnlyCollection<string> Roles { get; init; }
 
         public required string TenantSlug { get; init; }
+
+        public Guid? BranchId { get; init; }
+
+        public IReadOnlyList<string> EffectivePermissions { get; init; } = [];
     }
 }

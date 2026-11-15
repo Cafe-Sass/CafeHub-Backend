@@ -14,6 +14,7 @@ namespace CafeHub.Infrastructure.Identity
                 .Select(user => new
                 {
                     user.UserKind,
+                    user.BranchId,
                     user.SecurityStamp,
                     HasActiveBranch = context.Branches.Any(branch =>
                         branch.Id == user.BranchId && branch.LifecycleStatus == BranchLifecycleStatus.Active),
@@ -23,7 +24,10 @@ namespace CafeHub.Infrastructure.Identity
             return account is null ? null : new TenantAccountAccess(
                 account.UserKind == TenantUserKind.Staff,
                 TenantSessionVersion.FromStamp(account.SecurityStamp),
-                account.HasActiveBranch);
+                account.HasActiveBranch)
+            {
+                BranchId = account.BranchId,
+            };
         }
 
         internal Task LockAsync(Guid userId, CancellationToken cancellationToken) =>

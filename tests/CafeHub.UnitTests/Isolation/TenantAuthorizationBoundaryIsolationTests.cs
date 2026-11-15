@@ -4,6 +4,7 @@ using CafeHub.Application.Tenancy;
 using CafeHub.WebApi;
 using CafeHub.WebApi.Authorization;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests.Isolation
@@ -24,6 +25,7 @@ namespace CafeHub.UnitTests.Isolation
         {
             var services = new ServiceCollection();
             services.AddLogging();
+            services.AddSingleton<ITenantPermissionReader, FakeTenantPermissionReader>();
             services.AddSingleton<ITenantContextAccessor>(new FakeTenantContextAccessor(contextTenantId));
             services.AddTenantAuthorization();
             return services.BuildServiceProvider();
@@ -103,7 +105,7 @@ namespace CafeHub.UnitTests.Isolation
             var authorization = provider.GetRequiredService<IAuthorizationService>();
             var ownerOfTenantA = CreateTenantPrincipal(TenantAId, UserAId, TenantRoles.Owner);
 
-            var ownerPolicyResult = await authorization.AuthorizeAsync(ownerOfTenantA, TenantPolicies.TenantOwner);
+            var ownerPolicyResult = await authorization.AuthorizeAsync(ownerOfTenantA, OwnerContext(), TenantPolicies.TenantOwner);
 
             Assert.False(ownerPolicyResult.Succeeded);
         }
@@ -115,11 +117,18 @@ namespace CafeHub.UnitTests.Isolation
             var authorization = provider.GetRequiredService<IAuthorizationService>();
             var ownerOfTenantB = CreateTenantPrincipal(TenantBId, UserBId, TenantRoles.Owner);
 
-            var ownerPolicyResult = await authorization.AuthorizeAsync(ownerOfTenantB, TenantPolicies.TenantOwner);
+            var ownerPolicyResult = await authorization.AuthorizeAsync(ownerOfTenantB, OwnerContext(), TenantPolicies.TenantOwner);
             var userPolicyResult = await authorization.AuthorizeAsync(ownerOfTenantB, TenantPolicies.TenantUser);
 
             Assert.True(ownerPolicyResult.Succeeded);
             Assert.True(userPolicyResult.Succeeded);
+        }
+
+        private static DefaultHttpContext OwnerContext()
+        {
+            var context = new DefaultHttpContext();
+            context.Items[typeof(TenantAccountAccess)] = new TenantAccountAccess(false, null, false);
+            return context;
         }
 
         private sealed class FakeTenantContextAccessor(Guid tenantId) : ITenantContextAccessor

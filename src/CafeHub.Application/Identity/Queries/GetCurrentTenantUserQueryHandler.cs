@@ -10,15 +10,18 @@ namespace CafeHub.Application.Identity.Queries
         private readonly ICurrentTenantUser currentTenantUser;
         private readonly ITenantUserAuthenticator tenantUserAuthenticator;
         private readonly ITenantContextAccessor tenantContextAccessor;
+        private readonly ITenantPermissionReader permissions;
 
         public GetCurrentTenantUserQueryHandler(
             ICurrentTenantUser currentTenantUser,
             ITenantUserAuthenticator tenantUserAuthenticator,
-            ITenantContextAccessor tenantContextAccessor)
+            ITenantContextAccessor tenantContextAccessor,
+            ITenantPermissionReader permissions)
         {
             this.currentTenantUser = currentTenantUser ?? throw new ArgumentNullException(nameof(currentTenantUser));
             this.tenantUserAuthenticator = tenantUserAuthenticator ?? throw new ArgumentNullException(nameof(tenantUserAuthenticator));
             this.tenantContextAccessor = tenantContextAccessor ?? throw new ArgumentNullException(nameof(tenantContextAccessor));
+            this.permissions = permissions ?? throw new ArgumentNullException(nameof(permissions));
         }
 
         public async Task<Result<TenantMeResponse>> Handle(GetCurrentTenantUserQuery query, CancellationToken cancellationToken)
@@ -43,6 +46,7 @@ namespace CafeHub.Application.Identity.Queries
                 return Unavailable();
             }
 
+            var branchId = currentTenantUser.BranchId;
             return Result.Success(new TenantMeResponse
             {
                 UserId = user.Id,
@@ -51,6 +55,8 @@ namespace CafeHub.Application.Identity.Queries
                 UserKind = user.UserKind,
                 Roles = user.Roles,
                 TenantSlug = tenantContext.Slug,
+                BranchId = branchId,
+                EffectivePermissions = await permissions.ReadAsync(userId.Value, cancellationToken, branchId),
             });
         }
 

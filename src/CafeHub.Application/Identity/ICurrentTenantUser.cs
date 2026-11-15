@@ -11,5 +11,7 @@ namespace CafeHub.Application.Identity
         IReadOnlyCollection<string> Roles { get; }
 
         Guid? BranchId { get; }
+
+        TenantAccountAccess? AccountAccess => null;
     }
 }

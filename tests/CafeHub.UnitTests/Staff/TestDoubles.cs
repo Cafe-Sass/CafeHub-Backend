@@ -15,6 +15,7 @@ namespace CafeHub.UnitTests.Staff
         public List<CreateStaffCall> Created { get; } = new();
         public List<UpdateStaffCall> Updated { get; } = new();
         public List<Guid> GetByIdRequests { get; } = new();
+        public Guid? GetByIdBranch { get; private set; }
         public List<StaffListRequest> ListRequests { get; } = new();
         public List<Guid> DeactivateCalls { get; } = new();
         public List<Guid> ReactivateCalls { get; } = new();
@@ -65,17 +66,19 @@ namespace CafeHub.UnitTests.Staff
             return Task.FromResult(Result.Success(UpdateResult ?? MakeResponse(staffId, fullName, "staff@test.com", phoneNumber, branchId)));
         }
 
-        public Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken)
+        public Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken, Guid? branchId = null)
         {
             GetByIdRequests.Add(staffId);
-            return Task.FromResult(GetByIdResult);
+            GetByIdBranch = branchId;
+            return Task.FromResult(branchId.HasValue && GetByIdResult?.BranchId != branchId ? null : GetByIdResult);
         }
 
         public Task<StaffListPage> ListAsync(StaffListRequest request, CancellationToken cancellationToken)
         {
             ListRequests.Add(request);
-            var items = ListResults.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
-            var totalCount = request.IncludeTotalCount ? (int?)ListResults.Count : null;
+            var scoped = ListResults.Where(item => request.BranchId == null || item.BranchId == request.BranchId).ToArray();
+            var items = scoped.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
+            var totalCount = request.IncludeTotalCount ? (int?)scoped.Length : null;
             return Task.FromResult(new StaffListPage(items, totalCount));
         }
 

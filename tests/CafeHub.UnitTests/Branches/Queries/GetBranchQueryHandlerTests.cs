@@ -4,6 +4,7 @@ using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Branches;
 using CafeHub.Application.Branches.DTOs;
 using CafeHub.Application.Branches.Queries;
+using CafeHub.Application.Identity;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.UnitTests.Branches.Queries
@@ -17,7 +18,19 @@ namespace CafeHub.UnitTests.Branches.Queries
 
         public GetBranchQueryHandlerTests()
         {
-            handler = new GetBranchQueryHandler(store);
+            handler = new GetBranchQueryHandler(store, new FakeTask42Access());
+        }
+
+        [Fact]
+        public async Task DelegatedDetailUsesUniformNotFoundForAnotherBranchWithoutLookingItUp()
+        {
+            var access = new FakeTask42Access { AccountAccess = new TenantAccountAccess(true, null, true) { BranchId = BranchId } };
+            var delegated = new GetBranchQueryHandler(store, access);
+
+            var result = await delegated.Handle(new GetBranchQuery(Guid.NewGuid()), default);
+
+            Assert.Equal(BranchesErrors.NotFound(), result.Error);
+            Assert.Empty(store.GetByIdRequests);
         }
 
         [Fact]
@@ -66,7 +79,7 @@ namespace CafeHub.UnitTests.Branches.Queries
         [Fact]
         public void TheHandler_RequiresTheStore()
         {
-            Assert.Throws<ArgumentNullException>(() => new GetBranchQueryHandler(null!));
+            Assert.Throws<ArgumentNullException>(() => new GetBranchQueryHandler(null!, new FakeTask42Access()));
         }
 
         [Fact]

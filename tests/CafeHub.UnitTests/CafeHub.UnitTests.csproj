@@ -23,4 +23,9 @@
     <ProjectReference Include="..\..\src\CafeHub.WebApi\CafeHub.WebApi.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\src\CafeHub.WebApi\appsettings.json;..\..\src\CafeHub.WebApi\appsettings.template.json"
+          Link="Config\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

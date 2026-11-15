@@ -118,6 +118,8 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ITenantUserAuthenticator, TenantUserAuthenticator>();
             services.AddScoped<TenantAccountReader>();
             services.AddScoped<ITenantAccountReader>(provider => provider.GetRequiredService<TenantAccountReader>());
+            services.AddScoped<ITenantPermissionReader, TenantPermissionReader>();
+            services.AddScoped<CafeHub.Application.Roles.ITenantRoleAdministration, TenantRoleStore>();
             services.AddSingleton(serviceProvider => TenantJwtOptionsBinder.Bind(configuration, serviceProvider.GetRequiredService<JwtOptions>().Audience));
             services.AddSingleton<ITenantAccessTokenIssuer, TenantJwtAccessTokenIssuer>();
             services.AddScoped<ITenantRefreshTokenStore, TenantRefreshTokenStore>();

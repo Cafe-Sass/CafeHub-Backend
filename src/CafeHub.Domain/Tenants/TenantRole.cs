@@ -1,9 +1,9 @@
-using System.Text.RegularExpressions;
-
 namespace CafeHub.Domain.Tenants
 {
     public sealed class TenantRole
     {
+        public const string NormalizedOwnerName = "owner";
+
         private TenantRole()
         {
         }
@@ -23,6 +23,33 @@ namespace CafeHub.Domain.Tenants
         public Guid? CreatedBy { get; private set; }
 
         public Guid? UpdatedBy { get; private set; }
+
+        public DateTimeOffset? DeletedAt { get; private set; }
+
+        public Guid? DeletedBy { get; private set; }
+
+        public bool IsOwnerRole => NormalizedName == NormalizedOwnerName;
+
+        public void Revise(string name, string normalizedName, Guid actorId, DateTimeOffset now)
+        {
+            if (IsOwnerRole || DeletedAt.HasValue || normalizedName == NormalizedOwnerName)
+            {
+                throw new InvalidOperationException("The role cannot be changed.");
+            }
+
+            Name = name;
+            NormalizedName = normalizedName;
+            ConcurrencyStamp = Guid.NewGuid().ToString("N");
+            UpdatedBy = actorId;
+            UpdatedAt = now;
+        }
+
+        public void Retire(Guid actorId, DateTimeOffset now)
+        {
+            Revise(Name, NormalizedName, actorId, now);
+            DeletedAt = now;
+            DeletedBy = actorId;
+        }
 
         public static TenantRole Create(
             Guid id,

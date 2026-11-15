@@ -1,13 +1,10 @@
 using CafeHub.Application.Identity;
-using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.WebApi.Authorization
 {
     public sealed class HttpContextCurrentTenantUser : ICurrentTenantUser
     {
-        private const string BranchIdCacheKey = "CurrentTenantUser_BranchId";
         private readonly IHttpContextAccessor httpContextAccessor;
 
         public HttpContextCurrentTenantUser(IHttpContextAccessor httpContextAccessor)
@@ -41,40 +38,11 @@ namespace CafeHub.WebApi.Authorization
             }
         }
 
-        public Guid? BranchId
-        {
-            get
-            {
-                if (!IsAuthenticated || UserId is null)
-                {
-                    return null;
-                }
+        public Guid? BranchId => AccountAccess?.BranchId;
 
-                var httpContext = httpContextAccessor.HttpContext;
-                if (httpContext is null)
-                {
-                    return null;
-                }
-
-                if (httpContext.Items.TryGetValue(BranchIdCacheKey, out var cached))
-                {
-                    return cached as Guid?;
-                }
-
-                var dbContext = httpContext.RequestServices.GetService<TenantDbContext>();
-                if (dbContext is null)
-                {
-                    return null;
-                }
-
-                var branchId = dbContext.TenantUsers
-                    .Where(u => u.Id == UserId.Value && u.DeletedAt == null)
-                    .Select(u => u.BranchId)
-                    .FirstOrDefault();
-
-                httpContext.Items[BranchIdCacheKey] = branchId;
-                return branchId;
-            }
-        }
+        public TenantAccountAccess? AccountAccess => IsAuthenticated
+            && httpContextAccessor.HttpContext?.Items.TryGetValue(typeof(TenantAccountAccess), out var access) == true
+            ? access as TenantAccountAccess
+            : null;
     }
 }

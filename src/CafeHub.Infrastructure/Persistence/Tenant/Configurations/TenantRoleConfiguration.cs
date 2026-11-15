@@ -26,10 +26,20 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(r => r.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz").IsRequired();
             builder.Property(r => r.CreatedBy).HasColumnName("created_by").HasColumnType("uuid").IsRequired(false);
             builder.Property(r => r.UpdatedBy).HasColumnName("updated_by").HasColumnType("uuid").IsRequired(false);
+            builder.Property(r => r.DeletedAt).HasColumnName("deleted_at").HasColumnType("timestamptz");
+            builder.Property(r => r.DeletedBy).HasColumnName("deleted_by").HasColumnType("uuid");
+            builder.Property<uint>("xmin").IsRowVersion();
 
             builder.HasIndex(r => r.NormalizedName).IsUnique().HasDatabaseName("uq_tenant_roles_normalized_name");
             builder.HasIndex(r => r.CreatedBy).HasDatabaseName("ix_tenant_roles_created_by");
             builder.HasIndex(r => r.UpdatedBy).HasDatabaseName("ix_tenant_roles_updated_by");
+            builder.HasIndex(r => r.DeletedBy).HasDatabaseName("ix_tenant_roles_deleted_by");
+
+            builder.HasOne<TenantUser>()
+                .WithMany()
+                .HasForeignKey(r => r.DeletedBy)
+                .HasConstraintName("fk_tenant_roles_deleted_by")
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne<TenantUser>()
                 .WithMany()

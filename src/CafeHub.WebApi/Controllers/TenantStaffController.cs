@@ -1,5 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Identity;
 using CafeHub.Application.Pagination;
+using CafeHub.Application.Roles;
 using CafeHub.Application.Staff.Commands;
 using CafeHub.Application.Staff.DTOs;
 using CafeHub.Application.Staff.Queries;
@@ -47,7 +49,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.StaffRead)]
         public async Task<ActionResult<OffsetPage<StaffResponse>>> List(
             [FromQuery] ListStaffQuery query,
             CancellationToken cancellationToken)
@@ -63,7 +65,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet("{staffId:guid}")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.StaffRead)]
         public async Task<ActionResult<StaffResponse>> GetById(
             Guid staffId,
             CancellationToken cancellationToken)
@@ -79,7 +81,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPut("{staffId:guid}")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.StaffManage)]
         public async Task<ActionResult<StaffResponse>> Update(
             Guid staffId,
             [FromBody] UpdateStaffRequest request,
@@ -103,7 +105,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost("{staffId:guid}/deactivate")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.StaffManage)]
         public async Task<ActionResult> Deactivate(
             Guid staffId,
             CancellationToken cancellationToken)
@@ -119,7 +121,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPost("{staffId:guid}/reactivate")]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.StaffManage)]
         public async Task<ActionResult> Reactivate(
             Guid staffId,
             CancellationToken cancellationToken)
@@ -151,6 +153,30 @@ namespace CafeHub.WebApi.Controllers
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPut("{staffId:guid}/roles")]
+        [TenantAuthorize(TenantPermissions.RolesManage)]
+        public async Task<ActionResult> SetRoles(Guid staffId, ReplaceStaffRolesRequest request, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ReplaceStaffRoles(staffId, request.RoleIds), cancellationToken);
+            return result.IsSuccess ? NoContent() : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPut("{staffId:guid}/permissions")]
+        [TenantAuthorize(TenantPermissions.RolesManage)]
+        public async Task<ActionResult> SetPermissions(Guid staffId, ReplaceStaffPermissionsRequest request, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ReplaceStaffPermissions(staffId, request.PermissionCodes), cancellationToken);
+            return result.IsSuccess ? NoContent() : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("{staffId:guid}/effective-permissions")]
+        [TenantAuthorize(TenantPermissions.RolesManage)]
+        public async Task<ActionResult<IReadOnlyList<string>>> EffectivePermissions(Guid staffId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetStaffEffectivePermissions(staffId), cancellationToken);
+            return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
     }
 }

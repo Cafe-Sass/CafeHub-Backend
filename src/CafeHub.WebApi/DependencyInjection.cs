@@ -179,33 +179,37 @@ namespace CafeHub.WebApi
                 throw new ArgumentNullException(nameof(services));
             }
 
-            services.AddAuthorizationBuilder()
+            var authorization = services.AddAuthorizationBuilder();
+            authorization
                 .AddPolicy(TenantPolicies.TenantUser, policy =>
                 {
                     policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
                     policy.RequireAuthenticatedUser();
                     policy.AddRequirements(new TenantBoundRequirement());
                 })
-                .AddPolicy(TenantPolicies.TenantBranchReader, policy =>
-                {
-                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
-                    policy.RequireAuthenticatedUser();
-                    policy.AddRequirements(new TenantBoundRequirement());
-                    policy.RequireAssertion(context => context.Resource is Microsoft.AspNetCore.Http.HttpContext httpContext
-                        && httpContext.Items[typeof(TenantAccountAccess)] is TenantAccountAccess account
-                        && (!account.IsStaff || account.HasActiveBranch));
-                })
                 .AddPolicy(TenantPolicies.TenantOwner, policy =>
                 {
                     policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
                     policy.RequireAuthenticatedUser();
-                    policy.RequireRole(TenantRoles.Owner);
                     policy.AddRequirements(new TenantBoundRequirement());
+                    policy.RequireAssertion(context => context.Resource is HttpContext httpContext
+                        && httpContext.Items[typeof(TenantAccountAccess)] is TenantAccountAccess { IsStaff: false });
                 });
+
+            foreach (var permission in TenantPermissions.All)
+            {
+                authorization.AddPolicy(permission, policy =>
+                {
+                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(new TenantBoundRequirement(), new TenantPermissionRequirement(permission, TenantPermissions.IsOwnerOnly(permission)));
+                });
+            }
 
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentTenantUser, HttpContextCurrentTenantUser>();
             services.AddScoped<IAuthorizationHandler, TenantBoundAuthorizationHandler>();
+            services.AddScoped<IAuthorizationHandler, TenantPermissionAuthorizationHandler>();
 
             return services;
         }

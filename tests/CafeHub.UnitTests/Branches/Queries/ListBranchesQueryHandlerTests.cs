@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Branches.DTOs;
 using CafeHub.Application.Branches.Queries;
+using CafeHub.Application.Identity;
 using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 
@@ -14,7 +15,20 @@ namespace CafeHub.UnitTests.Branches.Queries
 
         public ListBranchesQueryHandlerTests()
         {
-            handler = new ListBranchesQueryHandler(store, paginationOptions);
+            handler = new ListBranchesQueryHandler(store, paginationOptions, new FakeTask42Access());
+        }
+
+        [Fact]
+        public async Task DelegatedBranchListPassesTheAssignedBranchIntoThePagedQuery()
+        {
+            var ownBranch = Guid.NewGuid();
+            var access = new FakeTask42Access { AccountAccess = new TenantAccountAccess(true, null, true) { BranchId = ownBranch } };
+            var delegated = new ListBranchesQueryHandler(store, paginationOptions, access);
+
+            var result = await delegated.Handle(new ListBranchesQuery { IncludeTotalCount = true }, default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(ownBranch, Assert.Single(store.ListRequests).BranchId);
         }
 
         [Fact]
@@ -132,8 +146,8 @@ namespace CafeHub.UnitTests.Branches.Queries
         [Fact]
         public void TheHandler_RequiresEveryDependency()
         {
-            Assert.Throws<ArgumentNullException>(() => new ListBranchesQueryHandler(null!, paginationOptions));
-            Assert.Throws<ArgumentNullException>(() => new ListBranchesQueryHandler(store, null!));
+            Assert.Throws<ArgumentNullException>(() => new ListBranchesQueryHandler(null!, paginationOptions, new FakeTask42Access()));
+            Assert.Throws<ArgumentNullException>(() => new ListBranchesQueryHandler(store, null!, new FakeTask42Access()));
         }
 
         [Fact]

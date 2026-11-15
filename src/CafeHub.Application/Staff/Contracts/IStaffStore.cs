@@ -23,7 +23,7 @@ namespace CafeHub.Application.Staff.Contracts
             Guid actorUserId,
             CancellationToken cancellationToken);
 
-        Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken);
+        Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken, Guid? branchId = null);
 
         Task<StaffListPage> ListAsync(StaffListRequest request, CancellationToken cancellationToken);
 

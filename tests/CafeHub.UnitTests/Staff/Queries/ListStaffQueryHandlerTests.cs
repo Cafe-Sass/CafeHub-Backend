@@ -1,4 +1,6 @@
+using CafeHub.Application.Identity;
 using CafeHub.Application.Pagination;
+using CafeHub.Application.Staff;
 using CafeHub.Application.Staff.DTOs;
 using CafeHub.Application.Staff.Queries;
 
@@ -14,7 +16,26 @@ namespace CafeHub.UnitTests.Staff.Queries
 
         public ListStaffQueryHandlerTests()
         {
-            handler = new ListStaffQueryHandler(store, paginationOptions);
+            handler = new ListStaffQueryHandler(store, paginationOptions, new FakeTask42Access());
+        }
+
+        [Fact]
+        public async Task DelegatedListScopesItemsAndCountAndRejectsAnExplicitForeignBranch()
+        {
+            var foreign = Guid.NewGuid();
+            var access = new FakeTask42Access { AccountAccess = new TenantAccountAccess(true, null, true) { BranchId = BranchId } };
+            var delegated = new ListStaffQueryHandler(store, paginationOptions, access);
+            store.ListResults.Add(FakeStaffStore.MakeResponse(Guid.NewGuid(), "Other Staff", "other@example.test", null, foreign));
+            store.ListResults.Add(FakeStaffStore.MakeResponse(Guid.NewGuid(), "Local Staff", "local@example.test", null, BranchId));
+
+            var result = await delegated.Handle(new ListStaffQuery { IncludeTotalCount = true, PageSize = 1 }, default);
+            var denied = await delegated.Handle(new ListStaffQuery { BranchId = foreign }, default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(BranchId, Assert.Single(result.Value.Items).BranchId);
+            Assert.Equal(1, result.Value.TotalCount);
+            Assert.Equal(StaffErrors.NotFound(), denied.Error);
+            Assert.Equal(BranchId, Assert.Single(store.ListRequests).BranchId);
         }
 
         [Fact]
@@ -83,8 +104,8 @@ namespace CafeHub.UnitTests.Staff.Queries
         [Fact]
         public void TheHandler_RequiresEveryDependency()
         {
-            Assert.Throws<ArgumentNullException>(() => new ListStaffQueryHandler(null!, paginationOptions));
-            Assert.Throws<ArgumentNullException>(() => new ListStaffQueryHandler(store, null!));
+            Assert.Throws<ArgumentNullException>(() => new ListStaffQueryHandler(null!, paginationOptions, new FakeTask42Access()));
+            Assert.Throws<ArgumentNullException>(() => new ListStaffQueryHandler(store, null!, new FakeTask42Access()));
         }
     }
 }

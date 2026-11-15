@@ -345,6 +345,14 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
@@ -363,11 +371,20 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_tenant_roles");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_tenant_roles_created_by");
+
+                    b.HasIndex("DeletedBy")
+                        .HasDatabaseName("ix_tenant_roles_deleted_by");
 
                     b.HasIndex("NormalizedName")
                         .IsUnique()
@@ -413,6 +430,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasName("pk_tenant_role_claims");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("RoleId", "ClaimValue")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_role_claims_permission")
+                        .HasFilter("claim_type = 'cafehub.permission' AND claim_value IS NOT NULL");
 
                     b.ToTable("tenant_role_claims", (string)null);
                 });
@@ -617,6 +639,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                     b.HasIndex("TenantUserId");
 
+                    b.HasIndex("TenantUserId", "ClaimValue")
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_user_claims_permission")
+                        .HasFilter("claim_type = 'cafehub.permission' AND claim_value IS NOT NULL");
+
                     b.ToTable("tenant_user_claims", (string)null);
                 });
 
@@ -712,6 +739,12 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_tenant_roles_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_tenant_roles_deleted_by");
 
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
                         .WithMany()
