@@ -51,6 +51,13 @@ namespace CafeHub.Infrastructure.Audit
                     "Status",
                     "BranchId",
                 },
+                ["branch_tables"] = new(StringComparer.Ordinal)
+                {
+                    "Number",
+                    "Label",
+                    "Status",
+                    "BranchId",
+                },
             };
 
         private static readonly HashSet<string> DeniedNames = new(StringComparer.Ordinal)

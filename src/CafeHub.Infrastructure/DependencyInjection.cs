@@ -132,6 +132,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ICafeSettingsWriter, CafeSettingsWriter>();
             services.AddScoped<IBranchStore, BranchStore>();
             services.AddScoped<IStationStore, StationStore>();
+            services.AddScoped<ITableStore, TableStore>();
             services.AddScoped<IStaffStore, StaffStore>();
             services.AddScoped<ITenantRefreshTokenService, TenantRefreshTokenService>();
             services.AddScoped<IAdminAccountReader, AdminAccountReader>();

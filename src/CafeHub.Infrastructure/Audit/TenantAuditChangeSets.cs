@@ -135,5 +135,26 @@ namespace CafeHub.Infrastructure.Audit
                     newStatus.ToString()),
             });
         }
+
+        public static TenantAuditChanges TableCreate(BranchTable table)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Number), null, table.Number.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Label), null, table.Label),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Status), null, table.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.BranchId), null, table.BranchId.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges TableUpdate(BranchTable table, string? label)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Label), table.Label, label),
+            });
+        }
     }
 }

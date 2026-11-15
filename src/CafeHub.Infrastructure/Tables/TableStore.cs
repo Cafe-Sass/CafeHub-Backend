@@ -1,0 +1,241 @@
+using System.Globalization;
+using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Audit;
+using CafeHub.Application.Tables;
+using CafeHub.Application.Tables.Contracts;
+using CafeHub.Application.Tables.DTOs;
+using CafeHub.Domain.Tenants;
+using CafeHub.Infrastructure.Audit;
+using CafeHub.Infrastructure.Persistence.Tenant;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+
+namespace CafeHub.Infrastructure.Tables
+{
+    internal sealed class TableStore(
+        TenantDbContext context,
+        ITenantAuditWriter auditWriter,
+        ITableQrCodeGenerator qrCodeGenerator,
+        TimeProvider timeProvider) : ITableStore
+    {
+        private const string TargetType = "branch_tables";
+        private const string ActiveNumberIndex = "uq_branch_tables_branch_active_number";
+        private const string QrCodeIndex = "uq_branch_tables_qr_code";
+
+        public async Task<Result<TableResponse>> AddAsync(
+            Guid branchId,
+            string? label,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            await context.LockBranchesAsync(cancellationToken, branchId);
+            var branch = await context.Branches
+                .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
+            if (branch is null)
+            {
+                return Result.Failure<TableResponse>(TablesErrors.BranchNotFound());
+            }
+
+            if (branch.LifecycleStatus != BranchLifecycleStatus.Active)
+            {
+                return Result.Failure<TableResponse>(TablesErrors.BranchNotActive());
+            }
+
+            var maxNumber = await MaxActiveNumberAsync(branchId, cancellationToken);
+            var number = maxNumber is null ? BranchTable.MinimumNumber : maxNumber.Value + 1;
+            if (number > BranchTable.MaximumNumber)
+            {
+                return Result.Failure<TableResponse>(TablesErrors.NumberRangeExceeded());
+            }
+
+            var qrCode = qrCodeGenerator.Generate();
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                var table = BranchTable.Create(
+                    Guid.CreateVersion7(),
+                    branchId,
+                    number,
+                    label,
+                    qrCode,
+                    timeProvider.GetUtcNow(),
+                    actorUserId);
+
+                context.BranchTables.Add(table);
+
+                var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+                {
+                    Action = "tables.created.succeeded",
+                    TargetType = TargetType,
+                    TargetId = table.Id,
+                    ActorUserId = actorUserId,
+                    Changes = TenantAuditChangeSets.TableCreate(table),
+                }, cancellationToken);
+                if (auditResult.IsFailure)
+                {
+                    return Result.Failure<TableResponse>(auditResult.Error!);
+                }
+
+                var saveError = await TrySaveAsync(cancellationToken);
+                if (saveError is null)
+                {
+                    return Result.Success(TableResponse.From(
+                        table,
+                        ConcurrencyToken(table),
+                        table.QrCode));
+                }
+
+                if (attempt == 0 && saveError.Code == TablesErrors.QrCodeConflictCode)
+                {
+                    context.Entry(table).State = EntityState.Detached;
+                    qrCode = qrCodeGenerator.Generate();
+                    continue;
+                }
+
+                return Result.Failure<TableResponse>(saveError);
+            }
+
+            return Result.Failure<TableResponse>(TablesErrors.QrCodeConflict());
+        }
+
+        public async Task<Result<TableResponse>> UpdateLabelAsync(
+            Guid tableId,
+            Guid? scopeBranchId,
+            string? label,
+            string concurrencyToken,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            var table = await LoadInScopeAsync(tableId, scopeBranchId, cancellationToken);
+            if (table is null)
+            {
+                return Result.Failure<TableResponse>(TablesErrors.NotFound());
+            }
+
+            if (!uint.TryParse(concurrencyToken, out var token))
+            {
+                return Result.Failure<TableResponse>(TablesErrors.InvalidConcurrencyToken());
+            }
+
+            context.Entry(table).Property<uint>("xmin").OriginalValue = token;
+
+            await context.LockBranchesAsync(cancellationToken, table.BranchId);
+            var version = context.Entry(table).Property<uint>("xmin");
+            if (version.CurrentValue != token)
+            {
+                return Result.Failure<TableResponse>(TablesErrors.ConcurrencyConflict());
+            }
+
+            var trimmedLabel = label?.Trim();
+            var changes = TenantAuditChangeSets.TableUpdate(table, trimmedLabel);
+            table.UpdateLabel(trimmedLabel, timeProvider.GetUtcNow(), actorUserId);
+
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "tables.updated.succeeded",
+                TargetType = TargetType,
+                TargetId = table.Id,
+                ActorUserId = actorUserId,
+                Changes = changes,
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure<TableResponse>(auditResult.Error!);
+            }
+
+            var saveError = await TrySaveAsync(cancellationToken);
+            if (saveError is not null)
+            {
+                return Result.Failure<TableResponse>(saveError);
+            }
+
+            return Result.Success(TableResponse.From(table, ConcurrencyToken(table), table.QrCode));
+        }
+
+        public Task<Result<TableBulkResult>> AddBulkAsync(
+            Guid branchId,
+            int count,
+            Guid actorUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Failure<TableBulkResult>(Error.Failure(
+                "Tables.NotImplemented",
+                "Bulk add is not implemented yet.")));
+
+        public Task<Result<TableResponse>> DeactivateAsync(
+            Guid tableId,
+            Guid? scopeBranchId,
+            string concurrencyToken,
+            Guid actorUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Failure<TableResponse>(Error.Failure(
+                "Tables.NotImplemented",
+                "Deactivate is not implemented yet.")));
+
+        public Task<Result<TableResponse>> ReactivateAsync(
+            Guid tableId,
+            Guid? scopeBranchId,
+            string concurrencyToken,
+            Guid actorUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Failure<TableResponse>(Error.Failure(
+                "Tables.NotImplemented",
+                "Reactivate is not implemented yet.")));
+
+        public Task<Result<TableBulkResult>> DeactivateHighestAsync(
+            Guid branchId,
+            int count,
+            Guid actorUserId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Failure<TableBulkResult>(Error.Failure(
+                "Tables.NotImplemented",
+                "Bulk deactivate is not implemented yet.")));
+
+        public Task<TableResponse?> GetByIdAsync(
+            Guid tableId,
+            Guid? scopeBranchId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<TableResponse?>(null);
+
+        public Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
+            Task.FromResult(0);
+
+        public Task<int?> MaxActiveNumberAsync(Guid branchId, CancellationToken cancellationToken) =>
+            Task.FromResult<int?>(null);
+
+        private async Task<BranchTable?> LoadInScopeAsync(
+            Guid tableId,
+            Guid? scopeBranchId,
+            CancellationToken cancellationToken) =>
+            await context.BranchTables.FirstOrDefaultAsync(
+                table => table.Id == tableId
+                    && (scopeBranchId == null || table.BranchId == scopeBranchId),
+                cancellationToken);
+
+        private async Task<Error?> TrySaveAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                return null;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return TablesErrors.ConcurrencyConflict();
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+            } violation)
+            {
+                return violation.ConstraintName switch
+                {
+                    ActiveNumberIndex => TablesErrors.NumberConflict(),
+                    QrCodeIndex => TablesErrors.QrCodeConflict(),
+                    _ => null,
+                };
+            }
+        }
+
+        private string ConcurrencyToken(BranchTable table) =>
+            context.Entry(table).Property<uint>("xmin").CurrentValue.ToString(CultureInfo.InvariantCulture);
+    }
+}
