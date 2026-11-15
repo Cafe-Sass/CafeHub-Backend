@@ -12,6 +12,7 @@ using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Tables.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Application.Upgrades;
 using CafeHub.Application.Upgrades.Contracts;
@@ -34,6 +35,7 @@ using CafeHub.Infrastructure.Persistence.Tenant;
 using CafeHub.Infrastructure.Provisioning;
 using CafeHub.Infrastructure.Staff;
 using CafeHub.Infrastructure.Stations;
+using CafeHub.Infrastructure.Tables;
 using CafeHub.Infrastructure.Tenancy;
 using CafeHub.Infrastructure.Upgrades;
 using Microsoft.AspNetCore.Identity;
@@ -83,6 +85,7 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(_ => RefreshTokenOptionsBinder.Bind(configuration));
             services.AddSingleton<ITokenHasher, TokenHasher>();
             services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
+            services.AddSingleton<ITableQrCodeGenerator, TableQrCodeGenerator>();
             services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
             services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 

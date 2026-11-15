@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 9 tables after adding `refresh_tokens` for owner and staff authentication sessions in Story CFMD-323; the baseline 8-table scope did not include authentication token persistence.
+The Tenant model contains 11 tables after adding `branch_tables` for cafe table numbering and QR codes in Story CFMD-387; earlier stories added `stations` and `refresh_tokens` for owner and staff authentication sessions, and the baseline 8-table scope included neither.
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. `CFMD-74` consumes this ERD for entity classes and migrations; no entity, migration, or DbContext change is made in this story.
 
@@ -45,6 +45,20 @@ erDiagram
         text name
         text lifecycle_status
     }
+    stations {
+        uuid id PK
+        uuid branch_id FK
+        text name
+        text status
+    }
+    branch_tables {
+        uuid id PK
+        uuid branch_id FK
+        integer number
+        text label
+        text qr_code
+        text status
+    }
     cafe_settings {
         uuid id PK
         text cafe_name
@@ -79,15 +93,17 @@ erDiagram
     tenant_users |o--o{ tenant_audit_records : "actor"
     tenant_users ||--o{ refresh_tokens : "sessions"
     branches ||--o{ tenant_users : "staff branch"
+    branches ||--o{ stations : "stations"
+    branches ||--o{ branch_tables : "tables"
 ```
 
-**Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one. `branches` draws no relationship line because all of its current foreign keys are audit actor columns, which the note above omits.
+**Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
 
 ## Tenant scoping and cross-database references
 
 - Every table belongs to exactly one cafe: the connection itself establishes the tenant boundary (one Tenant DB per cafe, PRD section 9 rule 2), so **no tenant identifier column exists anywhere in this design** (`architecture/database-schema-decisions.md`); tenant-scoped work reaches the database only through the validated, fail-closed tenant context (FR-PLT-002, PRD section 10.2).
 - No foreign key may cross to the Master database or any other tenant database (conventions): platform-side knowledge — the tenant's slug, subscription and plan versions, entitlement values, and lifecycle decisions — reaches the Tenant Application only through the provisioning path and validated platform metadata, never as a schema FK. Entitlement limits (FR-PLT-004) are enforced by the application from that delivered configuration; nothing in these tables encodes the retired 3-branch/15-table quotas (PRD section 9 rule 3). `What provisioning seeds into a new Tenant database` below documents the initial delivery.
-- Customer-facing URL and QR identifier decisions (including the `t/{slug}` prefix and the QR resolution source) belong to the later stories that introduce those flows; this ERD imposes nothing about them.
+- Customer-facing URL and QR identifier decisions (including the `t/{slug}` prefix and the QR resolution source) belong to the later stories that introduce those flows; this ERD models only the opaque `branch_tables.qr_code` value, never a URL or a resolution scheme.
 - All references a tenant row holds stay inside this database, so every FK in this design is resolvable locally and never orphaned by another database.
 
 ## Identity model documentation
@@ -188,6 +204,20 @@ Purpose: preparation stations within one branch (FR-IAM-002) — named, ordered 
 - The PostgreSQL system column `xmin` is mapped as a row version for optimistic concurrency on station updates.
 - `uq_stations_branch_active_name` — unique expression index on `(branch_id, lower(name))` WHERE `status = 'Active'`; a name is unique among a branch's active stations, case-insensitively, while an inactive duplicate stays allowed. The expression index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
 
+### branch_tables
+
+Purpose: the numbered physical tables of one branch (FR-CAF-003), each carrying from creation a random QR code that later resolves the customer table journey (the resolution design belongs to a later story). Tables are managed data and are never physically deleted; deactivation keeps the row and frees its number.
+
+- `id uuid NOT NULL` — `pk_branch_tables`.
+- `branch_id uuid NOT NULL` — `fk_branch_tables_branch_id` foreign key to `branches.id` (ON DELETE RESTRICT); `ix_branch_tables_branch_id` supports the per-branch list.
+- `number integer NOT NULL` (CHECK `number >= 1 AND number <= 9999`, `ck_branch_tables_number_range`) — the table number shown to the cafe; the application trims and validates nothing else, an integer is the whole value.
+- `label text NULL` (CHECK `label IS NULL OR length(label) >= 1 AND length(label) <= 64`, `ck_branch_tables_label_length`) — an optional human label (for example "Terrace 3"); application validation trims the value and stores an empty result as NULL.
+- `qr_code text NOT NULL` (CHECK `length(qr_code) = 22 AND qr_code ~ '^[A-Za-z0-9_-]{22}$'`, `ck_branch_tables_qr_code_format`) — 22 URL-safe base64url characters (about 128 bits) produced from `RandomNumberGenerator` by `ITableQrCodeGenerator`, never derived from the number or the branch id. `uq_branch_tables_qr_code` makes the code unique across the whole Tenant database.
+- `status text NOT NULL` — `ck_branch_tables_status` over `('Active', 'Inactive')`; deactivation changes the status instead of deleting the row. New tables are created Active.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
+- The PostgreSQL system column `xmin` is mapped as a row version for optimistic concurrency on table updates.
+- `uq_branch_tables_branch_active_number` — unique partial index on `(branch_id, number)` WHERE `status = 'Active'`; a number is unique among a branch's active tables, while an inactive table frees its number. Reactivation fails when an active table already uses the number. The partial index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
+
 ### cafe_settings
 
 Purpose: the cafe's profile and branding configuration (FR-CAF-001) and the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition). A singleton row: created once by provisioning (see the seeding section above) with no acting user.
@@ -229,7 +259,7 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
-- Cafe tables and QR codes — physical tables, their QR references and reprint flows, and the customer table QR journeys (FR-CAF-003, FR-CAF-004).
+- Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Menu management — categories, products, sizes, add-ons, per-branch availability, OCR-assisted import, and promotional banners (FR-MENU-001 through FR-MENU-006).
 - Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
