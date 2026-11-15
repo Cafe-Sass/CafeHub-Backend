@@ -1,3 +1,4 @@
+using System.Globalization;
 using CafeHub.Application.Audit;
 using CafeHub.Domain.Tenants;
 
@@ -92,6 +93,46 @@ namespace CafeHub.Infrastructure.Audit
             return TenantAuditChanges.Update(new[]
             {
                 new TenantAuditChanges.FieldChange("IsActive", currentIsActive.ToString(), newIsActive.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges StationCreate(Station station)
+        {
+            ArgumentNullException.ThrowIfNull(station);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(Station.Name), null, station.Name),
+                new TenantAuditChanges.FieldChange(
+                    nameof(Station.SortOrder),
+                    null,
+                    station.SortOrder.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(nameof(Station.Status), null, station.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Station.BranchId), null, station.BranchId.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges StationUpdate(Station station, string name, int sortOrder)
+        {
+            ArgumentNullException.ThrowIfNull(station);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(Station.Name), station.Name, name),
+                new TenantAuditChanges.FieldChange(
+                    nameof(Station.SortOrder),
+                    station.SortOrder.ToString(CultureInfo.InvariantCulture),
+                    sortOrder.ToString(CultureInfo.InvariantCulture)),
+            });
+        }
+
+        public static TenantAuditChanges StationLifecycleStatus(Station station, StationStatus newStatus)
+        {
+            ArgumentNullException.ThrowIfNull(station);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(Station.Status),
+                    station.Status.ToString(),
+                    newStatus.ToString()),
             });
         }
     }
