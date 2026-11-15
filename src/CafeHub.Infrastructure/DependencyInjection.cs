@@ -89,7 +89,6 @@ namespace CafeHub.Infrastructure
             services.AddSingleton(_ => PlatformSeedOptionsBinder.Bind(configuration));
             services.Configure<IdentityOptions>(options =>
             {
-                PlatformAdminPasswordPolicy.Apply(options);
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = identityLockoutOptions.MaxFailedAccessAttempts;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(identityLockoutOptions.LockoutMinutes);
@@ -97,6 +96,8 @@ namespace CafeHub.Infrastructure
 
             services.AddIdentityCore<PlatformAdminUser>()
                 .AddRoles<PlatformAdminRole>();
+            services.RemoveAll<IPasswordValidator<PlatformAdminUser>>();
+            services.AddScoped<IPasswordValidator<PlatformAdminUser>, PlatformAdminPasswordPolicy<PlatformAdminUser>>();
             services.AddScoped<IUserStore<PlatformAdminUser>, PlatformAdminUserStore>();
             services.AddScoped<IRoleStore<PlatformAdminRole>>(provider =>
                 new RoleStore<
@@ -112,7 +113,11 @@ namespace CafeHub.Infrastructure
                 .AddRoles<CafeHub.Domain.Tenants.TenantRole>()
                 .AddUserStore<TenantUserStore>()
                 .AddRoleStore<TenantRoleStore>();
+            services.RemoveAll<IPasswordValidator<CafeHub.Domain.Tenants.TenantUser>>();
+            services.AddScoped<IPasswordValidator<CafeHub.Domain.Tenants.TenantUser>, PlatformAdminPasswordPolicy<CafeHub.Domain.Tenants.TenantUser>>();
             services.AddScoped<ITenantUserAuthenticator, TenantUserAuthenticator>();
+            services.AddScoped<TenantAccountReader>();
+            services.AddScoped<ITenantAccountReader>(provider => provider.GetRequiredService<TenantAccountReader>());
             services.AddSingleton(serviceProvider => TenantJwtOptionsBinder.Bind(configuration, serviceProvider.GetRequiredService<JwtOptions>().Audience));
             services.AddSingleton<ITenantAccessTokenIssuer, TenantJwtAccessTokenIssuer>();
             services.AddScoped<ITenantRefreshTokenStore, TenantRefreshTokenStore>();

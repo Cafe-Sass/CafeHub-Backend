@@ -552,7 +552,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasDatabaseName("ix_tenant_users_deleted_by");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("ix_tenant_users_normalized_email");
+                        .IsUnique()
+                        .HasDatabaseName("uq_tenant_users_normalized_email")
+                        .HasFilter("normalized_email IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()

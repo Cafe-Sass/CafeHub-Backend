@@ -35,6 +35,11 @@ namespace CafeHub.Infrastructure.Authentication
                 new("tid", request.TenantId.ToString()),
                 new("token_kind", "tenant"),
             };
+            if (request.StaffSessionVersion is { } version)
+            {
+                claims.Add(new Claim(TenantSessionVersion.Claim, version));
+            }
+
             claims.AddRange(request.Roles.Select(role => new Claim("role", role)));
             var token = handler.CreateToken(new SecurityTokenDescriptor
             {

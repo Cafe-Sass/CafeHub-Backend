@@ -1,4 +1,5 @@
 using CafeHub.Application.Tenancy;
+using CafeHub.Application.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ namespace CafeHub.WebApi.Authentication
         private const string NoTenantContextCategory = "no_tenant_context";
         private static readonly object TenantUnavailableItemKey = new();
 
-        public override Task TokenValidated(TokenValidatedContext context)
+        public override async Task TokenValidated(TokenValidatedContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
             var logger = context.HttpContext.RequestServices.GetService<ILogger<TenantJwtBearerEvents>>();
@@ -20,14 +21,14 @@ namespace CafeHub.WebApi.Authentication
             if (principal?.FindFirst("token_kind")?.Value != "tenant")
             {
                 Reject(context, logger, TenantKindCategory);
-                return Task.CompletedTask;
+                return;
             }
 
             var tenantClaim = principal.FindFirst("tid")?.Value;
             if (!Guid.TryParse(tenantClaim, out var tokenTenantId))
             {
                 Reject(context, logger, TenantMismatchCategory);
-                return Task.CompletedTask;
+                return;
             }
 
             try
@@ -36,21 +37,37 @@ namespace CafeHub.WebApi.Authentication
                 if (!tenantContext.IsActive)
                 {
                     Reject(context, logger, NoTenantContextCategory);
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (tokenTenantId != tenantContext.TenantId)
                 {
                     context.HttpContext.Items[TenantUnavailableItemKey] = true;
                     Reject(context, logger, TenantMismatchCategory);
+                    return;
                 }
+
+                if (!Guid.TryParse(principal.FindFirst("sub")?.Value, out var userId))
+                {
+                    Reject(context, logger, "account");
+                    return;
+                }
+
+                var reader = context.HttpContext.RequestServices.GetRequiredService<ITenantAccountReader>();
+                var account = await reader.FindActiveAsync(userId, context.HttpContext.RequestAborted);
+                if (account is null || (account.IsStaff &&
+                    !string.Equals(account.SessionVersion, principal.FindFirst(TenantSessionVersion.Claim)?.Value, StringComparison.Ordinal)))
+                {
+                    Reject(context, logger, "account");
+                    return;
+                }
+
+                context.HttpContext.Items[typeof(TenantAccountAccess)] = account;
             }
             catch (TenantIsolationException)
             {
                 Reject(context, logger, NoTenantContextCategory);
             }
-
-            return Task.CompletedTask;
         }
 
         public override async Task Challenge(JwtBearerChallengeContext context)

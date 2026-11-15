@@ -227,7 +227,7 @@ namespace CafeHub.UnitTests
         private sealed class StubTenantRefreshTokenService : ITenantRefreshTokenService
         {
             public List<Guid> UserIds { get; } = new();
-            public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken) { UserIds.Add(userId); return Task.FromResult(Result.Success(new IssuedTenantRefreshToken { RawToken = "refresh", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), FamilyId = Guid.NewGuid() })); }
+            public Task<Result<IssuedTenantRefreshToken>> IssueAsync(Guid userId, CancellationToken cancellationToken, string? expectedSessionVersion = null) { UserIds.Add(userId); return Task.FromResult(Result.Success(new IssuedTenantRefreshToken { RawToken = "refresh", ExpiresAt = DateTimeOffset.UtcNow.AddDays(7), FamilyId = Guid.NewGuid() })); }
             public Task<Result<RotatedTenantRefreshToken>> RotateAsync(string rawToken, CancellationToken cancellationToken) => Task.FromResult(Result.Failure<RotatedTenantRefreshToken>(AuthErrors.InvalidRefreshToken()));
             public Task<Result> RevokeFamilyAsync(string rawToken, string reason, CancellationToken cancellationToken) => Task.FromResult(Result.Failure(AuthErrors.InvalidRefreshToken()));
         }
@@ -261,6 +261,12 @@ namespace CafeHub.UnitTests
         {
             public TenantRefreshToken? Token { get; private set; }
             public Task<TenantRefreshToken?> FindByTokenHashAsync(string tokenHash, CancellationToken cancellationToken) => Task.FromResult(Token is not null && Token.TokenHash == tokenHash ? Token : null);
+            public Task LockUserAsync(Guid userId, CancellationToken cancellationToken) => Task.CompletedTask;
+            public Task<TenantAccountAccess?> FindActiveAccountAsync(Guid userId, CancellationToken cancellationToken) =>
+                Task.FromResult<TenantAccountAccess?>(new(false, null, false));
+            public Task<Guid?> FindUserIdByTokenHashAsync(string tokenHash, CancellationToken cancellationToken) =>
+                Task.FromResult(Token?.TokenHash == tokenHash ? Token.UserId : (Guid?)null);
+
             public Task<IReadOnlyList<TenantRefreshToken>> FindFamilyAsync(Guid familyId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TenantRefreshToken>>(Token is not null && Token.FamilyId == familyId ? new[] { Token } : Array.Empty<TenantRefreshToken>());
             public void Add(TenantRefreshToken token) => Token = token;
             public void ClearTracking() { }

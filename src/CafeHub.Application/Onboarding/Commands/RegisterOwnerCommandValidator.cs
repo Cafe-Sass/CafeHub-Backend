@@ -1,12 +1,11 @@
 using System.Text.RegularExpressions;
+using CafeHub.Application.Identity;
 using FluentValidation;
 
 namespace CafeHub.Application.Onboarding.Commands
 {
     public sealed class RegisterOwnerCommandValidator : AbstractValidator<RegisterOwnerCommand>
     {
-        public const int MinimumPasswordLength = 12;
-        public const int MaximumPasswordLength = 128;
         public const int MaximumEmailLength = 254;
         public const int MaximumNameLength = 256;
         public const int MaximumPhoneLength = 64;
@@ -38,8 +37,8 @@ namespace CafeHub.Application.Onboarding.Commands
 
             RuleFor(command => command.Password)
                 .NotEmpty()
-                .MinimumLength(MinimumPasswordLength)
-                .MaximumLength(MaximumPasswordLength);
+                .Must(NewPasswordPolicy.IsValid)
+                .WithMessage(NewPasswordPolicy.Requirements);
 
             RuleFor(command => command.Slug)
                 .NotEmpty();

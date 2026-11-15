@@ -29,10 +29,9 @@ namespace CafeHub.UnitTests
             userStore ??= new FakePlatformAdminUserStore();
             roleStore ??= new FakePlatformAdminRoleStore();
             var identityOptions = new IdentityOptions();
-            PlatformAdminPasswordPolicy.Apply(identityOptions);
             var passwordValidators = new IPasswordValidator<PlatformAdminUser>[]
             {
-                new PasswordValidator<PlatformAdminUser>(),
+                new PlatformAdminPasswordPolicy<PlatformAdminUser>(),
             };
             var userManager = new UserManager<PlatformAdminUser>(
                 userStore,

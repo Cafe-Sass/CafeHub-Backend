@@ -186,6 +186,15 @@ namespace CafeHub.WebApi
                     policy.RequireAuthenticatedUser();
                     policy.AddRequirements(new TenantBoundRequirement());
                 })
+                .AddPolicy(TenantPolicies.TenantBranchReader, policy =>
+                {
+                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(new TenantBoundRequirement());
+                    policy.RequireAssertion(context => context.Resource is Microsoft.AspNetCore.Http.HttpContext httpContext
+                        && httpContext.Items[typeof(TenantAccountAccess)] is TenantAccountAccess account
+                        && (!account.IsStaff || account.HasActiveBranch));
+                })
                 .AddPolicy(TenantPolicies.TenantOwner, policy =>
                 {
                     policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);

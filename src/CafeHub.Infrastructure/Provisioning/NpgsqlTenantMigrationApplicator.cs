@@ -27,12 +27,18 @@ namespace CafeHub.Infrastructure.Provisioning
             }
 
             using var context = CreateContext(databaseName);
+            await context.Database.OpenConnectionAsync(cancellationToken);
+            var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+            var applied = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+            if (applied.Contains(TenantEmailBackfill.InitialTenantMigrationId) && !applied.Contains(TenantEmailBackfill.MigrationId))
+            {
+                await TenantEmailBackfill.PrepareAsync(connection, cancellationToken);
+            }
+
             await context.Database.MigrateAsync(cancellationToken);
 
             var applicationRoleName = TenantDatabaseNaming.ApplicationRoleName(databaseName);
             var quotedRoleName = new NpgsqlCommandBuilder().QuoteIdentifier(applicationRoleName);
-            var connection = context.Database.GetDbConnection();
-            await connection.OpenAsync(cancellationToken);
             await using var command = connection.CreateCommand();
             command.CommandText =
                 $"GRANT USAGE ON SCHEMA public TO {quotedRoleName}; " +

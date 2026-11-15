@@ -53,8 +53,8 @@ namespace CafeHub.Application.Identity.Commands
 
             var tenantId = tenantContextAccessor.GetRequired().TenantId;
             var user = authentication.Value;
-            var accessToken = accessTokenIssuer.Issue(new TenantAccessTokenRequest { UserId = user.Id, Email = user.Email, Roles = user.Roles, TenantId = tenantId });
-            var refreshToken = await refreshTokenService.IssueAsync(user.Id, cancellationToken);
+            var accessToken = accessTokenIssuer.Issue(new TenantAccessTokenRequest { UserId = user.Id, Email = user.Email, Roles = user.Roles, TenantId = tenantId, StaffSessionVersion = user.UserKind == "Staff" ? user.SessionVersion : null });
+            var refreshToken = await refreshTokenService.IssueAsync(user.Id, cancellationToken, user.SessionVersion);
             if (refreshToken.IsFailure)
             {
                 await TenantAuthenticationAudit.WriteAndCommitAsync(auditWriter, tenantUnitOfWork, new TenantAuditEntry

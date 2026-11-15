@@ -53,6 +53,7 @@ namespace CafeHub.Infrastructure.Identity
                 Email = user.Email ?? string.Empty,
                 FullName = user.FullName,
                 UserKind = user.UserKind.ToString(),
+                SessionVersion = TenantSessionVersion.FromStamp(user.SecurityStamp),
                 Roles = roles.ToList(),
             });
         }
@@ -72,6 +73,7 @@ namespace CafeHub.Infrastructure.Identity
                 Email = user.Email ?? string.Empty,
                 FullName = user.FullName,
                 UserKind = user.UserKind.ToString(),
+                SessionVersion = TenantSessionVersion.FromStamp(user.SecurityStamp),
                 Roles = roles.ToList(),
             };
         }

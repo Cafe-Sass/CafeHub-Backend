@@ -13,6 +13,30 @@ namespace CafeHub.UnitTests
         private static readonly DateTimeOffset Now = new(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
 
         [Fact]
+        public async Task Issue_RejectsCredentialsFromABeforeDeactivationSession()
+        {
+            var (service, store, _, _, _) = CreateService("unused-token");
+            store.Account = new TenantAccountAccess(true, "current", true);
+
+            var result = await service.IssueAsync(Guid.NewGuid(), default, "old");
+
+            Assert.True(result.IsFailure);
+            Assert.Empty(store.Tokens);
+        }
+
+        [Fact]
+        public async Task Rotate_DoesNotIssueATokenForADeactivatedAccount()
+        {
+            var (service, store, _, _, _) = CreateService("previous-token", "unused-token");
+            store.Account = new TenantAccountAccess(true, "current", true);
+            Assert.True((await service.IssueAsync(Guid.NewGuid(), default, "current")).IsSuccess);
+            store.Account = null;
+
+            AssertInvalid(await service.RotateAsync("previous-token", default));
+            Assert.Single(store.Tokens);
+        }
+
+        [Fact]
         public async Task Rotate_ReplacesTheTokenWithinItsFamily()
         {
             var (service, store, _, _, _) = CreateService("old-secret", "new-secret");
@@ -61,6 +85,43 @@ namespace CafeHub.UnitTests
             Assert.Single(results, result => result.IsSuccess);
             Assert.Single(results, result => result.IsFailure && result.Error == AuthErrors.InvalidRefreshToken());
             Assert.All(shared.Tokens, token => Assert.Equal(RefreshTokenRevocationReasons.ReuseDetected, token.RevokedReason));
+        }
+
+        [Fact]
+        public async Task Rotate_RejectsATokenThatExpiresWhileWaitingForTheUserLock()
+        {
+            var (service, store, _, time, _) = CreateService("original", "unused");
+            var issued = await service.IssueAsync(Guid.NewGuid(), default);
+            store.Operations.Clear();
+            store.OnLock = () => time.UtcNow = issued.Value.ExpiresAt;
+
+            AssertInvalid(await service.RotateAsync("original", default));
+
+            Assert.Equal(["identify", "lock", "read"], store.Operations);
+            Assert.Single(store.Tokens);
+        }
+
+        [Fact]
+        public async Task Logout_RevokesAReplacementCommittedBeforeItAcquiresTheUserLock()
+        {
+            var (service, store, _, _, _) = CreateService("original");
+            await service.IssueAsync(Guid.NewGuid(), default);
+            var original = Assert.Single(store.Tokens);
+            var replacement = TenantRefreshToken.Issue(
+                Guid.NewGuid(), original.UserId, original.FamilyId, Hash("replacement"), Now, Now.AddDays(7));
+            store.Operations.Clear();
+            store.OnLock = () =>
+            {
+                original.Rotate(Now, replacement.Id);
+                store.Tokens.Add(replacement);
+                store.Account = null;
+            };
+
+            var result = await service.RevokeFamilyAsync("original", RefreshTokenRevocationReasons.Logout, default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(["identify", "lock", "read", "family"], store.Operations);
+            Assert.All(store.Tokens, token => Assert.Equal(RefreshTokenRevocationReasons.Logout, token.RevokedReason));
         }
 
         [Fact]
@@ -156,8 +217,37 @@ namespace CafeHub.UnitTests
         private sealed class FakeStore : ITenantRefreshTokenStore
         {
             public List<TenantRefreshToken> Tokens { get; } = [];
-            public Task<TenantRefreshToken?> FindByTokenHashAsync(string hash, CancellationToken cancellationToken) => Task.FromResult(Tokens.SingleOrDefault(token => token.TokenHash == hash));
-            public Task<IReadOnlyList<TenantRefreshToken>> FindFamilyAsync(Guid familyId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TenantRefreshToken>>(Tokens.Where(token => token.FamilyId == familyId).ToArray());
+            public List<string> Operations { get; } = [];
+            public Action? OnLock { get; set; }
+            public TenantAccountAccess? Account { get; set; } = new(false, null, false);
+            public Task<Guid?> FindUserIdByTokenHashAsync(string hash, CancellationToken cancellationToken)
+            {
+                Operations.Add("identify");
+                return Task.FromResult(Tokens.SingleOrDefault(token => token.TokenHash == hash)?.UserId);
+            }
+
+            public Task<TenantRefreshToken?> FindByTokenHashAsync(string hash, CancellationToken cancellationToken)
+            {
+                Operations.Add("read");
+                return Task.FromResult(Tokens.SingleOrDefault(token => token.TokenHash == hash));
+            }
+
+            public Task LockUserAsync(Guid userId, CancellationToken cancellationToken)
+            {
+                Operations.Add("lock");
+                OnLock?.Invoke();
+                return Task.CompletedTask;
+            }
+
+            public Task<TenantAccountAccess?> FindActiveAccountAsync(Guid userId, CancellationToken cancellationToken) =>
+                Task.FromResult(Account);
+
+            public Task<IReadOnlyList<TenantRefreshToken>> FindFamilyAsync(Guid familyId, CancellationToken cancellationToken)
+            {
+                Operations.Add("family");
+                return Task.FromResult<IReadOnlyList<TenantRefreshToken>>(Tokens.Where(token => token.FamilyId == familyId).ToArray());
+            }
+
             public void Add(TenantRefreshToken token) => Tokens.Add(token);
             public void ClearTracking() { }
         }
@@ -198,6 +288,7 @@ namespace CafeHub.UnitTests
             private readonly object sync = new();
             private readonly List<TenantRefreshToken> tokens = [];
             private readonly Barrier lookupBarrier = new(2);
+            public SemaphoreSlim UserLock { get; } = new(1, 1);
 
             public IReadOnlyList<TenantRefreshToken> Tokens { get { lock (sync) return tokens.ToArray(); } }
 
@@ -243,12 +334,24 @@ namespace CafeHub.UnitTests
             private List<TenantRefreshToken>? localTokens;
             public IReadOnlyList<TenantRefreshToken> Changes => localTokens ?? [];
 
-            public async Task<TenantRefreshToken?> FindByTokenHashAsync(string hash, CancellationToken cancellationToken)
+            public async Task<Guid?> FindUserIdByTokenHashAsync(string hash, CancellationToken cancellationToken)
             {
-                localTokens ??= persistence.Snapshot();
+                var userId = persistence.Snapshot().SingleOrDefault(token => token.TokenHash == hash)?.UserId;
                 await persistence.SynchronizeInitialLookupAsync();
-                return localTokens.SingleOrDefault(token => token.TokenHash == hash);
+                return userId;
             }
+
+            public Task<TenantRefreshToken?> FindByTokenHashAsync(string hash, CancellationToken cancellationToken) =>
+                Task.FromResult(localTokens!.SingleOrDefault(token => token.TokenHash == hash));
+
+            public async Task LockUserAsync(Guid userId, CancellationToken cancellationToken)
+            {
+                Assert.True(await persistence.UserLock.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+                localTokens = persistence.Snapshot();
+            }
+
+            public Task<TenantAccountAccess?> FindActiveAccountAsync(Guid userId, CancellationToken cancellationToken) =>
+                Task.FromResult<TenantAccountAccess?>(new(false, null, false));
 
             public Task<IReadOnlyList<TenantRefreshToken>> FindFamilyAsync(Guid familyId, CancellationToken cancellationToken)
             {
@@ -263,8 +366,18 @@ namespace CafeHub.UnitTests
         private sealed class ConcurrentFakeUnitOfWork(ConcurrentPersistence persistence, ConcurrentFakeStore store) : ITenantUnitOfWork
         {
             public Task BeginTransactionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-            public Task CommitTransactionAsync(CancellationToken cancellationToken) { persistence.Commit(store.Changes); return Task.CompletedTask; }
-            public Task RollbackTransactionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+            public Task CommitTransactionAsync(CancellationToken cancellationToken)
+            {
+                persistence.Commit(store.Changes);
+                persistence.UserLock.Release();
+                return Task.CompletedTask;
+            }
+
+            public Task RollbackTransactionAsync(CancellationToken cancellationToken)
+            {
+                persistence.UserLock.Release();
+                return Task.CompletedTask;
+            }
         }
     }
 }

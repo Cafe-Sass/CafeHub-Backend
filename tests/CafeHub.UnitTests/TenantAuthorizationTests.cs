@@ -56,6 +56,22 @@ namespace CafeHub.UnitTests
             Assert.False(staffOwner.Succeeded);
         }
 
+        [Theory]
+        [InlineData(false, false, true)]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, true)]
+        public async Task BranchReadsRequireAnActiveAssignedBranchOnlyForStaff(bool staff, bool activeBranch, bool allowed)
+        {
+            using var provider = CreateServices();
+            var authorization = provider.GetRequiredService<IAuthorizationService>();
+            var context = new DefaultHttpContext();
+            context.Items[typeof(TenantAccountAccess)] = new TenantAccountAccess(staff, null, activeBranch);
+            var principal = Principal(TenantId, staff ? "Staff" : TenantRoles.Owner);
+
+            Assert.Equal(allowed, (await authorization.AuthorizeAsync(principal, context, TenantPolicies.TenantBranchReader)).Succeeded);
+            Assert.True((await authorization.AuthorizeAsync(principal, context, TenantPolicies.TenantUser)).Succeeded);
+        }
+
         [Fact]
         public async Task PlatformAnonymousAndCrossTenantPrincipals_SatisfyNeitherPolicy()
         {

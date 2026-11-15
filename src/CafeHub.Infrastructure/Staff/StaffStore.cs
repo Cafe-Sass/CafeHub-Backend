@@ -1,15 +1,17 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Staff;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Staff.DTOs;
+using CafeHub.Domain.Identity;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.AspNetCore.Identity;
+using CafeHub.Infrastructure.Persistence.Tenant.Configurations;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CafeHub.Infrastructure.Staff
 {
@@ -43,7 +45,7 @@ namespace CafeHub.Infrastructure.Staff
             Guid actorUserId,
             CancellationToken cancellationToken)
         {
-            var normalizedEmail = email.ToUpperInvariant();
+            var normalizedEmail = TenantUserEmail.Normalize(email);
             var exists = await context.TenantUsers
                 .AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
             if (exists)
@@ -51,6 +53,7 @@ namespace CafeHub.Infrastructure.Staff
                 return Result.Failure<StaffResponse>(StaffErrors.EmailConflict());
             }
 
+            await context.LockBranchesAsync(cancellationToken, branchId);
             var branch = await context.Branches
                 .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
             if (branch is null)
@@ -64,8 +67,19 @@ namespace CafeHub.Infrastructure.Staff
             }
 
             var staffId = Guid.CreateVersion7();
-            var userName = GenerateUserName(email, staffId);
-            var normalizedUserName = userName.ToUpperInvariant();
+            var userName = GenerateUserName(staffId);
+            for (var retry = 0; await context.TenantUsers.AnyAsync(
+                user => user.NormalizedUserName.ToLower() == userName, cancellationToken); retry++)
+            {
+                if (retry == 2)
+                {
+                    return Result.Failure<StaffResponse>(StaffErrors.ConcurrencyConflict());
+                }
+
+                staffId = Guid.CreateVersion7();
+                userName = GenerateUserName(staffId);
+            }
+
             var securityStamp = Guid.NewGuid().ToString("N");
             var concurrencyStamp = Guid.NewGuid().ToString("N");
             var now = timeProvider.GetUtcNow();
@@ -73,7 +87,7 @@ namespace CafeHub.Infrastructure.Staff
             var user = TenantUser.CreateStaff(
                 staffId,
                 userName,
-                normalizedUserName,
+                userName,
                 fullName,
                 email,
                 normalizedEmail,
@@ -104,7 +118,25 @@ namespace CafeHub.Infrastructure.Staff
                 return Result.Failure<StaffResponse>(auditResult.Error!);
             }
 
-            await context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+                { SqlState: PostgresErrorCodes.UniqueViolation } violation)
+            {
+                if (violation.ConstraintName == TenantUserConfiguration.UniqueEmailIndex)
+                {
+                    return Result.Failure<StaffResponse>(StaffErrors.EmailConflict());
+                }
+
+                if (violation.ConstraintName is "uq_tenant_users_normalized_user_name" or "pk_tenant_users")
+                {
+                    return Result.Failure<StaffResponse>(StaffErrors.ConcurrencyConflict());
+                }
+
+                throw;
+            }
 
             var token = context.Entry(user)
                 .Property<uint>("xmin")
@@ -123,6 +155,7 @@ namespace CafeHub.Infrastructure.Staff
             Guid actorUserId,
             CancellationToken cancellationToken)
         {
+            await context.LockUserAsync(staffId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
             if (user is null)
@@ -142,6 +175,7 @@ namespace CafeHub.Infrastructure.Staff
 
             context.Entry(user).Property<uint>("xmin").OriginalValue = token;
 
+            await context.LockBranchesAsync(cancellationToken, user.BranchId!.Value, branchId);
             var branch = await context.Branches
                 .FirstOrDefaultAsync(b => b.Id == branchId, cancellationToken);
             if (branch is null)
@@ -278,6 +312,7 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> DeactivateAsync(Guid staffId, Guid actorUserId, CancellationToken cancellationToken)
         {
+            await context.LockUserAsync(staffId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
             if (user is null || user.UserKind != TenantUserKind.Staff)
@@ -285,9 +320,14 @@ namespace CafeHub.Infrastructure.Staff
                 return Result.Failure(StaffErrors.NotFound());
             }
 
+            await context.LockBranchesAsync(cancellationToken, user.BranchId!.Value);
             var now = timeProvider.GetUtcNow();
             var changes = TenantAuditChangeSets.StaffLifecycleStatus(user, false);
-            user.Deactivate(now, actorUserId);
+            if (user.DeletedAt is null)
+            {
+                user.Deactivate(now, actorUserId);
+                context.Entry(user).Property(u => u.SecurityStamp).CurrentValue = Guid.NewGuid().ToString("N");
+            }
 
             var activeTokens = await context.TenantRefreshTokens
                 .Where(t => t.UserId == staffId && t.RevokedAt == null)
@@ -318,11 +358,25 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> ReactivateAsync(Guid staffId, Guid actorUserId, CancellationToken cancellationToken)
         {
+            await context.LockUserAsync(staffId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
             if (user is null || user.UserKind != TenantUserKind.Staff)
             {
                 return Result.Failure(StaffErrors.NotFound());
+            }
+
+            if (user.DeletedAt is null)
+            {
+                return Result.Success();
+            }
+
+            await context.LockBranchesAsync(cancellationToken, user.BranchId!.Value);
+            if (!await context.Branches.AnyAsync(
+                branch => branch.Id == user.BranchId && branch.LifecycleStatus == BranchLifecycleStatus.Active,
+                cancellationToken))
+            {
+                return Result.Failure(StaffErrors.ReactivationBranchNotActive());
             }
 
             var now = timeProvider.GetUtcNow();
@@ -349,6 +403,7 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> ResetPasswordAsync(Guid staffId, string newPassword, Guid actorUserId, CancellationToken cancellationToken)
         {
+            await context.LockUserAsync(staffId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
             if (user is null || user.UserKind != TenantUserKind.Staff)
@@ -391,6 +446,7 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken cancellationToken)
         {
+            await context.LockUserAsync(userId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
             if (user is null || user.DeletedAt != null)
@@ -437,22 +493,7 @@ namespace CafeHub.Infrastructure.Staff
             return Result.Success();
         }
 
-        private static string GenerateUserName(string email, Guid userId)
-        {
-            var prefix = email.Split('@')[0].ToLowerInvariant();
-            var sanitized = Regex.Replace(prefix, "[^a-z0-9]", "-").Trim('-');
-            if (sanitized.Length < 3)
-            {
-                sanitized = "user-" + userId.ToString("N")[..8];
-            }
-            else if (sanitized.Length > 28)
-            {
-                sanitized = sanitized[..28].Trim('-');
-            }
-
-            var suffix = "-" + userId.ToString("N")[..6];
-            return sanitized + suffix;
-        }
+        internal static string GenerateUserName(Guid staffId) => $"staff-{staffId:N}";
 
         private static StaffResponse MapToResponse(TenantUser user, string branchName, string concurrencyToken)
         {

@@ -6,6 +6,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
 {
     public sealed class TenantUserConfiguration : IEntityTypeConfiguration<TenantUser>
     {
+        internal const string UniqueEmailIndex = "uq_tenant_users_normalized_email";
+
         public void Configure(EntityTypeBuilder<TenantUser> builder)
         {
             builder.ToTable("tenant_users", t =>
@@ -54,7 +56,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property<uint>("xmin").IsRowVersion();
 
             builder.HasIndex(u => u.NormalizedUserName).IsUnique().HasDatabaseName("uq_tenant_users_normalized_user_name");
-            builder.HasIndex(u => u.NormalizedEmail).HasDatabaseName("ix_tenant_users_normalized_email");
+            builder.HasIndex(u => u.NormalizedEmail).IsUnique().HasFilter("normalized_email IS NOT NULL").HasDatabaseName(UniqueEmailIndex);
             builder.HasIndex(u => u.BranchId).HasDatabaseName("ix_tenant_users_branch_id");
             builder.HasIndex(u => u.CreatedBy).HasDatabaseName("ix_tenant_users_created_by");
             builder.HasIndex(u => u.UpdatedBy).HasDatabaseName("ix_tenant_users_updated_by");
