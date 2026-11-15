@@ -23,7 +23,7 @@ namespace CafeHub.UnitTests
             var fromRoles = new[] { TenantPermissions.StaffRead, TenantPermissions.BranchesRead };
             var personal = new[] { TenantPermissions.StaffManage, TenantPermissions.StaffRead, TenantPermissions.RolesManage, "unknown" };
 
-            Assert.Equal(new[] { "branches.manage", "branches.read", "cafe-profile.manage", "roles.manage", "staff.manage", "staff.read" },
+            Assert.Equal(new[] { "branches.manage", "branches.read", "cafe-profile.manage", "roles.manage", "staff.manage", "staff.read", "stations.manage" },
                 TenantPermissions.All);
             Assert.Equal(new[] { TenantPermissions.BranchesRead, TenantPermissions.StaffManage, TenantPermissions.StaffRead },
                 TenantPermissions.StaffUnion(fromRoles.Concat(personal)));
