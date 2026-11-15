@@ -42,7 +42,10 @@ namespace CafeHub.UnitTests.Staff.Queries
             var result = await handler.Handle(new GetStaffByIdQuery(StaffId), CancellationToken.None);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(StaffErrors.NotFoundCode, result.Error.Code);
+
+            var error = result.Error;
+            Assert.NotNull(error);
+            Assert.Equal(StaffErrors.NotFoundCode, error.Code);
         }
 
         [Fact]
