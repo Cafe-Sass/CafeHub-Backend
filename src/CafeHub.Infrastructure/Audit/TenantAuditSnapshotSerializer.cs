@@ -35,6 +35,14 @@ namespace CafeHub.Infrastructure.Audit
                     "BranchId",
                     "FullName",
                     "IsActive",
+                    "RoleId",
+                    "PersonalPermissionCodes",
+                },
+                ["tenant_roles"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "Status",
+                    "PermissionCodes",
                 },
             };
 

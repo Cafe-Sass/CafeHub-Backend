@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CafeHub.Application.Identity;
 using CafeHub.Domain.Identity;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Tenant;
@@ -72,46 +73,34 @@ namespace CafeHub.Infrastructure.Identity
         public Task<bool> GetLockoutEnabledAsync(TenantUser user, CancellationToken cancellationToken) => Task.FromResult(user.LockoutEnabled);
         public Task SetLockoutEnabledAsync(TenantUser user, bool enabled, CancellationToken cancellationToken) => SetAsync(user, nameof(TenantUser.LockoutEnabled), enabled);
 
-        public async Task AddToRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken)
-        {
-            var normalized = normalizedRoleName.ToLowerInvariant();
-            var role = await context.TenantRoles.SingleAsync(item => item.NormalizedName == normalized, cancellationToken);
-            if (!await context.TenantUserRoles.AnyAsync(item => item.TenantUserId == user.Id && item.RoleId == role.Id, cancellationToken))
-            {
-                context.TenantUserRoles.Add(TenantUserRole.Create(Guid.CreateVersion7(), user.Id, role.Id, timeProvider.GetUtcNow()));
-                await context.SaveChangesAsync(cancellationToken);
-            }
-        }
+        public Task AddToRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Use audited tenant role administration.");
 
-        public async Task RemoveFromRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken)
-        {
-            var normalized = normalizedRoleName.ToLowerInvariant();
-            var role = await context.TenantRoles.SingleOrDefaultAsync(item => item.NormalizedName == normalized, cancellationToken);
-            if (role is null) return;
-            var memberships = await context.TenantUserRoles.Where(item => item.TenantUserId == user.Id && item.RoleId == role.Id).ToListAsync(cancellationToken);
-            context.TenantUserRoles.RemoveRange(memberships);
-            await context.SaveChangesAsync(cancellationToken);
-        }
+        public Task RemoveFromRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Use audited tenant role administration.");
 
-        public async Task<IList<string>> GetRolesAsync(TenantUser user, CancellationToken cancellationToken) => await context.TenantUserRoles.Where(link => link.TenantUserId == user.Id).Join(context.TenantRoles, link => link.RoleId, role => role.Id, (_, role) => role.Name).ToListAsync(cancellationToken);
+        public async Task<IList<string>> GetRolesAsync(TenantUser user, CancellationToken cancellationToken) =>
+            await RolesFor(user).OrderBy(role => role.NormalizedName).Select(role => role.Name).ToListAsync(cancellationToken);
 
-        public async Task<bool> IsInRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken) => await context.TenantUserRoles.Where(link => link.TenantUserId == user.Id).Join(context.TenantRoles, link => link.RoleId, role => role.Id, (_, role) => role.NormalizedName).AnyAsync(name => name == normalizedRoleName.ToLowerInvariant(), cancellationToken);
+        public Task<bool> IsInRoleAsync(TenantUser user, string normalizedRoleName, CancellationToken cancellationToken) =>
+            RolesFor(user).AnyAsync(role => role.NormalizedName == normalizedRoleName.ToLowerInvariant(), cancellationToken);
 
         public async Task<IList<TenantUser>> GetUsersInRoleAsync(string normalizedRoleName, CancellationToken cancellationToken)
         {
-            return await context.TenantUserRoles.Join(context.TenantRoles, link => link.RoleId, role => role.Id, (link, role) => new { link, role }).Where(item => item.role.NormalizedName == normalizedRoleName.ToLowerInvariant()).Join(context.TenantUsers, item => item.link.TenantUserId, user => user.Id, (_, user) => user).ToListAsync(cancellationToken);
+            return await context.TenantUserRoles.Join(context.TenantRoles, link => link.RoleId, role => role.Id, (link, role) => new { link, role }).Where(item => item.role.DeletedAt == null && item.role.NormalizedName == normalizedRoleName.ToLowerInvariant()).Join(context.TenantUsers, item => item.link.TenantUserId, user => user.Id, (_, user) => user).ToListAsync(cancellationToken);
         }
 
         public async Task<IList<Claim>> GetClaimsAsync(TenantUser user, CancellationToken cancellationToken) => await context.TenantUserClaims.Where(claim => claim.TenantUserId == user.Id).Select(claim => new Claim(claim.ClaimType, claim.ClaimValue ?? string.Empty)).ToListAsync(cancellationToken);
 
         public async Task AddClaimsAsync(TenantUser user, IEnumerable<Claim> claims, CancellationToken cancellationToken)
         {
-            foreach (var claim in claims) context.TenantUserClaims.Add(TenantUserClaim.Create(Guid.CreateVersion7(), user.Id, claim.Type, claim.Value, timeProvider.GetUtcNow()));
+            foreach (var claim in EnsureClaimsWritable(claims)) context.TenantUserClaims.Add(TenantUserClaim.Create(Guid.CreateVersion7(), user.Id, claim.Type, claim.Value, timeProvider.GetUtcNow()));
             await context.SaveChangesAsync(cancellationToken);
         }
 
         public async Task ReplaceClaimAsync(TenantUser user, Claim claim, Claim newClaim, CancellationToken cancellationToken)
         {
+            EnsureClaimsWritable([claim, newClaim]);
             var oldClaims = await context.TenantUserClaims.Where(item => item.TenantUserId == user.Id && item.ClaimType == claim.Type && item.ClaimValue == claim.Value).ToListAsync(cancellationToken);
             context.TenantUserClaims.RemoveRange(oldClaims);
             context.TenantUserClaims.Add(TenantUserClaim.Create(Guid.CreateVersion7(), user.Id, newClaim.Type, newClaim.Value, timeProvider.GetUtcNow()));
@@ -120,7 +109,7 @@ namespace CafeHub.Infrastructure.Identity
 
         public async Task RemoveClaimsAsync(TenantUser user, IEnumerable<Claim> claims, CancellationToken cancellationToken)
         {
-            foreach (var claim in claims)
+            foreach (var claim in EnsureClaimsWritable(claims))
             {
                 var matches = await context.TenantUserClaims.Where(item => item.TenantUserId == user.Id && item.ClaimType == claim.Type && item.ClaimValue == claim.Value).ToListAsync(cancellationToken);
                 context.TenantUserClaims.RemoveRange(matches);
@@ -129,6 +118,24 @@ namespace CafeHub.Infrastructure.Identity
         }
 
         public async Task<IList<TenantUser>> GetUsersForClaimAsync(Claim claim, CancellationToken cancellationToken) => await context.TenantUserClaims.Where(item => item.ClaimType == claim.Type && item.ClaimValue == claim.Value).Join(context.TenantUsers, item => item.TenantUserId, user => user.Id, (_, user) => user).ToListAsync(cancellationToken);
+
+        private IQueryable<TenantRole> RolesFor(TenantUser user) =>
+            from link in context.TenantUserRoles
+            join role in context.TenantRoles on link.RoleId equals role.Id
+            where link.TenantUserId == user.Id && role.DeletedAt == null &&
+                (user.UserKind == TenantUserKind.Owner || role.NormalizedName != TenantRole.NormalizedOwnerName)
+            select role;
+
+        private static Claim[] EnsureClaimsWritable(IEnumerable<Claim> claims)
+        {
+            var requested = claims.ToArray();
+            if (requested.Any(claim => claim.Type == TenantPermissions.ClaimType))
+            {
+                throw new NotSupportedException("Use audited tenant permission administration.");
+            }
+
+            return requested;
+        }
 
         private Task SetAsync<TValue>(TenantUser user, string propertyName, TValue value)
         {

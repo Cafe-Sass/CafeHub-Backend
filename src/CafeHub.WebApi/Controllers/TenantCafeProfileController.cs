@@ -2,6 +2,7 @@ using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.CafeProfile.Commands;
 using CafeHub.Application.CafeProfile.DTOs;
 using CafeHub.Application.CafeProfile.Queries;
+using CafeHub.Application.Identity;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
 using MediatR;
@@ -37,7 +38,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpPut]
-        [TenantAuthorize(TenantPolicies.TenantOwner)]
+        [TenantAuthorize(TenantPermissions.CafeProfileManage)]
         public async Task<ActionResult<CafeProfileResponse>> Put(UpdateCafeProfileRequest request, CancellationToken cancellationToken)
         {
             var command = new UpdateCafeProfileCommand(

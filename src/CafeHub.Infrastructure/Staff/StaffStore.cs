@@ -1,6 +1,7 @@
 using System.Globalization;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Identity;
 using CafeHub.Application.Staff;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Staff.DTOs;
@@ -23,17 +24,20 @@ namespace CafeHub.Infrastructure.Staff
         private readonly IPasswordHasher<TenantUser> passwordHasher;
         private readonly ITenantAuditWriter auditWriter;
         private readonly TimeProvider timeProvider;
+        private readonly ICurrentTenantUser currentUser;
 
         public StaffStore(
             TenantDbContext context,
             IPasswordHasher<TenantUser> passwordHasher,
             ITenantAuditWriter auditWriter,
-            TimeProvider timeProvider)
+            TimeProvider timeProvider,
+            ICurrentTenantUser currentUser)
         {
             this.context = context ?? throw new ArgumentNullException(nameof(context));
             this.passwordHasher = passwordHasher ?? throw new ArgumentNullException(nameof(passwordHasher));
             this.auditWriter = auditWriter ?? throw new ArgumentNullException(nameof(auditWriter));
             this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            this.currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
         }
 
         public async Task<Result<StaffResponse>> CreateAsync(
@@ -45,12 +49,9 @@ namespace CafeHub.Infrastructure.Staff
             Guid actorUserId,
             CancellationToken cancellationToken)
         {
-            var normalizedEmail = TenantUserEmail.Normalize(email);
-            var exists = await context.TenantUsers
-                .AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
-            if (exists)
+            if (currentUser.AccountAccess is not { IsStaff: false })
             {
-                return Result.Failure<StaffResponse>(StaffErrors.EmailConflict());
+                return Result.Failure<StaffResponse>(AuthErrors.Forbidden());
             }
 
             await context.LockBranchesAsync(cancellationToken, branchId);
@@ -64,6 +65,12 @@ namespace CafeHub.Infrastructure.Staff
             if (branch.LifecycleStatus != BranchLifecycleStatus.Active)
             {
                 return Result.Failure<StaffResponse>(StaffErrors.BranchNotActive());
+            }
+
+            var normalizedEmail = TenantUserEmail.Normalize(email);
+            if (await context.TenantUsers.AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken))
+            {
+                return Result.Failure<StaffResponse>(StaffErrors.EmailConflict());
             }
 
             var staffId = Guid.CreateVersion7();
@@ -155,14 +162,13 @@ namespace CafeHub.Infrastructure.Staff
             Guid actorUserId,
             CancellationToken cancellationToken)
         {
-            await context.LockUserAsync(staffId, cancellationToken);
-            var user = await context.TenantUsers
-                .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
-            if (user is null)
+            var target = await FindManagedUserAsync(staffId, actorUserId, cancellationToken, branchId);
+            if (target.IsFailure)
             {
-                return Result.Failure<StaffResponse>(StaffErrors.NotFound());
+                return Result.Failure<StaffResponse>(target.Error!);
             }
 
+            var user = target.Value;
             if (user.UserKind != TenantUserKind.Staff)
             {
                 return Result.Failure<StaffResponse>(StaffErrors.CannotModifyOwner());
@@ -223,10 +229,10 @@ namespace CafeHub.Infrastructure.Staff
             return Result.Success(MapToResponse(user, branch.Name, newToken));
         }
 
-        public async Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken)
+        public async Task<StaffResponse?> GetByIdAsync(Guid staffId, CancellationToken cancellationToken, Guid? branchId = null)
         {
             var user = await context.TenantUsers
-                .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
+                .FirstOrDefaultAsync(u => u.Id == staffId && (branchId == null || u.BranchId == branchId), cancellationToken);
             if (user is null || user.UserKind != TenantUserKind.Staff)
             {
                 return null;
@@ -312,10 +318,14 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> DeactivateAsync(Guid staffId, Guid actorUserId, CancellationToken cancellationToken)
         {
-            await context.LockUserAsync(staffId, cancellationToken);
-            var user = await context.TenantUsers
-                .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
-            if (user is null || user.UserKind != TenantUserKind.Staff)
+            var target = await FindManagedUserAsync(staffId, actorUserId, cancellationToken);
+            if (target.IsFailure)
+            {
+                return Result.Failure(target.Error!);
+            }
+
+            var user = target.Value;
+            if (user.UserKind != TenantUserKind.Staff)
             {
                 return Result.Failure(StaffErrors.NotFound());
             }
@@ -358,10 +368,14 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> ReactivateAsync(Guid staffId, Guid actorUserId, CancellationToken cancellationToken)
         {
-            await context.LockUserAsync(staffId, cancellationToken);
-            var user = await context.TenantUsers
-                .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
-            if (user is null || user.UserKind != TenantUserKind.Staff)
+            var target = await FindManagedUserAsync(staffId, actorUserId, cancellationToken);
+            if (target.IsFailure)
+            {
+                return Result.Failure(target.Error!);
+            }
+
+            var user = target.Value;
+            if (user.UserKind != TenantUserKind.Staff)
             {
                 return Result.Failure(StaffErrors.NotFound());
             }
@@ -403,6 +417,11 @@ namespace CafeHub.Infrastructure.Staff
 
         public async Task<Result> ResetPasswordAsync(Guid staffId, string newPassword, Guid actorUserId, CancellationToken cancellationToken)
         {
+            if (currentUser.AccountAccess is not { IsStaff: false })
+            {
+                return Result.Failure(AuthErrors.Forbidden());
+            }
+
             await context.LockUserAsync(staffId, cancellationToken);
             var user = await context.TenantUsers
                 .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
@@ -494,6 +513,53 @@ namespace CafeHub.Infrastructure.Staff
         }
 
         internal static string GenerateUserName(Guid staffId) => $"staff-{staffId:N}";
+
+        private async Task<Result<TenantUser>> FindManagedUserAsync(
+            Guid staffId, Guid actorId, CancellationToken cancellationToken, Guid? destinationId = null)
+        {
+            var scope = TenantBranchScope.Resolve(currentUser.AccountAccess);
+            if (scope.IsFailure)
+            {
+                return Result.Failure<TenantUser>(scope.Error!);
+            }
+
+            if (scope.Value is { } branchId)
+            {
+                if (destinationId.HasValue && destinationId != branchId)
+                {
+                    return Result.Failure<TenantUser>(StaffErrors.NotFound());
+                }
+
+                foreach (var id in new[] { actorId, staffId }.Distinct().Order())
+                {
+                    if (!await context.LockBranchStaffAsync(id, branchId, cancellationToken))
+                    {
+                        return Result.Failure<TenantUser>(id == actorId ? AuthErrors.Forbidden() : StaffErrors.NotFound());
+                    }
+                }
+
+                await context.LockBranchesAsync(cancellationToken, branchId);
+                if (!await ActorIsInActiveBranchAsync(actorId, branchId, cancellationToken))
+                {
+                    return Result.Failure<TenantUser>(AuthErrors.Forbidden());
+                }
+            }
+            else
+            {
+                await context.LockUserAsync(staffId, cancellationToken);
+            }
+
+            var user = await context.TenantUsers.FirstOrDefaultAsync(
+                candidate => candidate.Id == staffId && (scope.Value == null || candidate.BranchId == scope.Value),
+                cancellationToken);
+            return user is null ? Result.Failure<TenantUser>(StaffErrors.NotFound()) : Result.Success(user);
+        }
+
+        private Task<bool> ActorIsInActiveBranchAsync(Guid actorId, Guid branchId, CancellationToken cancellationToken) =>
+            context.TenantUsers.AnyAsync(
+                user => user.Id == actorId && user.BranchId == branchId && user.DeletedAt == null &&
+                    context.Branches.Any(branch => branch.Id == branchId && branch.LifecycleStatus == BranchLifecycleStatus.Active),
+                cancellationToken);
 
         private static StaffResponse MapToResponse(TenantUser user, string branchName, string concurrencyToken)
         {

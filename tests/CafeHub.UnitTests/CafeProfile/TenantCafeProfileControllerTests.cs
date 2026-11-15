@@ -147,14 +147,14 @@ namespace CafeHub.UnitTests.CafeProfile
         }
 
         [Fact]
-        public void PutAction_UsesTenantOwnerAuthorization()
+        public void PutAction_RequiresCafeProfileManagePermission()
         {
             var controllerType = typeof(TenantCafeProfileController);
             var action = controllerType.GetMethod(nameof(TenantCafeProfileController.Put))!;
             Assert.NotNull(action.GetCustomAttribute<HttpPutAttribute>());
             var authorize = action.GetCustomAttribute<TenantAuthorizeAttribute>();
             Assert.NotNull(authorize);
-            Assert.Equal(TenantPolicies.TenantOwner, authorize!.Policy);
+            Assert.Equal(CafeHub.Application.Identity.TenantPermissions.CafeProfileManage, authorize!.Policy);
             Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
             Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
         }

@@ -7,6 +7,7 @@ using CafeHub.WebApi;
 using CafeHub.WebApi.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -118,6 +119,36 @@ namespace CafeHub.UnitTests
             };
             await options.Events.TokenValidated(context);
             return context;
+        }
+
+        [Fact]
+        public async Task RemovingAPermissionChangesAuthorizationOnTheNextRequestWithTheSameJwt()
+        {
+            var (options, _, signingServices) = RegisterSchemes();
+            using var signingProvider = signingServices;
+            var reader = new FakeTenantPermissionReader { Codes = [TenantPermissions.StaffRead] };
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<ITenantContextAccessor>(new StubTenantContextAccessor(TenantContext.Create(TenantId, "tenant-secret-ref", true)));
+            services.AddSingleton<ITenantPermissionReader>(reader);
+            services.AddTenantAuthorization();
+            using var provider = services.BuildServiceProvider();
+            var token = CreateTenantToken(sessionVersion: "current");
+            var account = new AccountReader(new TenantAccountAccess(true, "current", true) { BranchId = Guid.NewGuid() });
+
+            async Task<bool> AuthorizeRequestAsync()
+            {
+                using var scope = provider.CreateScope();
+                var validated = await ValidateAndBindAsync(token, options, accounts: account);
+                Assert.Null(validated.Result?.Failure);
+                var authorization = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
+                return (await authorization.AuthorizeAsync(validated.Principal!, validated.HttpContext, TenantPermissions.StaffRead)).Succeeded;
+            }
+
+            Assert.True(await AuthorizeRequestAsync());
+            reader.Codes = [];
+            Assert.False(await AuthorizeRequestAsync());
+            Assert.Equal(2, reader.Reads);
         }
 
         [Fact]

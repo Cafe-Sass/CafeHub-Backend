@@ -106,14 +106,14 @@ namespace CafeHub.UnitTests.Branches
         }
 
         [Fact]
-        public void ReadActions_RequireTenantBranchReaderPolicy()
+        public void ReadActions_RequireBranchesReadPermission()
         {
             foreach (var name in new[] { nameof(TenantBranchesController.List), nameof(TenantBranchesController.Get) })
             {
                 var action = Action(name);
                 var authorize = action.GetCustomAttribute<TenantAuthorizeAttribute>();
                 Assert.NotNull(authorize);
-                Assert.Equal(TenantPolicies.TenantBranchReader, authorize!.Policy);
+                Assert.Equal(CafeHub.Application.Identity.TenantPermissions.BranchesRead, authorize!.Policy);
                 Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
                 Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
             }
@@ -122,7 +122,7 @@ namespace CafeHub.UnitTests.Branches
         }
 
         [Fact]
-        public void WriteAndLifecycleActions_RequireTenantOwnerPolicy()
+        public void WriteAndLifecycleActions_RequireBranchesManagePermission()
         {
             foreach (var name in new[]
             {
@@ -136,7 +136,7 @@ namespace CafeHub.UnitTests.Branches
                 var action = Action(name);
                 var authorize = action.GetCustomAttribute<TenantAuthorizeAttribute>();
                 Assert.NotNull(authorize);
-                Assert.Equal(TenantPolicies.TenantOwner, authorize!.Policy);
+                Assert.Equal(CafeHub.Application.Identity.TenantPermissions.BranchesManage, authorize!.Policy);
                 Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
                 Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
             }

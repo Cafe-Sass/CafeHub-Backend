@@ -35,7 +35,7 @@ namespace CafeHub.UnitTests.Staff.Persistence
                 .AddInterceptors(commands, new SuppressConnectionOpen())
                 .Options;
             await using var context = new TenantDbContext(options);
-            var store = new StaffStore(context, new PasswordHasher<TenantUser>(), new UnexpectedAuditWriter(), TimeProvider.System);
+            var store = new StaffStore(context, new PasswordHasher<TenantUser>(), new UnexpectedAuditWriter(), TimeProvider.System, new FakeTask42Access());
 
             var result = await store.ReactivateAsync(staff.Id, actorId, default);
 

@@ -1,0 +1,24 @@
+namespace CafeHub.Application.Identity
+{
+    public static class TenantPermissions
+    {
+        public const string ClaimType = "cafehub.permission";
+        public const string StaffRead = "staff.read";
+        public const string StaffManage = "staff.manage";
+        public const string RolesManage = "roles.manage";
+        public const string CafeProfileManage = "cafe-profile.manage";
+        public const string BranchesRead = "branches.read";
+        public const string BranchesManage = "branches.manage";
+
+        public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
+            new[] { BranchesManage, BranchesRead, CafeProfileManage, RolesManage, StaffManage, StaffRead });
+
+        public static bool IsOwnerOnly(string? code) => code is RolesManage or BranchesManage or CafeProfileManage;
+
+        public static bool IsStaffGrant(string? code) =>
+            !IsOwnerOnly(code) && All.Contains(code, StringComparer.Ordinal);
+
+        public static IReadOnlyList<string> StaffUnion(IEnumerable<string?> grants) =>
+            All.Where(code => !IsOwnerOnly(code) && grants.Contains(code, StringComparer.Ordinal)).ToArray();
+    }
+}

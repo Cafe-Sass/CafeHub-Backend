@@ -12,5 +12,6 @@ namespace CafeHub.Application.Branches.Contracts
         int PageSize,
         IReadOnlyList<SortTerm> Sort,
         bool IncludeTotalCount,
-        BranchLifecycleStatus? Status);
+        BranchLifecycleStatus? Status,
+        Guid? BranchId = null);
 }

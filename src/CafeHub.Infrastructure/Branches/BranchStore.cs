@@ -226,6 +226,11 @@ namespace CafeHub.Infrastructure.Branches
             CancellationToken cancellationToken)
         {
             var query = context.Branches.AsQueryable();
+            if (request.BranchId is { } branchId)
+            {
+                query = query.Where(branch => branch.Id == branchId && branch.LifecycleStatus == BranchLifecycleStatus.Active);
+            }
+
             if (request.Status is { } status)
             {
                 query = query.Where(branch => branch.LifecycleStatus == status);

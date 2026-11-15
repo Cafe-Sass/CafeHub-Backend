@@ -13,12 +13,13 @@ namespace CafeHub.UnitTests
 
         private readonly FakeCurrentTenantUser currentTenantUser = new();
         private readonly StubTenantUserAuthenticator tenantUserAuthenticator = new();
+        private readonly FakeTenantPermissionReader permissionReader = new();
         private readonly StubTenantContextAccessor tenantContextAccessor = new(TenantContext.Create(TenantId, "tenant-secret-reference", true, "cafe-one"));
         private readonly GetCurrentTenantUserQueryHandler handler;
 
         public GetCurrentTenantUserQueryHandlerTests()
         {
-            handler = new GetCurrentTenantUserQueryHandler(currentTenantUser, tenantUserAuthenticator, tenantContextAccessor);
+            handler = new GetCurrentTenantUserQueryHandler(currentTenantUser, tenantUserAuthenticator, tenantContextAccessor, permissionReader);
         }
 
         private static AuthenticatedTenantUser CreateUser(Guid userId)
@@ -125,13 +126,40 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
-        public void TenantMeResponse_ExposesExactlySixSafeMembers()
+        public async Task MeReturnsCurrentBranchAndDatabasePermissions()
+        {
+            currentTenantUser.IsAuthenticated = true;
+            currentTenantUser.UserId = UserId;
+            currentTenantUser.TenantId = TenantId;
+            currentTenantUser.BranchId = Guid.NewGuid();
+            tenantUserAuthenticator.NextUser = new AuthenticatedTenantUser
+            {
+                Id = UserId,
+                Email = "staff@example.test",
+                FullName = "Staff",
+                UserKind = "Staff",
+                Roles = ["Manager"],
+            };
+            permissionReader.Codes = [TenantPermissions.StaffRead];
+
+            var result = await handler.Handle(new GetCurrentTenantUserQuery(), default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(currentTenantUser.BranchId, result.Value.BranchId);
+            Assert.Equal([TenantPermissions.StaffRead], result.Value.EffectivePermissions);
+            Assert.Equal(1, permissionReader.Reads);
+            Assert.Equal(currentTenantUser.BranchId, permissionReader.ExpectedBranchId);
+        }
+
+        [Fact]
+        public void TenantMeResponse_ExposesExactlyEightSafeMembers()
         {
             var properties = typeof(TenantMeResponse).GetProperties();
 
-            Assert.Equal(6, properties.Length);
+            Assert.Equal(8, properties.Length);
             Assert.Equal(
-                new[] { "UserId", "Email", "FullName", "UserKind", "Roles", "TenantSlug" }.OrderBy(name => name, StringComparer.Ordinal),
+                new[] { "UserId", "Email", "FullName", "UserKind", "Roles", "TenantSlug", "BranchId", "EffectivePermissions" }
+                    .OrderBy(name => name, StringComparer.Ordinal),
                 properties.Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
             Assert.DoesNotContain(properties, property => property.Name.Contains("hash", StringComparison.OrdinalIgnoreCase)
                 || property.Name.Contains("stamp", StringComparison.OrdinalIgnoreCase)
@@ -149,9 +177,9 @@ namespace CafeHub.UnitTests
         [Fact]
         public void TheHandler_RequiresAllDependencies()
         {
-            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(null!, tenantUserAuthenticator, tenantContextAccessor));
-            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(currentTenantUser, null!, tenantContextAccessor));
-            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(currentTenantUser, tenantUserAuthenticator, null!));
+            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(null!, tenantUserAuthenticator, tenantContextAccessor, new FakeTenantPermissionReader()));
+            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(currentTenantUser, null!, tenantContextAccessor, new FakeTenantPermissionReader()));
+            Assert.Throws<ArgumentNullException>(() => new GetCurrentTenantUserQueryHandler(currentTenantUser, tenantUserAuthenticator, null!, new FakeTenantPermissionReader()));
         }
 
         private sealed class FakeCurrentTenantUser : ICurrentTenantUser

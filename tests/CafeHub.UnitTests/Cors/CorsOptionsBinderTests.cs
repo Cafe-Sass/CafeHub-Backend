@@ -9,9 +9,6 @@ namespace CafeHub.UnitTests.Cors
         {
             return new Dictionary<string, string?>
             {
-                [CorsConfigurationKeys.AllowedMethodsPath] = "GET, POST, PUT, PATCH",
-                [CorsConfigurationKeys.AllowedHeadersPath] = "Authorization, Content-Type, Idempotency-Key, X-Correlation-Id",
-                [CorsConfigurationKeys.ExposedHeadersPath] = "X-Correlation-Id, Retry-After",
                 [CorsConfigurationKeys.AllowCredentialsPath] = "false",
                 [CorsConfigurationKeys.MaxAgeSecondsPath] = "600",
             };
@@ -32,17 +29,32 @@ namespace CafeHub.UnitTests.Cors
                 () => CorsOptionsBinder.Bind(configuration));
         }
 
-        [Fact]
-        public void Bind_WithTemplateDefaults_ReturnsTheDocumentedDefaults()
+        [Theory]
+        [InlineData("appsettings.json")]
+        [InlineData("appsettings.template.json")]
+        public void Bind_WithShippedJson_ReturnsTheDocumentedDefaults(string fileName)
         {
-            var options = CorsOptionsBinder.Bind(CreateConfiguration(CreateTemplateDefaults()));
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "Config", fileName))
+                .Build();
+            Assert.Contains(configuration.GetSection(CorsConfigurationKeys.AllowedMethodsPath).GetChildren(), child => child.Value == "DELETE");
+
+            var options = CorsOptionsBinder.Bind(configuration);
 
             Assert.Empty(options.AllowedOrigins);
-            Assert.Equal(new[] { "GET", "POST", "PUT", "PATCH" }, options.AllowedMethods);
+            Assert.Equal(new[] { "GET", "POST", "PUT", "PATCH", "DELETE" }, options.AllowedMethods);
             Assert.Equal(new[] { "Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-Id" }, options.AllowedHeaders);
             Assert.Equal(new[] { "X-Correlation-Id", "Retry-After" }, options.ExposedHeaders);
             Assert.False(options.AllowCredentials);
             Assert.Equal(600, options.MaxAgeSeconds);
+        }
+
+        [Fact]
+        public void Bind_WithAnExplicitMethodsList_UsesItWithoutAddingDefaults()
+        {
+            var configuration = CreateConfiguration(new() { [$"{CorsConfigurationKeys.AllowedMethodsPath}:0"] = "GET" });
+
+            Assert.Equal(new[] { "GET" }, CorsOptionsBinder.Bind(configuration).AllowedMethods);
         }
 
         [Fact]
@@ -53,6 +65,7 @@ namespace CafeHub.UnitTests.Cors
             Assert.Empty(options.AllowedOrigins);
             Assert.False(options.AllowCredentials);
             Assert.Equal(CorsOptions.DefaultMaxAgeSeconds, options.MaxAgeSeconds);
+            Assert.Contains("DELETE", options.AllowedMethods);
         }
 
         [Fact]

@@ -1,4 +1,7 @@
 namespace CafeHub.Application.Identity
 {
-    public sealed record TenantAccountAccess(bool IsStaff, string? SessionVersion, bool HasActiveBranch);
+    public sealed record TenantAccountAccess(bool IsStaff, string? SessionVersion, bool HasActiveBranch)
+    {
+        public Guid? BranchId { get; init; }
+    }
 }

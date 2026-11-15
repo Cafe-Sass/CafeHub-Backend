@@ -24,23 +24,33 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/auth/login` | Anonymous (`[AllowAnonymous]`) | Tenant owner/login | TenantAuthController.cs:27 |
 | POST | `t/{slug}/api/v1/auth/refresh` | Anonymous | Tenant token refresh | TenantAuthController.cs:36 |
 | POST | `t/{slug}/api/v1/auth/logout` | Anonymous | Tenant logout | TenantAuthController.cs:45 |
-| GET | `t/{slug}/api/v1/me` | `TenantUser` (`[TenantAuthorize(TenantPolicies.TenantUser)]`) | Current tenant user profile | TenantMeController.cs:24 |
+| GET | `t/{slug}/api/v1/me` | `TenantUser` | Current profile, role names, nullable branch ID and effective permissions | TenantMeController.cs |
 | GET | `t/{slug}/api/v1/cafe-profile` | `TenantUser` | Get cafe profile | TenantCafeProfileController.cs:25 |
-| PUT | `t/{slug}/api/v1/cafe-profile` | `TenantOwner` (`[TenantAuthorize(TenantPolicies.TenantOwner)]`) | Update cafe profile | TenantCafeProfileController.cs:39 |
-| GET | `t/{slug}/api/v1/branches` | `TenantBranchReader` | List branches (paginated, optional status filter) | TenantBranchesController.cs:26 |
-| GET | `t/{slug}/api/v1/branches/{branchId:guid}` | `TenantBranchReader` | Get one branch | TenantBranchesController.cs:42 |
-| POST | `t/{slug}/api/v1/branches` | `TenantOwner` | Create a branch (201 + Location header) | TenantBranchesController.cs:58 |
-| PUT | `t/{slug}/api/v1/branches/{branchId:guid}` | `TenantOwner` | Update a branch | TenantBranchesController.cs:80 |
-| POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `TenantOwner` | Suspend a branch | TenantBranchesController.cs:105 |
-| POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `TenantOwner` | Reactivate a branch | TenantBranchesController.cs:124 |
-| POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `TenantOwner` | Retire a branch. Returns Conflict while active staff are assigned. | TenantBranchesController.cs:143 |
-| POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create a staff member (201 + Location header) | TenantStaffController.cs:28 |
-| GET | `t/{slug}/api/v1/staff` | `TenantOwner` | List staff members (paginated, optional branchId/isActive filter) | TenantStaffController.cs:52 |
-| GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Get one staff member | TenantStaffController.cs:68 |
-| PUT | `t/{slug}/api/v1/staff/{staffId:guid}` | `TenantOwner` | Update a staff member profile | TenantStaffController.cs:84 |
-| POST | `t/{slug}/api/v1/staff/{staffId:guid}/deactivate` | `TenantOwner` | Deactivate a staff member (idempotent, invalidates access and refresh tokens) | TenantStaffController.cs:104 |
-| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reactivate` | `TenantOwner` | Reactivate a staff member assigned to an active branch. Fresh sign-in is required after deactivation. | TenantStaffController.cs:120 |
+| PUT | `t/{slug}/api/v1/cafe-profile` | `cafe-profile.manage` (Owner) | Update cafe profile | TenantCafeProfileController.cs |
+| GET | `t/{slug}/api/v1/branches` | `branches.read` | List branches. Staff see only their assigned active branch. | TenantBranchesController.cs |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}` | `branches.read` | Get one branch. Staff see only their assigned active branch. | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/branches` | `branches.manage` (Owner) | Create a branch (201 + Location header) | TenantBranchesController.cs |
+| PUT | `t/{slug}/api/v1/branches/{branchId:guid}` | `branches.manage` (Owner) | Update a branch | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `branches.manage` (Owner) | Suspend a branch | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `branches.manage` (Owner) | Reactivate a branch | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `branches.manage` (Owner) | Retire a branch. Returns 409 while active staff are assigned. | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create staff in an active branch (201 + Location header). Duplicate tenant email returns 409. | TenantStaffController.cs |
+| GET | `t/{slug}/api/v1/staff` | `staff.read` | List staff. Branch scope applies before filters, count and paging. | TenantStaffController.cs |
+| GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `staff.read` | Get one staff member within scope. | TenantStaffController.cs |
+| PUT | `t/{slug}/api/v1/staff/{staffId:guid}` | `staff.manage` | Update staff within scope. Transfers are Owner-only. | TenantStaffController.cs |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/deactivate` | `staff.manage` | Deactivate staff within scope and invalidate access and refresh tokens. | TenantStaffController.cs |
+| POST | `t/{slug}/api/v1/staff/{staffId:guid}/reactivate` | `staff.manage` | Reactivate staff within scope. A transition requires an active branch and a fresh sign-in. | TenantStaffController.cs |
 | POST | `t/{slug}/api/v1/staff/{staffId:guid}/reset-password` | `TenantOwner` | Owner resets a staff member's password (revokes tokens) | TenantStaffController.cs:136 |
+| GET | `t/{slug}/api/v1/permissions` | `roles.manage` (Owner) | Read the permission catalog | TenantPermissionsController.cs |
+| GET | `t/{slug}/api/v1/role-presets` | `roles.manage` (Owner) | Read suggestions without creating roles or grants | TenantPermissionsController.cs |
+| GET | `t/{slug}/api/v1/roles` | `roles.manage` (Owner) | List active roles | TenantRolesController.cs |
+| GET | `t/{slug}/api/v1/roles/{roleId:guid}` | `roles.manage` (Owner) | Read an active role, its permissions, and its concurrency token from one snapshot | TenantRolesController.cs |
+| POST | `t/{slug}/api/v1/roles` | `roles.manage` (Owner) | Create a role from `name` and `permissionCodes` | TenantRolesController.cs |
+| PUT | `t/{slug}/api/v1/roles/{roleId:guid}` | `roles.manage` (Owner) | Replace the role name and permissions using `concurrencyToken`. Stale token returns 409. | TenantRolesController.cs |
+| DELETE | `t/{slug}/api/v1/roles/{roleId:guid}` | `roles.manage` (Owner) | Retire an unused role (204). Any membership, including deactivated staff, returns 409. | TenantRolesController.cs |
+| PUT | `t/{slug}/api/v1/staff/{staffId:guid}/roles` | `roles.manage` (Owner) | Replace `roleIds`. Empty array clears memberships. | TenantStaffController.cs |
+| PUT | `t/{slug}/api/v1/staff/{staffId:guid}/permissions` | `roles.manage` (Owner) | Replace personal `permissionCodes`. Empty array clears personal grants only. | TenantStaffController.cs |
+| GET | `t/{slug}/api/v1/staff/{staffId:guid}/effective-permissions` | `roles.manage` (Owner) | Read effective permissions. Deactivated staff and staff without an active assigned branch return an empty array. | TenantStaffController.cs |
 | POST | `t/{slug}/api/v1/me/password` | `TenantUser` | Staff member changes their own password (revokes tokens) | TenantMeController.cs:40 |
 | GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
 | GET | `health/ready` | Anonymous | Readiness probe; Master database connectivity | Health check middleware (Program.cs:68) |
@@ -51,9 +61,12 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 |---|---|---|
 | `PlatformAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Platform administrator |
 | `SuperAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Super administrator |
-| `TenantBranchReader` | `CafeHub.WebApi.Authorization.TenantPolicies` | Active Owner, or active Staff whose assigned branch is Active |
 | `TenantUser` | `CafeHub.WebApi.Authorization.TenantPolicies` | Authenticated tenant user (owner or staff) |
 | `TenantOwner` | `CafeHub.WebApi.Authorization.TenantPolicies` | Tenant owner only |
+| `staff.read`, `staff.manage`, `branches.read` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
+| `roles.manage`, `cafe-profile.manage`, `branches.manage` | Tenant permission policy | Reserved for the Owner. These catalog codes are excluded from staff grants and effective permissions. |
+
+Tenant policies read current grants from the tenant database. The grant query verifies that the staff member still belongs to the active branch captured at authentication and used to scope the request. Missing credentials and permissions return generic 401 and 403 responses. Out-of-scope resources return the same 404 as missing resources. Suspended branches block delegated staff operations and branch reads, while active accounts retain sign-in, refresh, cafe-profile reads, and self-service.
 
 ## Configuration reference
 
@@ -79,7 +92,7 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | `RateLimiting:Global` | `PermitLimit` | Global rate limit permits | `300` | No |
 | `RateLimiting:Global` | `WindowSeconds` | Global rate limit window | `60` | No |
 | `Cors` | `AllowedOrigins` | CORS allowed origins | `[]` | No |
-| `Cors` | `AllowedMethods` | CORS allowed methods | GET, POST, PUT, PATCH | No |
+| `Cors` | `AllowedMethods` | CORS allowed methods. Explicit deployment overrides must include `DELETE` for cross-origin role retirement. | GET, POST, PUT, PATCH, DELETE | No |
 | `Cors` | `AllowedHeaders` | CORS allowed headers | Authorization, Content-Type, Idempotency-Key, X-Correlation-Id | No |
 | `Cors` | `ExposedHeaders` | CORS exposed headers | X-Correlation-Id, Retry-After | No |
 | `Cors` | `AllowCredentials` | CORS allow credentials | `false` | No |

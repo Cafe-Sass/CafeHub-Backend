@@ -8,7 +8,8 @@ using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CafeHub.UnitTests
@@ -18,10 +19,11 @@ namespace CafeHub.UnitTests
         private static readonly Guid TenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         private static readonly Guid UserId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-        private static ServiceProvider CreateServices(Guid? contextTenantId = null)
+        private static ServiceProvider CreateServices(Guid? contextTenantId = null, FakeTenantPermissionReader? permissions = null)
         {
             var services = new ServiceCollection();
             services.AddLogging();
+            services.AddSingleton<ITenantPermissionReader>(permissions ?? new FakeTenantPermissionReader { Codes = [TenantPermissions.BranchesRead] });
             services.AddSingleton<ITenantContextAccessor>(new StubTenantContextAccessor(contextTenantId ?? TenantId));
             services.AddTenantAuthentication();
             services.AddTenantAuthorization();
@@ -46,9 +48,9 @@ namespace CafeHub.UnitTests
             var authorization = provider.GetRequiredService<IAuthorizationService>();
 
             var ownerUser = await authorization.AuthorizeAsync(Principal(TenantId, TenantRoles.Owner), TenantPolicies.TenantUser);
-            var ownerOnly = await authorization.AuthorizeAsync(Principal(TenantId, TenantRoles.Owner), TenantPolicies.TenantOwner);
+            var ownerOnly = await authorization.AuthorizeAsync(Principal(TenantId), AccessContext(new(false, null, false)), TenantPolicies.TenantOwner);
             var staffUser = await authorization.AuthorizeAsync(Principal(TenantId, "Staff"), TenantPolicies.TenantUser);
-            var staffOwner = await authorization.AuthorizeAsync(Principal(TenantId, "Staff"), TenantPolicies.TenantOwner);
+            var staffOwner = await authorization.AuthorizeAsync(Principal(TenantId, TenantRoles.Owner), AccessContext(new(true, null, true)), TenantPolicies.TenantOwner);
 
             Assert.True(ownerUser.Succeeded);
             Assert.True(ownerOnly.Succeeded);
@@ -64,12 +66,49 @@ namespace CafeHub.UnitTests
         {
             using var provider = CreateServices();
             var authorization = provider.GetRequiredService<IAuthorizationService>();
-            var context = new DefaultHttpContext();
-            context.Items[typeof(TenantAccountAccess)] = new TenantAccountAccess(staff, null, activeBranch);
+            var context = AccessContext(new TenantAccountAccess(staff, null, activeBranch) { BranchId = Guid.NewGuid() });
             var principal = Principal(TenantId, staff ? "Staff" : TenantRoles.Owner);
 
-            Assert.Equal(allowed, (await authorization.AuthorizeAsync(principal, context, TenantPolicies.TenantBranchReader)).Succeeded);
+            Assert.Equal(allowed, (await authorization.AuthorizeAsync(principal, context, TenantPermissions.BranchesRead)).Succeeded);
             Assert.True((await authorization.AuthorizeAsync(principal, context, TenantPolicies.TenantUser)).Succeeded);
+        }
+
+        [Fact]
+        public async Task StaffWithManageAloneCannotReadStaffOrUseOwnerPolicies()
+        {
+            var permissions = new FakeTenantPermissionReader { Codes = TenantPermissions.All.Except([TenantPermissions.StaffRead]).ToArray() };
+            using var provider = CreateServices(permissions: permissions);
+            var authorization = provider.GetRequiredService<IAuthorizationService>();
+            var context = AccessContext(new TenantAccountAccess(true, "staff", true) { BranchId = Guid.NewGuid() });
+            var principal = Principal(TenantId, TenantRoles.Owner);
+
+            Assert.True((await authorization.AuthorizeAsync(principal, context, TenantPermissions.StaffManage)).Succeeded);
+            Assert.Equal(((TenantAccountAccess)context.Items[typeof(TenantAccountAccess)]!).BranchId, permissions.ExpectedBranchId);
+            Assert.False((await authorization.AuthorizeAsync(principal, context, TenantPermissions.StaffRead)).Succeeded);
+            foreach (var policy in new[] { TenantPermissions.RolesManage, TenantPermissions.BranchesManage, TenantPermissions.CafeProfileManage, TenantPolicies.TenantOwner })
+            {
+                Assert.False((await authorization.AuthorizeAsync(principal, context, policy)).Succeeded);
+            }
+        }
+
+        [Fact]
+        public async Task SuspendedStaffKeepTenantUserAccessAndRegainScopedAccessOnReactivation()
+        {
+            var permissions = new FakeTenantPermissionReader { Codes = [TenantPermissions.StaffManage, TenantPermissions.StaffRead, TenantPermissions.BranchesRead] };
+            using var provider = CreateServices(permissions: permissions);
+            var authorization = provider.GetRequiredService<IAuthorizationService>();
+            var account = new TenantAccountAccess(true, "staff", false) { BranchId = Guid.NewGuid() };
+            var principal = Principal(TenantId);
+            var suspended = AccessContext(account);
+            var active = AccessContext(account with { HasActiveBranch = true });
+
+            foreach (var policy in permissions.Codes)
+            {
+                Assert.False((await authorization.AuthorizeAsync(principal, suspended, policy)).Succeeded);
+                Assert.True((await authorization.AuthorizeAsync(principal, active, policy)).Succeeded);
+            }
+
+            Assert.True((await authorization.AuthorizeAsync(principal, suspended, TenantPolicies.TenantUser)).Succeeded);
         }
 
         [Fact]
@@ -92,6 +131,23 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task PlatformAuthorizationDoesNotResolveTheTenantPermissionReader()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<ITenantContextAccessor>(new StubTenantContextAccessor(TenantId));
+            services.AddScoped<ITenantPermissionReader>(_ => throw new InvalidOperationException("Tenant data is unavailable on platform routes."));
+            services.AddPlatformAuthorization();
+            services.AddTenantAuthorization();
+            using var provider = services.BuildServiceProvider();
+            using var scope = provider.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
+            var identity = new ClaimsIdentity([new Claim(ClaimTypes.Role, "SuperAdmin")], "platform");
+
+            Assert.True((await service.AuthorizeAsync(new ClaimsPrincipal(identity), PlatformAuthorizationPolicies.SuperAdmin)).Succeeded);
+        }
+
+        [Fact]
         public void TenantAuthorizeAttribute_SelectsTenantSchemeAndPolicy()
         {
             var attribute = new TenantAuthorizeAttribute(TenantPolicies.TenantUser);
@@ -103,22 +159,55 @@ namespace CafeHub.UnitTests
         [Fact]
         public void TenantControllerActions_AreExplicitlyAuthorizedOrAnonymous()
         {
-            var controllerTypes = typeof(TenantAuthController).Assembly.GetTypes()
-                .Where(type => typeof(ControllerBase).IsAssignableFrom(type)
-                    && type.GetCustomAttribute<RouteAttribute>()?.Template.StartsWith("t/{slug}", StringComparison.Ordinal) == true);
-            var actions = controllerTypes.SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(method => method.GetCustomAttributes().Any(attribute => attribute is HttpGetAttribute or HttpPostAttribute or HttpPutAttribute or HttpDeleteAttribute or HttpPatchAttribute))
-                .Select(method => (Type: type, Method: method)))
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddControllers().AddApplicationPart(typeof(TenantAuthController).Assembly);
+            using var provider = services.BuildServiceProvider();
+            var actions = provider.GetRequiredService<IActionDescriptorCollectionProvider>().ActionDescriptors.Items
+                .OfType<ControllerActionDescriptor>()
+                .Where(action => action.AttributeRouteInfo?.Template?.StartsWith("t/{slug}/", StringComparison.OrdinalIgnoreCase) == true)
                 .ToArray();
 
             Assert.NotEmpty(actions);
-            foreach (var (type, method) in actions)
+            foreach (var action in actions)
             {
-                var tenantAuthorization = method.GetCustomAttribute<TenantAuthorizeAttribute>()
-                    ?? type.GetCustomAttribute<TenantAuthorizeAttribute>();
-                var anonymous = method.GetCustomAttribute<AllowAnonymousAttribute>()
-                    ?? type.GetCustomAttribute<AllowAnonymousAttribute>();
-                Assert.True(tenantAuthorization is not null || anonymous is not null, $"{type.Name}.{method.Name} has no tenant authorization or AllowAnonymous attribute.");
+                var tenantAuthorization = action.EndpointMetadata.OfType<TenantAuthorizeAttribute>().LastOrDefault();
+                var anonymous = action.EndpointMetadata.OfType<IAllowAnonymous>().Any();
+                Assert.True(tenantAuthorization is not null || anonymous, $"{action.DisplayName} has no tenant authorization or AllowAnonymous metadata.");
+                if (anonymous)
+                {
+                    Assert.Equal(typeof(TenantAuthController), action.ControllerTypeInfo.AsType());
+                    Assert.Contains(action.MethodInfo.Name, new[] { "Login", "Refresh", "Logout" });
+                }
+                else
+                {
+                    Assert.Equal(TenantAuthenticationSchemes.Bearer, tenantAuthorization!.AuthenticationSchemes);
+                    Assert.Contains(tenantAuthorization.Policy, TenantPermissions.All.Concat([TenantPolicies.TenantOwner, TenantPolicies.TenantUser]));
+                }
+            }
+        }
+
+        [Fact]
+        public void StaffEndpointsRequireTheirExactPermissionsAndKeepCreationAndPasswordResetsOwnerOnly()
+        {
+            var policies = new Dictionary<string, string>
+            {
+                [nameof(TenantStaffController.List)] = TenantPermissions.StaffRead,
+                [nameof(TenantStaffController.GetById)] = TenantPermissions.StaffRead,
+                [nameof(TenantStaffController.Create)] = TenantPolicies.TenantOwner,
+                [nameof(TenantStaffController.Update)] = TenantPermissions.StaffManage,
+                [nameof(TenantStaffController.Deactivate)] = TenantPermissions.StaffManage,
+                [nameof(TenantStaffController.Reactivate)] = TenantPermissions.StaffManage,
+                [nameof(TenantStaffController.ResetPassword)] = TenantPolicies.TenantOwner,
+                [nameof(TenantStaffController.SetRoles)] = TenantPermissions.RolesManage,
+                [nameof(TenantStaffController.SetPermissions)] = TenantPermissions.RolesManage,
+                [nameof(TenantStaffController.EffectivePermissions)] = TenantPermissions.RolesManage,
+            };
+
+            foreach (var (action, policy) in policies)
+            {
+                var method = typeof(TenantStaffController).GetMethod(action);
+                Assert.Equal(policy, method?.GetCustomAttribute<TenantAuthorizeAttribute>()?.Policy);
             }
         }
 
@@ -157,6 +246,13 @@ namespace CafeHub.UnitTests
             Assert.Null(invalid.UserId);
             Assert.Null(invalid.TenantId);
             Assert.Equal(new[] { "Owner" }, invalid.Roles);
+        }
+
+        private static DefaultHttpContext AccessContext(TenantAccountAccess account)
+        {
+            var context = new DefaultHttpContext();
+            context.Items[typeof(TenantAccountAccess)] = account;
+            return context;
         }
 
         private sealed class StubTenantContextAccessor(Guid tenantId) : ITenantContextAccessor

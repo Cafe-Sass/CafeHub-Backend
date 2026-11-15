@@ -18,6 +18,12 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(c => c.ClaimValue).HasColumnName("claim_value").HasColumnType("text").IsRequired(false);
             builder.Property(c => c.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
 
+            builder.HasIndex(c => c.TenantUserId);
+            builder.HasIndex(c => new { c.TenantUserId, c.ClaimValue })
+                .IsUnique()
+                .HasFilter("claim_type = 'cafehub.permission' AND claim_value IS NOT NULL")
+                .HasDatabaseName("uq_tenant_user_claims_permission");
+
             builder.HasOne<TenantUser>()
                 .WithMany()
                 .HasForeignKey(c => c.TenantUserId)

@@ -103,7 +103,7 @@ erDiagram
 Provisioning creates the database, applies migrations, and seeds required data (FR-ONB-006). Seed steps must stay safe under provisioning retries (FR-ONB-007): a resumed attempt must not duplicate seeded rows or reset owner-configured state. The seeds and the source of each row:
 
 - `cafe_settings` — the singleton profile row: `cafe_name` is copied from the approved onboarding request (Master source `onboarding_requests.cafe_name`; FR-CAF-001 for the profile row it initializes) as delivered by the provisioning pipeline; `timezone` receives the provisioning default (**Proposed** — the value and its derivation await owner confirmation); the cafe contact fields (`contact_phone`, `contact_email`, `contact_address`), the logo reference, and the template colors are **empty after seeding** — they have no registration-time source — and are filled by the owner through the cafe profile screen later (**Proposed, pending owner confirmation**; rejected alternative: collecting cafe contact fields on the public registration form and copying them, which widens the Master registration data and the public form — a product decision, not a schema detail); the row exists from seed with `created_by` NULL (no acting user).
-- `tenant_roles` — the seeded Owner role (Proposed name `Owner`), so the owner's permissions are carried through role claims from the first login (FR-IAM-002); further roles are configured later.
+- `tenant_roles` — the protected seeded `Owner` role. The active database Owner account receives every catalog permission without per-permission seed rows.
 - `tenant_users` — the seeded Owner account, copied row by row from the approved onboarding request as delivered by the provisioning pipeline: `full_name` from its `owner_full_name`; `email` and the mechanism's `normalized_email` from its `owner_email` (the same value also seeds `user_name`/`normalized_user_name` — **Proposed**, matching the Master contract); `phone_number` from its `owner_phone_number`, NULL when the owner did not enter one; and `password_hash` from its `owner_password_hash`, copied as-is — a hasher-produced value, never transformed or decrypted; it is verified only through the mechanism's hasher (PRD section 11.1). Generated at seed with no Master source: `user_kind` (`'Owner'`), the `security_stamp`/`concurrency_stamp` mechanism stamps, and the lockout start state (enabled — the Identity default). The private slug (`tenant_slug`) is **not copied** — the Tenant database never stores it.
 - `tenant_user_roles` — the membership row linking the seeded Owner user to the seeded Owner role, so the first login is authorized without manual setup.
 - `tenant_audit_records` — the first audit record, written by the system (`actor_kind = 'System'`, `actor_user_id` NULL), capturing that the database was provisioned and seeded.
@@ -117,7 +117,7 @@ Nothing links back to the Master database: no foreign key crosses databases (con
 Purpose: owner and staff authentication and authorization subjects in this cafe's database (FR-IAM-001, FR-IAM-002); the lifecycle behaviors and included/excluded Identity tables are documented under `Identity model documentation` above.
 
 - `id uuid NOT NULL` — entity identity; `pk_tenant_users` (Identity keyed by GUID; the default string key is intentionally not used because all identities are UUIDv7).
-- `user_kind text NOT NULL` — `ck_tenant_users_kind` over `('Owner', 'Staff')` (Proposed): the seeded cafe owner versus staff accounts; role claims stay the authoritative authorization input (FR-IAM-002). Owner versus staff matters for audit derivation (see `tenant_audit_records`); it is not duplicated into audit rows.
+- `user_kind text NOT NULL` — `ck_tenant_users_kind` over `('Owner', 'Staff')`. The active Owner receives all catalog permissions; active staff receive the union of active role grants and additive personal grants. Deactivated accounts have no effective permissions.
 - `branch_id uuid NULL FK branches.id` (`fk_tenant_users_branch_id`, ON DELETE RESTRICT) — the staff member's assigned branch; NULL for Owner accounts. Indexed via `ix_tenant_users_branch_id`. CHECK constraint `ck_tenant_users_branch_scope`: `((user_kind = 'Staff' AND branch_id IS NOT NULL) OR (user_kind = 'Owner' AND branch_id IS NULL))`.
 - `user_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_user_name_length`); `normalized_user_name text NOT NULL` (CHECK length 1..256) with `uq_tenant_users_normalized_user_name` — the mechanism's own case-normalized column and the uniqueness enforcement.
 - `full_name text NOT NULL` (CHECK length 1..256, `ck_tenant_users_full_name_length`) — **Proposed, pending owner confirmation**: every account holder (the Owner now, staff later) is a person whose name audit display and staff screens need (FR-IAM-005 audit attribution, FR-IAM-003 staff views). The rejected alternative is a nullable column: accounts could exist with no human-readable name, and both audit records and staff screens would need fallback rules instead. The Owner seed fills it from the onboarding request's `owner_full_name` (see the seeding section above).
@@ -136,7 +136,8 @@ Purpose: role catalog for owner/staff authorization (FR-IAM-002); the MVP role e
 
 - `id uuid NOT NULL` — `pk_tenant_roles`.
 - `name text NOT NULL` (CHECK length 1..256); `normalized_name text NOT NULL` (CHECK length 1..256) with `uq_tenant_roles_normalized_name`.
-- `concurrency_stamp text NOT NULL` (CHECK length 1..64) — mechanism column as above.
+- `concurrency_stamp text NOT NULL` (CHECK length 1..64) — Identity stamp. PostgreSQL system column `xmin` is mapped as a row version for role updates, including permission-only changes.
+- `deleted_at timestamptz NULL`, `deleted_by uuid NULL FK tenant_users.id` (indexed) mark retirement. Owner is protected. Any membership, including one held by a deactivated user, prevents retirement. Retired rows and their grants remain for history, and the unique normalized name stays reserved.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id` (the seeded Owner role is bootstrapped by provisioning with NULL actor).
 
 ### tenant_user_roles
@@ -160,6 +161,8 @@ Purpose: claims granted to every holder of a role. Same assignment-state treatme
 
 - `id uuid NOT NULL` — `pk_tenant_role_claims`; `role_id uuid NOT NULL FK tenant_roles.id`; `claim_type text NOT NULL` (CHECK length 1..512); `claim_value text NULL` (CHECK length 0..1024 when present).
 - `created_at timestamptz NOT NULL`.
+
+Role and personal permissions use claim type `cafehub.permission` and a non-null catalog code. Partial unique indexes `uq_tenant_role_claims_permission` and `uq_tenant_user_claims_permission` enforce one row per role or user and code. Only the Owner can assign grants. `roles.manage`, `branches.manage`, and `cafe-profile.manage` are reserved for the Owner. Replacing a grant set removes only permission rows of the relevant type and audits the before/after values.
 
 ### branches
 

@@ -16,7 +16,7 @@ namespace CafeHub.WebApi.Cors
         public CorsOptions()
         {
             AllowedOrigins = Array.Empty<string>();
-            AllowedMethods = new[] { "GET", "POST", "PUT", "PATCH" };
+            AllowedMethods = new[] { "GET", "POST", "PUT", "PATCH", "DELETE" };
             AllowedHeaders = new[] { "Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-Id" };
             ExposedHeaders = new[] { "X-Correlation-Id", "Retry-After" };
         }

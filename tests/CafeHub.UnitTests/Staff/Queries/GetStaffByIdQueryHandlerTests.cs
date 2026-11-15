@@ -16,7 +16,7 @@ namespace CafeHub.UnitTests.Staff.Queries
 
         public GetStaffByIdQueryHandlerTests()
         {
-            handler = new GetStaffByIdQueryHandler(store);
+            handler = new GetStaffByIdQueryHandler(store, new FakeTask42Access());
         }
 
         [Fact]
@@ -56,7 +56,7 @@ namespace CafeHub.UnitTests.Staff.Queries
         [Fact]
         public void TheHandler_RequiresDependency()
         {
-            Assert.Throws<ArgumentNullException>(() => new GetStaffByIdQueryHandler(null!));
+            Assert.Throws<ArgumentNullException>(() => new GetStaffByIdQueryHandler(null!, new FakeTask42Access()));
         }
     }
 }
