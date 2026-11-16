@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Menu.DTOs;
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Menu.Contracts
@@ -14,5 +15,20 @@ namespace CafeHub.Application.Menu.Contracts
 
         Task<Result<ProductResponse>> ChangeStatusAsync(
             Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken);
+
+        Task<OffsetPage<ProductListItemResponse>> ListAsync(
+            Guid? categoryId,
+            ProductKind? kind,
+            bool? caffeine,
+            string? tag,
+            ProductStatus? status,
+            string? search,
+            int page,
+            int pageSize,
+            IReadOnlyList<SortTerm> sort,
+            bool includeTotalCount,
+            CancellationToken cancellationToken);
+
+        Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken);
     }
 }

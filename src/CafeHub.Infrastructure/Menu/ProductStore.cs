@@ -1,9 +1,12 @@
+using System.Data;
 using System.Globalization;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Menu;
 using CafeHub.Application.Menu.Contracts;
 using CafeHub.Application.Menu.DTOs;
+using CafeHub.Application.Menu.Queries;
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
@@ -213,6 +216,169 @@ namespace CafeHub.Infrastructure.Menu
                 action,
                 TenantAuditChangeSets.ProductLifecycleStatus(product, oldStatus),
                 cancellationToken);
+        }
+
+        public async Task<OffsetPage<ProductListItemResponse>> ListAsync(
+            Guid? categoryId,
+            ProductKind? kind,
+            bool? caffeine,
+            string? tag,
+            ProductStatus? status,
+            string? search,
+            int page,
+            int pageSize,
+            IReadOnlyList<SortTerm> sort,
+            bool includeTotalCount,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(sort);
+
+            var query = context.Products.AsNoTracking();
+            if (status is { } statusFilter)
+            {
+                query = query.Where(product => product.Status == statusFilter);
+            }
+            else
+            {
+                query = query.Where(product => product.Status == ProductStatus.Active);
+            }
+
+            if (categoryId is { } categoryIdValue)
+            {
+                var categoryIds = new List<Guid> { categoryIdValue };
+                categoryIds.AddRange(await context.MenuCategories.AsNoTracking()
+                    .Where(category => category.ParentId == categoryIdValue)
+                    .Select(category => category.Id)
+                    .ToListAsync(cancellationToken));
+                query = query.Where(product => categoryIds.Contains(product.CategoryId));
+            }
+
+            if (kind is { } kindFilter)
+            {
+                query = query.Where(product => product.Kind == kindFilter);
+            }
+
+            if (caffeine is { } caffeineFilter)
+            {
+                query = query.Where(product => product.Caffeine == caffeineFilter);
+            }
+
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                var normalizedTag = tag.Trim().ToLowerInvariant();
+                query = query.Where(product => product.Tags.Any(tagRow => tagRow.Tag == normalizedTag));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var pattern = $"%{EscapeLike(search.Trim())}%";
+                query = query.Where(product => EF.Functions.ILike(product.Name, pattern));
+            }
+
+            await using var transaction = includeTotalCount
+                ? await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken)
+                : null;
+
+            int? totalCount = includeTotalCount ? await query.CountAsync(cancellationToken) : null;
+
+            var fetchedItems = await ApplySort(query, sort)
+                .Skip(checked((page - 1) * pageSize))
+                .Take(pageSize + 1)
+                .Select(product => new
+                {
+                    Product = product,
+                    DefaultSizePrice = product.Sizes.Where(size => size.IsDefault).Select(size => size.Price).FirstOrDefault(),
+                })
+                .ToListAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return OffsetPage<ProductListItemResponse>.Create(
+                fetchedItems.Select(row => ProductListItemResponse.From(row.Product, row.DefaultSizePrice)).ToArray(),
+                page,
+                pageSize,
+                totalCount);
+        }
+
+        public async Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var row = await context.Products.AsNoTracking()
+                .Include(product => product.Sizes)
+                .Include(product => product.Addons)
+                .Include(product => product.Tags)
+                .Where(product => product.Id == id)
+                .Select(product => new
+                {
+                    Product = product,
+                    Version = EF.Property<uint>(product, "xmin"),
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+            return row is null
+                ? null
+                : ProductResponse.From(row.Product, row.Version.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static IOrderedQueryable<Product> ApplySort(
+            IQueryable<Product> query,
+            IReadOnlyList<SortTerm> sort)
+        {
+            if (sort.Count == 0)
+            {
+                throw new InvalidOperationException("The products list requires at least one resolved sort term.");
+            }
+
+            var ordered = OrderBy(query, sort[0]);
+            for (var index = 1; index < sort.Count; index++)
+            {
+                ordered = ThenBy(ordered, sort[index]);
+            }
+
+            return ordered;
+        }
+
+        private static IOrderedQueryable<Product> OrderBy(IQueryable<Product> query, SortTerm term)
+        {
+            return (term.Field, term.Direction) switch
+            {
+                (ProductListSort.SortOrderField, SortDirection.Asc) => query.OrderBy(product => product.SortOrder),
+                (ProductListSort.SortOrderField, SortDirection.Desc) => query.OrderByDescending(product => product.SortOrder),
+                (ProductListSort.NameField, SortDirection.Asc) => query.OrderBy(product => product.Name),
+                (ProductListSort.NameField, SortDirection.Desc) => query.OrderByDescending(product => product.Name),
+                (ProductListSort.CreatedAtField, SortDirection.Asc) => query.OrderBy(product => product.CreatedAt),
+                (ProductListSort.CreatedAtField, SortDirection.Desc) => query.OrderByDescending(product => product.CreatedAt),
+                (SortWhitelist.IdentifierField, SortDirection.Asc) => query.OrderBy(product => product.Id),
+                (SortWhitelist.IdentifierField, SortDirection.Desc) => query.OrderByDescending(product => product.Id),
+                _ => throw new InvalidOperationException(
+                    $"The products list sort term '{term.Field}' with direction '{term.Direction}' is not supported."),
+            };
+        }
+
+        private static IOrderedQueryable<Product> ThenBy(IOrderedQueryable<Product> query, SortTerm term)
+        {
+            return (term.Field, term.Direction) switch
+            {
+                (ProductListSort.SortOrderField, SortDirection.Asc) => query.ThenBy(product => product.SortOrder),
+                (ProductListSort.SortOrderField, SortDirection.Desc) => query.ThenByDescending(product => product.SortOrder),
+                (ProductListSort.NameField, SortDirection.Asc) => query.ThenBy(product => product.Name),
+                (ProductListSort.NameField, SortDirection.Desc) => query.ThenByDescending(product => product.Name),
+                (ProductListSort.CreatedAtField, SortDirection.Asc) => query.ThenBy(product => product.CreatedAt),
+                (ProductListSort.CreatedAtField, SortDirection.Desc) => query.ThenByDescending(product => product.CreatedAt),
+                (SortWhitelist.IdentifierField, SortDirection.Asc) => query.ThenBy(product => product.Id),
+                (SortWhitelist.IdentifierField, SortDirection.Desc) => query.ThenByDescending(product => product.Id),
+                _ => throw new InvalidOperationException(
+                    $"The products list sort term '{term.Field}' with direction '{term.Direction}' is not supported."),
+            };
+        }
+
+        private static string EscapeLike(string value)
+        {
+            return value
+                .Replace(@"\", @"\\")
+                .Replace("%", @"\%")
+                .Replace("_", @"\_");
         }
 
         private async Task<Product?> LockAndLoadAsync(Guid id, CancellationToken cancellationToken)
