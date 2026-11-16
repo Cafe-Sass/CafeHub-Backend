@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 11 tables after adding `branch_tables` for cafe table numbering and QR codes in Story CFMD-387; earlier stories added `stations` and `refresh_tokens` for owner and staff authentication sessions, and the baseline 8-table scope included neither.
+The Tenant model contains 12 tables after adding `tenant_user_stations` for staff station assignment in Story CFMD-386; earlier stories added `stations` and `refresh_tokens` for owner and staff authentication sessions, and `branch_tables` for cafe table numbering in Story CFMD-387, and the baseline 8-table scope included neither.
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. `CFMD-74` consumes this ERD for entity classes and migrations; no entity, migration, or DbContext change is made in this story.
 
@@ -59,6 +59,10 @@ erDiagram
         text qr_code
         text status
     }
+    tenant_user_stations {
+        uuid tenant_user_id FK
+        uuid station_id FK
+    }
     cafe_settings {
         uuid id PK
         text cafe_name
@@ -95,6 +99,8 @@ erDiagram
     branches ||--o{ tenant_users : "staff branch"
     branches ||--o{ stations : "stations"
     branches ||--o{ branch_tables : "tables"
+    tenant_users ||--o{ tenant_user_stations : "station assignments"
+    stations ||--o{ tenant_user_stations : "assigned staff"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -203,6 +209,17 @@ Purpose: preparation stations within one branch (FR-IAM-002) — named, ordered 
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
 - The PostgreSQL system column `xmin` is mapped as a row version for optimistic concurrency on station updates.
 - `uq_stations_branch_active_name` — unique expression index on `(branch_id, lower(name))` WHERE `status = 'Active'`; a name is unique among a branch's active stations, case-insensitively, while an inactive duplicate stays allowed. The expression index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
+
+### tenant_user_stations
+
+Purpose: the many-to-many assignment of staff to stations within one branch (FR-IAM-002) — a staff member sees only their assigned stations, while a staff member with no assignments sees every active station of their branch. Rows are never physically deleted; moving a staff member to another branch clears their assignments.
+
+- `tenant_user_id uuid NOT NULL` — `fk_tenant_user_stations_tenant_user_id` foreign key to `tenant_users.id` (ON DELETE RESTRICT); the user must be a Staff user of the station's branch.
+- `station_id uuid NOT NULL` — `fk_tenant_user_stations_station_id` foreign key to `stations.id` (ON DELETE RESTRICT); the station must be Active and belong to the same branch as the staff member.
+- `created_at timestamptz NOT NULL` — when the assignment was made.
+- `pk_tenant_user_stations` — composite primary key on `(tenant_user_id, station_id)`; a staff member is assigned to a given station at most once.
+- `ix_tenant_user_stations_station_id` — index on `station_id` to support per-station staff lookups.
+- `ix_tenant_user_stations_tenant_user_id` — index on `tenant_user_id` to support per-staff station lookups (covered by the PK in most engines but stated explicitly for the tenant upgrade path).
 
 ### branch_tables
 

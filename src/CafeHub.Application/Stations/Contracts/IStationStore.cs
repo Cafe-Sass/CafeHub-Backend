@@ -48,5 +48,12 @@ namespace CafeHub.Application.Stations.Contracts
             CancellationToken cancellationToken);
 
         Task<StationListPage> ListAsync(StationListRequest request, CancellationToken cancellationToken);
+
+        Task<Result> SetStaffStationsAsync(
+            Guid staffId,
+            IReadOnlyList<Guid> stationIds,
+            Guid? scopeBranchId,
+            Guid actorUserId,
+            CancellationToken cancellationToken);
     }
 }
