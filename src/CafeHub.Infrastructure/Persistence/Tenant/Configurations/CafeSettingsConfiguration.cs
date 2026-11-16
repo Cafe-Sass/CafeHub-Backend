@@ -17,6 +17,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 t.HasCheckConstraint("ck_cafe_settings_contact_email_length", "contact_email IS NULL OR length(contact_email) <= 320");
                 t.HasCheckConstraint("ck_cafe_settings_contact_address_length", "contact_address IS NULL OR length(contact_address) <= 512");
                 t.HasCheckConstraint("ck_cafe_settings_timezone", "length(timezone) >= 1 AND length(timezone) <= 64");
+                t.HasCheckConstraint("ck_cafe_settings_currency_code_format", "currency_code ~ '^[a-z]{3}$'");
             });
 
             builder.HasKey(s => s.Id).HasName("pk_cafe_settings");
@@ -31,6 +32,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(s => s.ContactEmail).HasColumnName("contact_email").HasColumnType("text").IsRequired(false);
             builder.Property(s => s.ContactAddress).HasColumnName("contact_address").HasColumnType("text").IsRequired(false);
             builder.Property(s => s.Timezone).HasColumnName("timezone").HasColumnType("text").IsRequired();
+            builder.Property(s => s.CurrencyCode).HasColumnName("currency_code").HasColumnType("text").HasDefaultValue(CafeSettings.DefaultCurrencyCode).IsRequired();
 
             builder.Property(s => s.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
             builder.Property(s => s.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz").IsRequired();
