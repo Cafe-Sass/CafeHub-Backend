@@ -34,13 +34,14 @@ namespace CafeHub.UnitTests
                 Assert.Contains("normalized_name", grantSources[0], StringComparison.Ordinal);
                 Assert.Contains("tenant_user_claims", grantSources[1], StringComparison.Ordinal);
                 return TenantCommandStub.Scalars(TenantPermissions.StaffRead, TenantPermissions.StaffManage,
-                    TenantPermissions.RolesManage, TenantPermissions.BranchesManage, TenantPermissions.CafeProfileManage, "unknown");
+                    TenantPermissions.MenuManage, TenantPermissions.RolesManage, TenantPermissions.BranchesManage,
+                    TenantPermissions.CafeProfileManage, "unknown");
             });
             await using var context = stub.CreateContext();
 
             var permissions = await new TenantPermissionReader(context).ReadAsync(userId, default, branchId);
 
-            Assert.Equal(new[] { TenantPermissions.StaffManage, TenantPermissions.StaffRead }, permissions);
+            Assert.Equal(new[] { TenantPermissions.MenuManage, TenantPermissions.StaffManage, TenantPermissions.StaffRead }, permissions);
             Assert.Single(commands);
         }
 

@@ -117,7 +117,7 @@ All modules below are **planned**; none exists as business code yet. No empty mo
 | Subscriptions | Plan catalog, subscription lifecycle, initial payment states | planned |
 | Identity | Owner and staff authentication and permission boundaries | planned |
 | CafeConfiguration | Profile/branding, branches, tables, QR generation | planned |
-| Menu | Catalog, branch availability, OCR draft import review | planned |
+| Menu | Catalog, branch availability, OCR draft import review | categories |
 | Ordering | Guest and Captain-assisted orders, acceptance, Order More | planned |
 | Billing | Bills, payment records, Hybrid settlement, receipts | planned |
 | WiFi | Packages, token issuance | planned |

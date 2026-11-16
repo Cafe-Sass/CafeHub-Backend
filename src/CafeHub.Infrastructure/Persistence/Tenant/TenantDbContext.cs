@@ -12,6 +12,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<TenantRoleClaim> TenantRoleClaims => Set<TenantRoleClaim>();
         public DbSet<Branch> Branches => Set<Branch>();
         public DbSet<Station> Stations => Set<Station>();
+        public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
         public DbSet<BranchTable> BranchTables => Set<BranchTable>();
         public DbSet<TenantUserStation> TenantUserStations => Set<TenantUserStation>();
         public DbSet<CafeSettings> CafeSettings => Set<CafeSettings>();

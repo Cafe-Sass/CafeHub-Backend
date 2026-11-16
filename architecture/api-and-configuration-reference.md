@@ -41,6 +41,12 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/stations/{stationId:guid}/deactivate` | `stations.manage` | Deactivate a station (row kept). | TenantStationsController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/stations/{stationId:guid}/reactivate` | `stations.manage` | Reactivate a station; fails with 409 if an active station already uses the name. | TenantStationsController.cs |
 | PUT | `t/{slug}/api/v1/staff/{staffId:guid}/stations` | `stations.manage` | Replace a staff member's station assignments. | TenantStaffController.cs |
+| POST | `t/{slug}/api/v1/menu/categories` | `menu.manage` | Create an active category (201 + Location). Accepts `name`, explicit `sortOrder`, and optional `parentId`. | TenantMenuCategoriesController.cs |
+| GET | `t/{slug}/api/v1/menu/categories` | `TenantUser`, `menu.manage` for `includeInactive=true` | Page the cafe's root categories with all eligible children. | TenantMenuCategoriesController.cs |
+| GET | `t/{slug}/api/v1/menu/categories/{id:guid}` | `TenantUser` | Get a visible category. Hidden and missing rows return the same 404 for all callers. | TenantMenuCategoriesController.cs |
+| PUT | `t/{slug}/api/v1/menu/categories/{id:guid}` | `menu.manage` | Update `name` and `sortOrder` using `concurrencyToken`. Managers may edit hidden or inactive rows. | TenantMenuCategoriesController.cs |
+| POST | `t/{slug}/api/v1/menu/categories/{id:guid}/deactivate` | `menu.manage` | Deactivate this row using `concurrencyToken`. Child statuses are preserved. | TenantMenuCategoriesController.cs |
+| POST | `t/{slug}/api/v1/menu/categories/{id:guid}/reactivate` | `menu.manage` | Reactivate this row using `concurrencyToken`. A child transition requires an active parent. | TenantMenuCategoriesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables` | `tables.manage` | Add one table to an active branch (201 + Location header). | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-add` | `tables.manage` | Add N tables (1 to 200) numbered after the highest active number. | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-deactivate-highest` | `tables.manage` | Deactivate the highest N active tables. | TenantTablesController.cs |
@@ -76,6 +82,10 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 
 The management QR response contains `tableId`, `number`, `label`, `path`, `url`, and `concurrencyToken`. The path is `/t/{slug}/q/{code}` and the URL uses `Public:AppBaseUrl`. Regeneration takes the current token and replaces the code at commit. The guest resolver returns `cafeName`, `branchId`, `branchName`, `tableId`, and `tableNumber`. Missing and malformed code paths use the same rate limit and `404 GuestQr.NotFound` contract. QR responses use `Cache-Control: no-store`. Allowed origins can read `Retry-After` on a `429` response.
 
+Menu category responses contain `id`, `parentId`, `name`, `sortOrder`, `status`, and `concurrencyToken`. Tree roots also have `children`. Both levels sort by `sortOrder` and then `id`. The tree uses `page`, `pageSize`, and `includeTotalCount` for roots. The default `includeInactive=false` shows active roots and their active children. A granted expansion includes inactive and parent-hidden rows in their original hierarchy. An unauthorized expansion returns `403 Identity.Forbidden`.
+
+Invalid create parents return a generic `400 Validation.Failed` for `parentId`. Category state conflicts return `409 MenuCategories.NameConflict`, `409 MenuCategories.ConcurrencyConflict`, or `409 MenuCategories.ParentInactive`. Missing and inaccessible category IDs return `404 MenuCategories.NotFound`. Update and lifecycle success return 200 with the category. A current-token request that leaves the row unchanged preserves its token and creates no mutation audit record. Repeating a create while its active sibling name is reserved returns a name conflict.
+
 ### Policy names
 
 | Policy | Defined in | Meaning |
@@ -84,7 +94,7 @@ The management QR response contains `tableId`, `number`, `label`, `path`, `url`,
 | `SuperAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Super administrator |
 | `TenantUser` | `CafeHub.WebApi.Authorization.TenantPolicies` | Authenticated tenant user (owner or staff) |
 | `TenantOwner` | `CafeHub.WebApi.Authorization.TenantPolicies` | Tenant owner only |
-| `staff.read`, `staff.manage`, `branches.read`, `tables.manage`, `stations.manage` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
+| `staff.read`, `staff.manage`, `branches.read`, `tables.manage`, `stations.manage`, `menu.manage` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
 | `roles.manage`, `cafe-profile.manage`, `branches.manage` | Tenant permission policy | Reserved for the Owner. These catalog codes are excluded from staff grants and effective permissions. |
 
 Tenant policies read current grants from the tenant database. The grant query verifies that the staff member still belongs to the active branch captured at authentication and used to scope the request. Missing credentials and permissions return generic 401 and 403 responses. Out-of-scope resources return the same 404 as missing resources. Suspended branches block delegated staff operations and branch reads, while active accounts retain sign-in, refresh, cafe-profile reads, and self-service.
