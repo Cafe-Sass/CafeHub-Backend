@@ -26,6 +26,8 @@ namespace CafeHub.Application.CafeProfile.DTOs
 
         public required string Timezone { get; init; }
 
+        public required string Currency { get; init; }
+
         public required string ConcurrencyToken { get; init; }
 
         public static CafeProfileResponse From(CafeSettings settings, string concurrencyToken)
@@ -44,6 +46,7 @@ namespace CafeHub.Application.CafeProfile.DTOs
                 ContactEmail = settings.ContactEmail,
                 ContactAddress = settings.ContactAddress,
                 Timezone = settings.Timezone,
+                Currency = settings.CurrencyCode,
                 ConcurrencyToken = concurrencyToken,
             };
         }

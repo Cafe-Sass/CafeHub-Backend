@@ -4,6 +4,8 @@ namespace CafeHub.Domain.Tenants
 {
     public sealed class CafeSettings
     {
+        public const string DefaultCurrencyCode = "egp";
+
         private static readonly Regex ColorPattern = new(
             "^#[0-9a-fA-F]{6}$",
             RegexOptions.CultureInvariant);
@@ -31,6 +33,8 @@ namespace CafeHub.Domain.Tenants
         public string? ContactAddress { get; private set; }
 
         public string Timezone { get; private set; } = string.Empty;
+
+        public string CurrencyCode { get; private set; } = DefaultCurrencyCode;
 
         public DateTimeOffset CreatedAt { get; private set; }
 
@@ -134,6 +138,7 @@ namespace CafeHub.Domain.Tenants
                 ContactEmail = contactEmail,
                 ContactAddress = contactAddress,
                 Timezone = timezone,
+                CurrencyCode = DefaultCurrencyCode,
                 CreatedAt = createdAt,
                 UpdatedAt = createdAt,
                 CreatedBy = createdBy,

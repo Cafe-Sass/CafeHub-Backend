@@ -2,9 +2,9 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 13 tables, including `menu_categories` for the cafe-wide menu hierarchy in Task 46.
+The Tenant model contains 17 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), and the cafe currency used by menu prices.
 
-Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. `CFMD-74` consumes this ERD for entity classes and migrations; no entity, migration, or DbContext change is made in this story.
+Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; later entities and migrations consume this ERD through their own stories.
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
 
@@ -58,6 +58,36 @@ erDiagram
         integer sort_order
         text status
     }
+    products {
+        uuid id PK
+        uuid category_id FK
+        uuid station_id FK
+        text name
+        text kind
+        boolean caffeine
+        integer preparation_minutes
+        integer sort_order
+        text status
+    }
+    product_sizes {
+        uuid id PK
+        uuid product_id FK
+        text name
+        numeric price
+        boolean is_default
+        text status
+    }
+    product_addons {
+        uuid id PK
+        uuid product_id FK
+        text name
+        numeric price
+        text status
+    }
+    product_tags {
+        uuid product_id FK
+        text tag
+    }
     branch_tables {
         uuid id PK
         uuid branch_id FK
@@ -74,6 +104,7 @@ erDiagram
         uuid id PK
         text cafe_name
         text timezone
+        text currency_code
     }
     tenant_audit_records {
         uuid id PK
@@ -106,6 +137,11 @@ erDiagram
     branches ||--o{ tenant_users : "staff branch"
     branches ||--o{ stations : "stations"
     menu_categories |o--o{ menu_categories : "parent"
+    menu_categories ||--o{ products : "catalog"
+    stations |o--o{ products : "routing"
+    products ||--o{ product_sizes : "sizes"
+    products ||--o{ product_addons : "add-ons"
+    products ||--o{ product_tags : "tags"
     branches ||--o{ branch_tables : "tables"
     tenant_users ||--o{ tenant_user_stations : "station assignments"
     stations ||--o{ tenant_user_stations : "assigned staff"
@@ -132,7 +168,7 @@ erDiagram
 
 Provisioning creates the database, applies migrations, and seeds required data (FR-ONB-006). Seed steps must stay safe under provisioning retries (FR-ONB-007): a resumed attempt must not duplicate seeded rows or reset owner-configured state. The seeds and the source of each row:
 
-- `cafe_settings` — the singleton profile row: `cafe_name` is copied from the approved onboarding request (Master source `onboarding_requests.cafe_name`; FR-CAF-001 for the profile row it initializes) as delivered by the provisioning pipeline; `timezone` receives the provisioning default (**Proposed** — the value and its derivation await owner confirmation); the cafe contact fields (`contact_phone`, `contact_email`, `contact_address`), the logo reference, and the template colors are **empty after seeding** — they have no registration-time source — and are filled by the owner through the cafe profile screen later (**Proposed, pending owner confirmation**; rejected alternative: collecting cafe contact fields on the public registration form and copying them, which widens the Master registration data and the public form — a product decision, not a schema detail); the row exists from seed with `created_by` NULL (no acting user).
+- `cafe_settings` — the singleton profile row: `cafe_name` is copied from the approved onboarding request (Master source `onboarding_requests.cafe_name`; FR-CAF-001 for the profile row it initializes) as delivered by the provisioning pipeline; `timezone` receives the provisioning default (**Proposed** — the value and its derivation await owner confirmation); `currency_code` receives the owner-approved default `egp` (this story's owner decision); the cafe contact fields (`contact_phone`, `contact_email`, `contact_address`), the logo reference, and the template colors are **empty after seeding** — they have no registration-time source — and are filled by the owner through the cafe profile screen later (**Proposed, pending owner confirmation**; rejected alternative: collecting cafe contact fields on the public registration form and copying them, which widens the Master registration data and the public form — a product decision, not a schema detail); the row exists from seed with `created_by` NULL (no acting user).
 - `tenant_roles` — the protected seeded `Owner` role. The active database Owner account receives every catalog permission without per-permission seed rows.
 - `tenant_users` — the seeded Owner account, copied row by row from the approved onboarding request as delivered by the provisioning pipeline: `full_name` from its `owner_full_name`; `email` and the mechanism's `normalized_email` from its `owner_email` (the same value also seeds `user_name`/`normalized_user_name` — **Proposed**, matching the Master contract); `phone_number` from its `owner_phone_number`, NULL when the owner did not enter one; and `password_hash` from its `owner_password_hash`, copied as-is — a hasher-produced value, never transformed or decrypted; it is verified only through the mechanism's hasher (PRD section 11.1). Generated at seed with no Master source: `user_kind` (`'Owner'`), the `security_stamp`/`concurrency_stamp` mechanism stamps, and the lockout start state (enabled — the Identity default). The private slug (`tenant_slug`) is **not copied** — the Tenant database never stores it.
 - `tenant_user_roles` — the membership row linking the seeded Owner user to the seeded Owner role, so the first login is authorized without manual setup.
@@ -256,9 +292,67 @@ Purpose: the cafe-wide, two-level category tree (FR-MENU-001).
 - PostgreSQL `xmin` is mapped as the row version.
 - `uq_menu_categories_active_root_name` uniquely indexes `lower(name)` where `parent_id IS NULL AND status = 'Active'`. `uq_menu_categories_active_child_name` uniquely indexes `(parent_id, lower(name))` where `parent_id IS NOT NULL AND status = 'Active'`. An active child under an inactive root still reserves its name. Both expression indexes use the Tenant database's default collation. Run the [category-name preflight](../database/postgresql-commands.md#task-46-category-name-preflight) before applying the migration.
 
+### products
+
+Purpose: the cafe-wide sellable menu items (FR-MENU-002) with kind, caffeine signal, optional preparation routing, display order, and lifecycle. Products are managed data and are never physically deleted; deactivation keeps the row and its history.
+
+- `id uuid NOT NULL` — app-generated UUIDv7, `pk_products`.
+- `category_id uuid NOT NULL` — `fk_products_category_id` references `menu_categories.id` with ON DELETE RESTRICT; `ix_products_category_id` supports category filters and the foreign key. The category may be top-level or a sub-category; the write path requires an Active category.
+- `station_id uuid NULL` — `fk_products_station_id` references `stations.id` with ON DELETE RESTRICT; `ix_products_station_id` supports routing reads and the foreign key. NULL means the product is visible to every station of every branch with order permissions; when present, the write path requires an Active station of this cafe.
+- `name text NOT NULL` (CHECK length 1..96, `ck_products_name_length`) — application validation trims the value and rejects control characters.
+- `description text NULL` (CHECK `description IS NULL OR length(description) >= 1 AND length(description) <= 1000`, `ck_products_description_length`) — application validation trims the value and stores an empty result as NULL.
+- `ingredients text NULL` (CHECK `ingredients IS NULL OR length(ingredients) >= 1 AND length(ingredients) <= 1000`, `ck_products_ingredients_length`) — application validation trims the value and stores an empty result as NULL.
+- `kind text NOT NULL` — `ck_products_kind` over `('Food', 'Drink')`.
+- `caffeine boolean NOT NULL` — whether the item contains caffeine; independent of `kind`.
+- `preparation_minutes integer NULL` (CHECK `preparation_minutes IS NULL OR preparation_minutes >= 0 AND preparation_minutes <= 240`, `ck_products_preparation_minutes`) — optional preparation estimate.
+- `sort_order integer NOT NULL` (CHECK `sort_order >= 0`, `ck_products_sort_order`) — menu ordering; ties are resolved by `id`.
+- `status text NOT NULL` — `ck_products_status` over `('Active', 'Inactive')`; new products are Active, and deactivation/reactivation never physically deletes the row.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`. Each actor FK uses ON DELETE RESTRICT and its own index.
+- PostgreSQL `xmin` is mapped as the row version for optimistic concurrency on product updates, including the whole size/add-on/tag replacement.
+- The product aggregate enforces at least one Active size, exactly one Active default size, and unique Active size/add-on names. Child rows are retained and deactivated rather than deleted.
+
+### product_sizes
+
+Purpose: the selectable sizes of one product; every product has at least one, with exactly one Active default. Rows are never physically deleted; a removed size becomes Inactive so order history can keep referencing it.
+
+- `id uuid NOT NULL` — app-generated UUIDv7, `pk_product_sizes`.
+- `product_id uuid NOT NULL` — `fk_product_sizes_product_id` references `products.id` with ON DELETE RESTRICT; `ix_product_sizes_product_id` supports the per-product read and the foreign key.
+- `name text NOT NULL` (CHECK length 1..32, `ck_product_sizes_name_length`) — trimmed by application validation, which also rejects control characters; a single-size product uses a neutral name such as `Regular`.
+- `price numeric(12,2) NOT NULL` (CHECK `price >= 0 AND price <= 99999999.99`, `ck_product_sizes_price_range`) — application validation rejects negative values, more than two decimal places, and values above the maximum.
+- `is_default boolean NOT NULL` — exactly one Active default per product is enforced by the aggregate; `uq_product_sizes_active_default` is a unique partial index on `(product_id)` WHERE `is_default AND status = 'Active'` that blocks a second active default at the data boundary.
+- `status text NOT NULL` — `ck_product_sizes_status` over `('Active', 'Inactive')`; **Proposed, pending owner confirmation** because the story lists only name, price, and default: sub-task 2 requires missing sizes to be deactivated rather than deleted, and the name rule is stated only among active rows. Rejected alternative: physical deletion, which would break later order references.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
+- `uq_product_sizes_active_name` — unique expression index on `(product_id, lower(name))` WHERE `status = 'Active'`; inactive duplicates stay allowed. The expression index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
+- No separate `xmin`: the parent `products` row version guards the aggregate update that replaces sizes.
+
+### product_addons
+
+Purpose: fixed-price extras that belong to one product (shared add-on groups are rejected for this story and recorded as an open item). Rows are never physically deleted; a removed add-on becomes Inactive.
+
+- `id uuid NOT NULL` — app-generated UUIDv7, `pk_product_addons`.
+- `product_id uuid NOT NULL` — `fk_product_addons_product_id` references `products.id` with ON DELETE RESTRICT; `ix_product_addons_product_id` supports the per-product read and the foreign key.
+- `name text NOT NULL` (CHECK length 1..48, `ck_product_addons_name_length`) — trimmed by application validation, which also rejects control characters.
+- `price numeric(12,2) NOT NULL` (CHECK `price >= 0 AND price <= 99999999.99`, `ck_product_addons_price_range`) — application validation rejects negative values, more than two decimal places, and values above the maximum.
+- `status text NOT NULL` — `ck_product_addons_status` over `('Active', 'Inactive')`.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`.
+- `uq_product_addons_active_name` — unique expression index on `(product_id, lower(name))` WHERE `status = 'Active'`; inactive duplicates stay allowed. The expression index is hand-written raw SQL in the migration.
+- No separate `xmin`: the parent `products` row version guards the aggregate update that replaces add-ons.
+
+### product_tags
+
+Purpose: normalized filter tags for one product, at most 10 per product (application-enforced), stored as rows because tag filters are indexed; a filtered value must not live in `jsonb`.
+
+- `product_id uuid NOT NULL` — `fk_product_tags_product_id` references `products.id` with ON DELETE RESTRICT.
+- `tag text NOT NULL` — stored lower-case and trimmed, 1 to 32 characters (`ck_product_tags_tag_length`); `ck_product_tags_tag_lowercase` enforces `tag = lower(tag)` and `ck_product_tags_tag_format` permits lower-case ASCII letters, digits, hyphens, and spaces only (`^[a-z0-9 -]+$`).
+- `pk_product_tags` — composite primary key on `(product_id, tag)`, which enforces one row per product and tag and indexes the product foreign key.
+- `ix_product_tags_tag` — index on `tag` for exact lower-case tag filters.
+- `created_at timestamptz NOT NULL`.
+- Tags are current assignment state; replacing a product's tags may physically remove removed tag rows under the documented assignment-state exception. The product row itself is never deleted.
+- **Proposed, pending owner confirmation**: ASCII letters are used for the allowed character set because the tag is matched exactly and exposed as a simple filter; rejected alternative: Unicode letters, which widen normalization and matching rules without an approved need.
+
 ### cafe_settings
 
-Purpose: the cafe's profile and branding configuration (FR-CAF-001) and the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition). A singleton row: created once by provisioning (see the seeding section above) with no acting user.
+Purpose: the cafe's profile and branding configuration (FR-CAF-001), the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition), and the currency unit for cafe-menu prices. A singleton row: created once by provisioning (see the seeding section above) with no acting user.
 
 - `id uuid NOT NULL` — `pk_cafe_settings`. Singleton guarantee **(Proposed)**: `uq_cafe_settings_singleton` — a unique index over a constant expression (`CREATE UNIQUE INDEX uq_cafe_settings_singleton ON cafe_settings ((true))`), which PostgreSQL enforces as at most one row.
 - `cafe_name text NOT NULL` (CHECK length 1..256) — seeded from the approved onboarding request's registration data (see the seeding section above).
@@ -266,6 +360,7 @@ Purpose: the cafe's profile and branding configuration (FR-CAF-001) and the time
 - `primary_color text NULL`, `secondary_color text NULL`, `accent_color text NULL` (each CHECK `^#[0-9a-fA-F]{6}$` when present, `ck_cafe_settings_color_format`) — approved standard-template colors (FR-PLT-003, FR-CAF-001).
 - `contact_phone text NULL` (CHECK length 1..32 when present), `contact_email text NULL` (CHECK length 1..320 when present), `contact_address text NULL` (CHECK length 1..512 when present) — **empty after seeding**: they carry no registration-time source (see the seeding section above); the owner configures them through the cafe profile screen later (FR-CAF-001).
 - `timezone text NOT NULL` (CHECK length 1..64, `ck_cafe_settings_timezone`) — an IANA zone name; PG validity is application-validated (reporting hour/day grouping is explicit, PRD section 13); seeded with the Proposed provisioning default (see the seeding section above).
+- `currency_code text NOT NULL DEFAULT 'egp'` (CHECK `currency_code ~ '^[a-z]{3}$'`, `ck_cafe_settings_currency_code_format`) — the unit for every cafe-menu price, seeded with the owner-approved default `egp` (2026-11-16 decision) and returned read-only by the cafe profile in this story; the change workflow is later work. This is the intentional money-convention shape for a single-cafe Tenant database: `product_sizes.price` and `product_addons.price` carry no per-row currency because this database holds exactly one cafe, and the singleton settings row is its unit. Rejected alternative: a currency column on every product price row, which would duplicate one immutable-per-database value.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id` (NULL at provisioning seed), `updated_by uuid NULL FK tenant_users.id`.
 
 ### tenant_audit_records
@@ -298,7 +393,7 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
-- Menu products, sizes, add-ons, per-branch availability, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006).
+- Per-branch product availability, product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog schema is defined above.
 - Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).

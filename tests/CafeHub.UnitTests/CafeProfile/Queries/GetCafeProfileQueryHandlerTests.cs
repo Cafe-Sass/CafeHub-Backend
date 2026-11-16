@@ -20,6 +20,7 @@ namespace CafeHub.UnitTests.CafeProfile.Queries
             ContactEmail = "contact@example.com",
             ContactAddress = "123 Main St",
             Timezone = "America/New_York",
+            Currency = "egp",
             ConcurrencyToken = "12345",
         };
 

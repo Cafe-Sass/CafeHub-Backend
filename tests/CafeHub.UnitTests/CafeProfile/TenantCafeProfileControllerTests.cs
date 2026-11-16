@@ -45,6 +45,7 @@ namespace CafeHub.UnitTests.CafeProfile
                 ContactEmail = "contact@example.com",
                 ContactAddress = "123 Main St",
                 Timezone = "America/New_York",
+                Currency = "egp",
                 ConcurrencyToken = "12345",
             };
             var sender = new RecordingSender { Response = Result.Success(response) };
@@ -90,6 +91,7 @@ namespace CafeHub.UnitTests.CafeProfile
                 ContactEmail = null,
                 ContactAddress = null,
                 Timezone = "America/New_York",
+                Currency = "egp",
                 ConcurrencyToken = "12345",
             };
             var sender = new RecordingSender { Response = Result.Success(response) };

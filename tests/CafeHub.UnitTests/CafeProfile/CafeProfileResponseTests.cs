@@ -37,6 +37,7 @@ namespace CafeHub.UnitTests.CafeProfile
             Assert.Equal("contact@example.com", response.ContactEmail);
             Assert.Equal("123 Main St", response.ContactAddress);
             Assert.Equal("America/New_York", response.Timezone);
+            Assert.Equal(CafeSettings.DefaultCurrencyCode, response.Currency);
             Assert.Equal("000007d1", response.ConcurrencyToken);
         }
 
@@ -89,6 +90,7 @@ namespace CafeHub.UnitTests.CafeProfile
                 "ContactEmail",
                 "ContactAddress",
                 "Timezone",
+                "Currency",
                 "ConcurrencyToken",
             };
 
