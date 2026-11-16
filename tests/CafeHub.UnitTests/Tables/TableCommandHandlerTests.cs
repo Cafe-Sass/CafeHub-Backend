@@ -265,6 +265,12 @@ namespace CafeHub.UnitTests.Tables
             Guid? scopeBranchId,
             CancellationToken cancellationToken) => Task.FromResult<TableResponse?>(null);
 
+        public Task<TableListPage> ListAsync(TableListRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new TableListPage(ListResponses, null));
+
+        public List<TableListRequest> ListRequests { get; } = new();
+        public List<TableResponse> ListResponses { get; } = new();
+
         public Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
             Task.FromResult(0);
 
