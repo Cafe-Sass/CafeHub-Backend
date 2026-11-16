@@ -5,6 +5,7 @@ using CafeHub.Application.Roles;
 using CafeHub.Application.Staff.Commands;
 using CafeHub.Application.Staff.DTOs;
 using CafeHub.Application.Staff.Queries;
+using CafeHub.Application.Stations.Commands;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
 using MediatR;
@@ -178,6 +179,19 @@ namespace CafeHub.WebApi.Controllers
         {
             var result = await sender.Send(new GetStaffEffectivePermissions(staffId), cancellationToken);
             return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPut("{staffId:guid}/stations")]
+        [TenantAuthorize(TenantPermissions.StationsManage)]
+        public async Task<ActionResult> SetStaffStations(
+            Guid staffId,
+            [FromBody] SetStaffStationsRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new SetStaffStationsCommand(staffId, request.StationIds ?? []),
+                cancellationToken);
+            return result.IsSuccess ? NoContent() : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
     }
 }
