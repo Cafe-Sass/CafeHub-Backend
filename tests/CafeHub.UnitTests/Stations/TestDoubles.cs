@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Application.Stations.DTOs;
@@ -81,8 +82,24 @@ namespace CafeHub.UnitTests.Stations
             return Task.FromResult(new StationListPage(items, totalCount));
         }
 
+        public List<SetStaffStationsCall> StaffStationAssignments { get; } = new();
+
+        public Task<Result> SetStaffStationsAsync(
+            Guid staffId,
+            IReadOnlyList<Guid> stationIds,
+            Guid? scopeBranchId,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            StaffStationAssignments.Add(new SetStaffStationsCall(staffId, stationIds, scopeBranchId, actorUserId));
+            return Task.FromResult(RespondResult());
+        }
+
         private Result<StationResponse> Respond() =>
             Failure is { } failure ? Result.Failure<StationResponse>(failure) : Result.Success(Response!);
+
+        private Result RespondResult() =>
+            Failure is { } failure ? Result.Failure(failure) : Result.Success();
     }
 
     internal sealed record CreateStationCall(Guid BranchId, string Name, int SortOrder, Guid ActorUserId);
@@ -99,6 +116,12 @@ namespace CafeHub.UnitTests.Stations
         Guid StationId,
         Guid? ScopeBranchId,
         string ConcurrencyToken,
+        Guid ActorUserId);
+
+    internal sealed record SetStaffStationsCall(
+        Guid StaffId,
+        IReadOnlyList<Guid> StationIds,
+        Guid? ScopeBranchId,
         Guid ActorUserId);
 
     internal static class StationResponses

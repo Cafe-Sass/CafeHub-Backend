@@ -823,6 +823,29 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("tenant_user_roles", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.TenantUserStation", b =>
+                {
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("TenantUserId", "StationId")
+                        .HasName("pk_tenant_user_stations");
+
+                    b.HasIndex("StationId")
+                        .HasDatabaseName("ix_tenant_user_stations_station_id");
+
+                    b.ToTable("tenant_user_stations", (string)null);
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Branch", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
@@ -1005,6 +1028,23 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_roles_tenant_user_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.TenantUserStation", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_stations_station_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_user_stations_tenant_user_id");
                 });
 #pragma warning restore 612, 618
         }

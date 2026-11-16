@@ -188,5 +188,17 @@ namespace CafeHub.Infrastructure.Audit
                     newStatus.ToString()),
             });
         }
+
+        public static TenantAuditChanges StaffStations(TenantUser staff, IReadOnlyList<Guid> stationIds)
+        {
+            ArgumentNullException.ThrowIfNull(staff);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    "StationIds",
+                    null,
+                    string.Join(",", stationIds.OrderBy(id => id).Select(id => id.ToString()))),
+            });
+        }
     }
 }

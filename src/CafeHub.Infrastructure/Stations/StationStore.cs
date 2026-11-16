@@ -1,6 +1,7 @@
 using System.Globalization;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Staff;
 using CafeHub.Application.Stations;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Application.Stations.DTOs;
@@ -213,6 +214,83 @@ namespace CafeHub.Infrastructure.Stations
             }
 
             return new StationListPage(items, totalCount);
+        }
+
+        public async Task<Result> SetStaffStationsAsync(
+            Guid staffId,
+            IReadOnlyList<Guid> stationIds,
+            Guid? scopeBranchId,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            var staff = await context.TenantUsers
+                .FirstOrDefaultAsync(u => u.Id == staffId, cancellationToken);
+            if (staff is null || staff.UserKind != TenantUserKind.Staff)
+            {
+                return Result.Failure(StaffErrors.NotFound());
+            }
+
+            if (scopeBranchId is { } scope && staff.BranchId != scope)
+            {
+                return Result.Failure(StationsErrors.NotFound());
+            }
+
+            var staffBranchId = staff.BranchId!.Value;
+
+            var stations = await context.Stations
+                .Where(s => stationIds.Contains(s.Id))
+                .ToListAsync(cancellationToken);
+
+            if (stations.Count != stationIds.Count)
+            {
+                return Result.Failure(StationsErrors.NotFound());
+            }
+
+            foreach (var station in stations)
+            {
+                if (station.Status != StationStatus.Active || station.BranchId != staffBranchId)
+                {
+                    return Result.Failure(StationsErrors.NotFound());
+                }
+            }
+
+            var current = await context.TenantUserStations
+                .Where(link => link.TenantUserId == staffId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var link in current.Where(link => !stationIds.Contains(link.StationId)))
+            {
+                context.TenantUserStations.Remove(link);
+            }
+
+            var now = timeProvider.GetUtcNow();
+            var assigned = current.Select(link => link.StationId).ToHashSet();
+            foreach (var stationId in stationIds.Where(id => !assigned.Contains(id)).Order())
+            {
+                context.TenantUserStations.Add(TenantUserStation.Create(staffId, stationId, now));
+            }
+
+            var changes = TenantAuditChangeSets.StaffStations(staff, stationIds);
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "stations.staff.updated.succeeded",
+                TargetType = "tenant_users",
+                TargetId = staffId,
+                ActorUserId = actorUserId,
+                Changes = changes,
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure(auditResult.Error!);
+            }
+
+            var save = await TrySaveAsync(cancellationToken);
+            if (save is not null)
+            {
+                return Result.Failure(save);
+            }
+
+            return Result.Success();
         }
 
         private async Task<Result<StationResponse>> ChangeStatusAsync(

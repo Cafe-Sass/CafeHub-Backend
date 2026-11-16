@@ -196,6 +196,45 @@ namespace CafeHub.Infrastructure.Staff
 
             var changes = TenantAuditChangeSets.StaffUpdate(user, fullName, branchId);
 
+            if (user.BranchId is { } oldBranchId && oldBranchId != branchId)
+            {
+                var oldAssignmentIds = await context.TenantUserStations
+                    .Where(link => link.TenantUserId == staffId)
+                    .Select(link => link.StationId)
+                    .OrderBy(id => id)
+                    .Select(id => id.ToString())
+                    .ToListAsync(cancellationToken);
+
+                var currentLinks = await context.TenantUserStations
+                    .Where(link => link.TenantUserId == staffId)
+                    .ToListAsync(cancellationToken);
+                foreach (var link in currentLinks)
+                {
+                    context.TenantUserStations.Remove(link);
+                }
+
+                var stationChanges = TenantAuditChanges.Update(new[]
+                {
+                    new TenantAuditChanges.FieldChange(
+                        "StationIds",
+                        oldAssignmentIds.Count > 0 ? string.Join(",", oldAssignmentIds) : null,
+                        ""),
+                });
+
+                var stationAuditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+                {
+                    Action = "staff.stations.cleared.succeeded",
+                    TargetType = TargetType,
+                    TargetId = user.Id,
+                    ActorUserId = actorUserId,
+                    Changes = stationChanges,
+                }, cancellationToken);
+                if (stationAuditResult.IsFailure)
+                {
+                    return Result.Failure<StaffResponse>(stationAuditResult.Error!);
+                }
+            }
+
             user.UpdateStaffProfile(fullName, phoneNumber, branchId, timeProvider.GetUtcNow(), actorUserId);
 
             var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
