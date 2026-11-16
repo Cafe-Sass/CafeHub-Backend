@@ -135,5 +135,58 @@ namespace CafeHub.Infrastructure.Audit
                     newStatus.ToString()),
             });
         }
+
+        public static TenantAuditChanges TableCreate(BranchTable table)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Number), null, table.Number.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Label), null, table.Label),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Status), null, table.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.BranchId), null, table.BranchId.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges TableUpdate(BranchTable table, string? label)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchTable.Label), table.Label, label),
+            });
+        }
+
+        public static TenantAuditChanges TableBulkCreate(int count, int fromNumber, int toNumber)
+        {
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange("count", null, count.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange("fromNumber", null, fromNumber.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange("toNumber", null, toNumber.ToString(CultureInfo.InvariantCulture)),
+            });
+        }
+
+        public static TenantAuditChanges TableBulkDeactivate(int count, int fromNumber, int toNumber)
+        {
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange("count", null, count.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange("fromNumber", null, fromNumber.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange("toNumber", null, toNumber.ToString(CultureInfo.InvariantCulture)),
+            });
+        }
+
+        public static TenantAuditChanges TableLifecycleStatus(BranchTable table, BranchTableStatus newStatus)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchTable.Status),
+                    table.Status.ToString(),
+                    newStatus.ToString()),
+            });
+        }
     }
 }
