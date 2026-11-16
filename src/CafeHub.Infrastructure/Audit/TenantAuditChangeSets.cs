@@ -176,5 +176,17 @@ namespace CafeHub.Infrastructure.Audit
                 new TenantAuditChanges.FieldChange("toNumber", null, toNumber.ToString(CultureInfo.InvariantCulture)),
             });
         }
+
+        public static TenantAuditChanges TableLifecycleStatus(BranchTable table, BranchTableStatus newStatus)
+        {
+            ArgumentNullException.ThrowIfNull(table);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchTable.Status),
+                    table.Status.ToString(),
+                    newStatus.ToString()),
+            });
+        }
     }
 }
