@@ -81,6 +81,9 @@ namespace CafeHub.Application.Tables
             return Error.Conflict(QrCodeConflictCode, QrCodeConflictMessage);
         }
 
+        public static Error TableNotActive() =>
+            Error.Conflict("Tables.NotActive", "The table is not active.");
+
         public static ValidationError InvalidConcurrencyToken()
         {
             return ValidationError.Create(new[]

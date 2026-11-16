@@ -65,6 +65,7 @@ namespace CafeHub.Infrastructure.Tenancy
                     Username = roleName,
                     Password = password,
                     SslMode = options.SslMode,
+                    IncludeErrorDetail = false,
                     Pooling = true,
                     MaxPoolSize = options.MaxPoolSize,
                     ApplicationName = "cafehub-tenant",

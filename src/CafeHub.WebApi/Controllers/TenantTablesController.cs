@@ -7,6 +7,7 @@ using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -222,6 +223,55 @@ namespace CafeHub.WebApi.Controllers
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("{tableId:guid}/qr")]
+        [TenantAuthorize(TenantPermissions.TablesManage)]
+        [TableQrEndpoint]
+        public async Task<ActionResult<TableQrLinkResponse>> GetQr(
+            [FromRoute] string slug,
+            [FromRoute] Guid branchId,
+            [FromRoute] Guid tableId,
+            [FromServices] TableQrLinks links,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetTableQrQuery(branchId, tableId), cancellationToken);
+            return result.IsSuccess
+                ? Ok(links.Create(result.Value))
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("qr-sheet")]
+        [TenantAuthorize(TenantPermissions.TablesManage)]
+        [TableQrEndpoint]
+        public async Task<ActionResult<IReadOnlyList<TableQrLinkResponse>>> GetQrSheet(
+            [FromRoute] string slug,
+            [FromRoute] Guid branchId,
+            [FromServices] TableQrLinks links,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetTableQrSheetQuery(branchId), cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value.Select(links.Create).ToArray())
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("{tableId:guid}/qr/regenerate")]
+        [TenantAuthorize(TenantPermissions.TablesManage)]
+        [TableQrEndpoint]
+        public async Task<ActionResult<TableQrLinkResponse>> RegenerateQr(
+            [FromRoute] string slug,
+            [FromRoute] Guid branchId,
+            [FromRoute] Guid tableId,
+            [FromBody] BranchLifecycleRequest request,
+            [FromServices] TableQrLinks links,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new RegenerateTableQrCommand(branchId, tableId, request.ConcurrencyToken), cancellationToken);
+            return result.IsSuccess
+                ? Ok(links.Create(result.Value))
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
 
         private async Task<bool> CanManageTablesAsync(CancellationToken cancellationToken)

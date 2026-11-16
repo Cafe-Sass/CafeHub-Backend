@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Net.Http.Headers;
 
 namespace CafeHub.WebApi.Cors
 {
@@ -37,7 +38,10 @@ namespace CafeHub.WebApi.Cors
 
                         builder.WithMethods(options.AllowedMethods.ToArray());
                         builder.WithHeaders(options.AllowedHeaders.ToArray());
-                        builder.WithExposedHeaders(options.ExposedHeaders.ToArray());
+                        builder.WithExposedHeaders(options.ExposedHeaders
+                            .Append(HeaderNames.RetryAfter)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToArray());
                         if (options.AllowCredentials)
                         {
                             builder.AllowCredentials();

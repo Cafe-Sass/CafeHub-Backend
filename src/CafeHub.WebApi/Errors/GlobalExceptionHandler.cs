@@ -4,6 +4,7 @@ using System.Text.Json;
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Tenancy;
+using CafeHub.WebApi.Security;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -47,11 +48,25 @@ namespace CafeHub.WebApi.Errors
             }
 
             var traceIdentifier = Activity.Current?.Id ?? httpContext.TraceIdentifier;
-            var problemDetails = CreateProblemDetails(exception, traceIdentifier, correlationIdAccessor?.CorrelationId);
+            var endpoint = httpContext.Features.Get<IExceptionHandlerFeature>()?.Endpoint ?? httpContext.GetEndpoint();
+            var qrEndpoint = endpoint?.Metadata.GetMetadata<TableQrEndpointAttribute>();
 
             using var tenantScope = BeginTenantScope(httpContext);
-            logger.LogError(exception, "Request {TraceId} failed with {ExceptionType}", traceIdentifier, exception.GetType().Name);
+            if (qrEndpoint is not null)
+            {
+                logger.LogError("Request {TraceId} failed with {ExceptionType}", traceIdentifier, exception.GetType().Name);
+                if (qrEndpoint.IsGuest && exception is TenantIsolationException)
+                {
+                    await GuestQrProblem.WriteNotFoundAsync(httpContext, correlationIdAccessor, cancellationToken);
+                    return true;
+                }
+            }
+            else
+            {
+                logger.LogError(exception, "Request {TraceId} failed with {ExceptionType}", traceIdentifier, exception.GetType().Name);
+            }
 
+            var problemDetails = CreateProblemDetails(exception, traceIdentifier, correlationIdAccessor?.CorrelationId);
             httpContext.Response.StatusCode = problemDetails.Status!.Value;
             httpContext.Response.ContentType = ProblemJsonContentType;
             await JsonSerializer.SerializeAsync(httpContext.Response.Body, problemDetails, ResponseJsonOptions, cancellationToken);

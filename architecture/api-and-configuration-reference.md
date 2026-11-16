@@ -49,6 +49,10 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | PUT | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}` | `tables.manage` | Update a table's label. | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/deactivate` | `tables.manage` | Deactivate a table (row kept). | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/reactivate` | `tables.manage` | Reactivate a table; fails with 409 if the number is taken. | TenantTablesController.cs |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/qr` | `tables.manage` | Read a table's current QR link within the requested branch. | TenantTablesController.cs |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}/tables/qr-sheet` | `tables.manage` | Read every active table's QR link in table-number order. An existing empty branch returns an empty array. | TenantTablesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/qr/regenerate` | `tables.manage` | Replace an active table's QR code using the body's `concurrencyToken`. Returns the replacement link with its new token. Stale versions, inactive tables, and QR uniqueness conflicts return 409. | TenantTablesController.cs |
+| GET | `t/{slug}/api/v1/guest/qr/{code}` | Anonymous, Global rate limit | Resolve an active cafe, branch, and table. All rejected QR contexts return `404 GuestQr.NotFound`. | TenantGuestQrController.cs |
 | POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create staff in an active branch (201 + Location header). Duplicate tenant email returns 409. | TenantStaffController.cs |
 | GET | `t/{slug}/api/v1/staff` | `staff.read` | List staff. Branch scope applies before filters, count and paging. | TenantStaffController.cs |
 | GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `staff.read` | Get one staff member within scope. | TenantStaffController.cs |
@@ -69,6 +73,8 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/me/password` | `TenantUser` | Staff member changes their own password (revokes tokens) | TenantMeController.cs:40 |
 | GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
 | GET | `health/ready` | Anonymous | Readiness probe; Master database connectivity | Health check middleware (Program.cs:68) |
+
+The management QR response contains `tableId`, `number`, `label`, `path`, `url`, and `concurrencyToken`. The path is `/t/{slug}/q/{code}` and the URL uses `Public:AppBaseUrl`. Regeneration takes the current token and replaces the code at commit. The guest resolver returns `cafeName`, `branchId`, `branchName`, `tableId`, and `tableNumber`. Missing and malformed code paths use the same rate limit and `404 GuestQr.NotFound` contract. QR responses use `Cache-Control: no-store`. Allowed origins can read `Retry-After` on a `429` response.
 
 ### Policy names
 
@@ -106,10 +112,11 @@ Tenant policies read current grants from the tenant database. The grant query ve
 | `RateLimiting:AdminAuth` | `WindowSeconds` | Admin auth rate limit window | `60` | No |
 | `RateLimiting:Global` | `PermitLimit` | Global rate limit permits | `300` | No |
 | `RateLimiting:Global` | `WindowSeconds` | Global rate limit window | `60` | No |
+| `Public` | `AppBaseUrl` | Required public app origin for printed QR links. HTTPS with no credentials, path prefix, query, or fragment. Development also accepts HTTP loopback. Startup validates this setting. | Required | No |
 | `Cors` | `AllowedOrigins` | CORS allowed origins | `[]` | No |
 | `Cors` | `AllowedMethods` | CORS allowed methods. Explicit deployment overrides must include `DELETE` for cross-origin role retirement. | GET, POST, PUT, PATCH, DELETE | No |
 | `Cors` | `AllowedHeaders` | CORS allowed headers | Authorization, Content-Type, Idempotency-Key, X-Correlation-Id | No |
-| `Cors` | `ExposedHeaders` | CORS exposed headers | X-Correlation-Id, Retry-After | No |
+| `Cors` | `ExposedHeaders` | CORS exposed headers. The policy always exposes `Retry-After` to allowed origins. | X-Correlation-Id, Retry-After | No |
 | `Cors` | `AllowCredentials` | CORS allow credentials | `false` | No |
 | `Cors` | `MaxAgeSeconds` | CORS max age | `600` | No |
 | `RequestLimits` | `MaxBodyBytes` | Max request body size | `1048576` | No |

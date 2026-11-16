@@ -7,6 +7,8 @@ using CafeHub.Application.Tables;
 using CafeHub.Application.Tables.Commands;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
+using CafeHub.Application.Tenancy;
+using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi.Authentication;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Controllers;
@@ -126,7 +128,7 @@ namespace CafeHub.UnitTests.Tables
         }
 
         [Fact]
-        public void WriteActions_RequireTablesManagePermission()
+        public void ManagementActions_RequireTablesManagePermission()
         {
             foreach (var name in new[]
             {
@@ -136,6 +138,9 @@ namespace CafeHub.UnitTests.Tables
                 nameof(TenantTablesController.Put),
                 nameof(TenantTablesController.Deactivate),
                 nameof(TenantTablesController.Reactivate),
+                nameof(TenantTablesController.GetQr),
+                nameof(TenantTablesController.GetQrSheet),
+                nameof(TenantTablesController.RegenerateQr),
             })
             {
                 var action = Action(name);
@@ -145,6 +150,36 @@ namespace CafeHub.UnitTests.Tables
                 Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
                 Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
             }
+        }
+
+        [Fact]
+        public async Task QrActions_SendTheRouteBranchAndReturnCanonicalLinks()
+        {
+            var branchId = Guid.NewGuid();
+            var tableId = Guid.NewGuid();
+            var qr = new TableQrData(tableId, 7, "Terrace", "Abcdefghijklmnopqrstuv", 9);
+            var sender = new RecordingSender { Response = Result.Success(qr) };
+            var controller = CreateController(sender, OwnerUser(), OwnerPermissions());
+            var tenantContext = new TenantContextAccessor();
+            tenantContext.Set(TenantContext.Create(
+                Guid.NewGuid(), "test-reference", true, "canonical-cafe"));
+            var links = new TableQrLinks(TableQrLinks.ParseOrigin("https://public.example.test/", false), tenantContext);
+
+            var single = await controller.GetQr("CANONICAL-CAFE", branchId, tableId, links, default);
+            Assert.Equal(new GetTableQrQuery(branchId, tableId), Assert.IsType<GetTableQrQuery>(sender.LastRequest));
+            var link = Assert.IsType<TableQrLinkResponse>(Assert.IsType<OkObjectResult>(single.Result).Value);
+            Assert.Equal("/t/canonical-cafe/q/Abcdefghijklmnopqrstuv", link.Path);
+            Assert.Equal("9", link.ConcurrencyToken);
+
+            sender.Response = Result.Success<IReadOnlyList<TableQrData>>([qr]);
+            var sheet = await controller.GetQrSheet("CANONICAL-CAFE", branchId, links, default);
+            Assert.Equal(new GetTableQrSheetQuery(branchId), Assert.IsType<GetTableQrSheetQuery>(sender.LastRequest));
+            Assert.Equal(link, Assert.Single(Assert.IsType<TableQrLinkResponse[]>(Assert.IsType<OkObjectResult>(sheet.Result).Value)));
+
+            sender.Response = Result.Success(qr);
+            var rotation = await controller.RegenerateQr("CANONICAL-CAFE", branchId, tableId, new("8"), links, default);
+            Assert.Equal(new RegenerateTableQrCommand(branchId, tableId, "8"), Assert.IsType<RegenerateTableQrCommand>(sender.LastRequest));
+            Assert.Equal(link, Assert.IsType<OkObjectResult>(rotation.Result).Value);
         }
 
         [Fact]

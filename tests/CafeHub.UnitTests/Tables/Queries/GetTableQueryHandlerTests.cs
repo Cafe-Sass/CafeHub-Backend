@@ -173,6 +173,12 @@ namespace CafeHub.UnitTests.Tables.Queries
             public Task<TableListPage> ListAsync(TableListRequest request, CancellationToken cancellationToken) =>
                 Task.FromResult(new TableListPage([], null));
 
+            public Task<TableQrData?> GetQrAsync(Guid branchId, Guid tableId, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<IReadOnlyList<TableQrData>?> GetQrSheetAsync(Guid branchId, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<Result<TableQrData>> RegenerateQrAsync(Guid branchId, Guid tableId, string concurrencyToken, Guid actorUserId, CancellationToken cancellationToken) =>
+                throw new NotSupportedException();
+            public Task<GuestQrContext?> ResolveGuestQrAsync(string code, CancellationToken cancellationToken) => throw new NotSupportedException();
+
             public Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
                 Task.FromResult(0);
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -41,7 +42,15 @@ namespace CafeHub.Application.Abstractions.Behaviors
             catch (Exception exception)
             {
                 var duration = Stopwatch.GetElapsedTime(startTimestamp);
-                logger.LogError(exception, "Request {RequestName} threw {ExceptionType} in {Duration}", requestName, exception.GetType().Name, duration);
+                if (request is ISensitiveRequest)
+                {
+                    logger.LogError("Request {RequestName} threw {ExceptionType} in {Duration}", requestName, exception.GetType().Name, duration);
+                }
+                else
+                {
+                    logger.LogError(exception, "Request {RequestName} threw {ExceptionType} in {Duration}", requestName, exception.GetType().Name, duration);
+                }
+
                 throw;
             }
         }

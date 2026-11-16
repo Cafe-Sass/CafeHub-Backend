@@ -1,13 +1,15 @@
 using CafeHub.Application;
+using CafeHub.Application.Tenancy;
 using CafeHub.Infrastructure;
 using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
+using CafeHub.WebApi.Controllers;
 using CafeHub.WebApi.Cors;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.HealthChecks;
 using CafeHub.WebApi.Idempotency;
-using CafeHub.WebApi.RateLimiting;
 using CafeHub.WebApi.Security;
+using CafeHub.WebApi.Tenancy;
 using CafeHub.WebApi.Transport;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -16,6 +18,11 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
+var publicAppOrigin = TableQrLinks.ParseOrigin(
+    builder.Configuration[TableQrLinks.ConfigurationKey], builder.Environment.IsDevelopment());
+builder.Services.AddScoped(provider => new TableQrLinks(
+    publicAppOrigin, provider.GetRequiredService<ITenantContextAccessor>()));
+builder.Logging.ProtectTableQrLogs();
 
 builder.Services.AddControllers(options =>
 {
@@ -48,16 +55,9 @@ _ = app.Services.GetRequiredService<TenantDatabaseOptions>();
 app.UseForwardedHeaders();
 app.UseCorrelationId();
 app.UseSecurityHeaders();
-app.UseExceptionHandler();
-app.UseTransportSecurity(app.Environment);
-app.UseRateLimiter();
-app.UseConfiguredCors();
-app.UseMiddleware<CafeHub.WebApi.Tenancy.TenantResolutionMiddleware>();
-app.UseAuthentication();
-app.UseAuthorization();
+app.ConfigureTenantApi();
 
 app.MapApiDocumentation();
-app.MapControllers().RequireRateLimiting(GlobalRateLimiting.PolicyName);
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {

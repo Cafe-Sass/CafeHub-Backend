@@ -176,8 +176,16 @@ namespace CafeHub.UnitTests
                 Assert.True(tenantAuthorization is not null || anonymous, $"{action.DisplayName} has no tenant authorization or AllowAnonymous metadata.");
                 if (anonymous)
                 {
-                    Assert.Equal(typeof(TenantAuthController), action.ControllerTypeInfo.AsType());
-                    Assert.Contains(action.MethodInfo.Name, new[] { "Login", "Refresh", "Logout" });
+                    if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestQrController))
+                    {
+                        Assert.Equal(nameof(TenantGuestQrController.Resolve), action.MethodInfo.Name);
+                        Assert.Equal("t/{slug}/api/v1/guest/qr/{**code}", action.AttributeRouteInfo?.Template);
+                    }
+                    else
+                    {
+                        Assert.Equal(typeof(TenantAuthController), action.ControllerTypeInfo.AsType());
+                        Assert.Contains(action.MethodInfo.Name, new[] { "Login", "Refresh", "Logout" });
+                    }
                 }
                 else
                 {

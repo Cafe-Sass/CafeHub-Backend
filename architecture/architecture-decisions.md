@@ -115,9 +115,12 @@ Unhandled exceptions leave `GlobalExceptionHandler` (`src/CafeHub.WebApi/Errors`
   in the PR conversation (Feature/250_SA_ApiVersioningAndRouteConventions). The route template,
   examples, reserved-prefix rule, version rules, and rejected alternatives are documented in
   `architecture/route-conventions.md`.
-- Customer QR resolution: remains a separate, undecided topic. FR-CAF-004 (Table QR generation
-  and resolution) will get its own future design decision; this entry does not decide it and
-  route conventions here do not describe it.
+- Customer QR resolution (Task 45, proposed pending owner confirmation). The URL slug selects
+  the active cafe through the Master registry. The selected Tenant database resolves the current
+  table code and checks the branch and table lifecycle states. The management API returns JSON
+  link data for the public app to render and print. The guest resolver uses the existing Global
+  per-client-IP limit. A platform-wide QR index would duplicate tenant data and create a second
+  source for rotation and lifecycle decisions.
 - Why the path prefix: keeping the tenant identifier in the URL makes tenant scope visible and
   shareable, works without wildcard TLS or custom domains, and matches the fail-closed rules in
   `architecture/database-schema-decisions.md` (the slug stays an untrusted value until validated;
@@ -169,7 +172,7 @@ The WebApi reads real credentials locally through User Secrets or environment va
 ## Open decisions
 
 - Result/Error model placement — the model lives in Application (CFMD-241); Domain cannot reference it until a later decision.
-- Tenant identifier source — the URL path prefix `/t/{slug}` was chosen by the owner on 2026-10-19 (recorded above as Proposed, pending owner confirmation of the recording); tenant resolution middleware stays a future story, and customer QR resolution remains a separate, undecided topic.
+- Tenant identifier source — the URL path prefix `/t/{slug}` was chosen by the owner on 2026-10-19. Task 45 records the proposed customer QR resolution flow above.
 - API versioning style — required before first business endpoint (PRD section 10.4); the path-segment `v1` proposal is documented in `architecture/route-conventions.md` and stays open until the owner confirms it.
 - Notification provider/channels — PRD TBD-09.
 - Payment provider(s) — PRD TBD-02.

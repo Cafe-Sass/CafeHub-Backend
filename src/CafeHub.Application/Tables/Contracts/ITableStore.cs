@@ -60,6 +60,19 @@ namespace CafeHub.Application.Tables.Contracts
 
         Task<TableListPage> ListAsync(TableListRequest request, CancellationToken cancellationToken);
 
+        Task<TableQrData?> GetQrAsync(Guid branchId, Guid tableId, CancellationToken cancellationToken);
+
+        Task<IReadOnlyList<TableQrData>?> GetQrSheetAsync(Guid branchId, CancellationToken cancellationToken);
+
+        Task<Result<TableQrData>> RegenerateQrAsync(
+            Guid branchId,
+            Guid tableId,
+            string concurrencyToken,
+            Guid actorUserId,
+            CancellationToken cancellationToken);
+
+        Task<GuestQrContext?> ResolveGuestQrAsync(string code, CancellationToken cancellationToken);
+
         Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken);
 
         Task<int?> MaxActiveNumberAsync(Guid branchId, CancellationToken cancellationToken);

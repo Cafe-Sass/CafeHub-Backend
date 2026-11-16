@@ -75,7 +75,7 @@ Tenant owner and staff sessions use a `refresh_tokens` table local to each Tenan
 | TBD-19 | Backup retention, frequency, RPO, and RTO |
 | TBD-20 | Audit log retention and tamper-resistance requirements |
 | TBD-22 | AI provider, model, approved context, and failure behavior |
-| — | Tenant identifier source (host, header, or path); no PRD TBD number exists. Decision recorded 2026-10-23: the MVP tenant identifier source is the URL path prefix /t/{slug} (owner decision of 2026-10-19, recorded as Proposed, pending owner confirmation in the PR conversation — see architecture/architecture-decisions.md). Customer QR resolution remains a separate, undecided topic and stays open |
+| — | Tenant identifier source (host, header, or path); no PRD TBD number exists. Decision recorded 2026-10-23: the MVP tenant identifier source is the URL path prefix /t/{slug} (owner decision of 2026-10-19, recorded as Proposed, pending owner confirmation in the PR conversation — see architecture/architecture-decisions.md). Task 45 resolves the current QR code in the Tenant database selected by that slug. |
 
 No entity, DbContext, or migration passes through this sub-task; this document is the decision baseline the later sub-tasks reference.
 
