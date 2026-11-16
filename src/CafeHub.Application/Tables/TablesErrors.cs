@@ -88,5 +88,13 @@ namespace CafeHub.Application.Tables
                 new FieldError("concurrencyToken", "The concurrency token is not a valid unsigned integer."),
             });
         }
+
+        public const string InvalidStatusCode = "Tables.InvalidStatus";
+        public const string InvalidStatusMessage = "The status is not valid.";
+
+        public static ValidationError InvalidStatus()
+        {
+            return ValidationError.Create(new[] { new FieldError("status", InvalidStatusMessage) });
+        }
     }
 }

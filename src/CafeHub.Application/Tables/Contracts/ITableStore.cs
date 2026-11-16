@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Domain.Tenants;
@@ -57,8 +58,31 @@ namespace CafeHub.Application.Tables.Contracts
             Guid? scopeBranchId,
             CancellationToken cancellationToken);
 
+        Task<TableListPage> ListAsync(TableListRequest request, CancellationToken cancellationToken);
+
         Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken);
 
         Task<int?> MaxActiveNumberAsync(Guid branchId, CancellationToken cancellationToken);
     }
+
+    /// <summary>
+    /// Offset-page request for one branch's table list, with optional status and number-range filters.
+    /// <see cref="PageSize"/> is the resolved page size; the store fetches at most one extra row so the
+    /// caller can derive <c>HasNextPage</c> without a count.
+    /// </summary>
+    public sealed record TableListRequest(
+        Guid BranchId,
+        int Page,
+        int PageSize,
+        bool IncludeTotalCount,
+        BranchTableStatus? Status,
+        int? FromNumber,
+        int? ToNumber);
+
+    /// <summary>
+    /// One tables list page as read from persistence. <see cref="Items"/> contains at most the requested
+    /// page size plus one row; the extra row signals a following page and is trimmed by the query handler.
+    /// <see cref="TotalCount"/> is populated only when the request asked for it.
+    /// </summary>
+    public sealed record TableListPage(IReadOnlyList<TableResponse> Items, int? TotalCount);
 }

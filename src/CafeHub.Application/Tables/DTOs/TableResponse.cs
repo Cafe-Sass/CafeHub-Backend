@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Tables.DTOs
@@ -5,6 +6,7 @@ namespace CafeHub.Application.Tables.DTOs
     /// <summary>
     /// The table read model returned to a tenant user: identity, owning branch, number, optional label,
     /// status, timestamps, the QR code (for callers who may manage tables), and an opaque concurrency token.
+    /// The QR code is omitted from serialized output when null so staff without the permission cannot scrape it.
     /// </summary>
     public sealed class TableResponse
     {
@@ -18,6 +20,7 @@ namespace CafeHub.Application.Tables.DTOs
 
         public required string Status { get; init; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public required string? QrCode { get; init; }
 
         public required DateTimeOffset CreatedAt { get; init; }

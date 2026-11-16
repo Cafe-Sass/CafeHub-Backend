@@ -305,6 +305,48 @@ namespace CafeHub.Infrastructure.Tables
             CancellationToken cancellationToken) =>
             Task.FromResult<TableResponse?>(null);
 
+        public async Task<TableListPage> ListAsync(
+            TableListRequest request,
+            CancellationToken cancellationToken)
+        {
+            var query = context.BranchTables.Where(table => table.BranchId == request.BranchId);
+            if (request.Status is { } status)
+            {
+                query = query.Where(table => table.Status == status);
+            }
+
+            if (request.FromNumber is { } fromNumber)
+            {
+                query = query.Where(table => table.Number >= fromNumber);
+            }
+
+            if (request.ToNumber is { } toNumber)
+            {
+                query = query.Where(table => table.Number <= toNumber);
+            }
+
+            int? totalCount = null;
+            if (request.IncludeTotalCount)
+            {
+                totalCount = await query.CountAsync(cancellationToken);
+            }
+
+            var fetched = await query
+                .OrderBy(table => table.Number)
+                .ThenBy(table => table.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            var items = fetched.Select(table =>
+                TableResponse.From(
+                    table,
+                    ConcurrencyToken(table),
+                    table.QrCode)).ToList();
+
+            return new TableListPage(items, totalCount);
+        }
+
         public Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
             context.BranchTables.CountAsync(
                 table => table.BranchId == branchId && table.Status == BranchTableStatus.Active,
