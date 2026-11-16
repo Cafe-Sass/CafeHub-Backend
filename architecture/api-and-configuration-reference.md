@@ -34,6 +34,14 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/suspend` | `branches.manage` (Owner) | Suspend a branch | TenantBranchesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/reactivate` | `branches.manage` (Owner) | Reactivate a branch | TenantBranchesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/retire` | `branches.manage` (Owner) | Retire a branch. Returns 409 while active staff are assigned. | TenantBranchesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables` | `tables.manage` | Add one table to an active branch (201 + Location header). | TenantTablesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-add` | `tables.manage` | Add N tables (1 to 200) numbered after the highest active number. | TenantTablesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-deactivate-highest` | `tables.manage` | Deactivate the highest N active tables. | TenantTablesController.cs |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}/tables` | `TenantUser` | List a branch's tables, ordered by number, with optional status and number-range filters. | TenantTablesController.cs |
+| GET | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}` | `TenantUser` | Get one table within the caller's branch scope. | TenantTablesController.cs |
+| PUT | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}` | `tables.manage` | Update a table's label. | TenantTablesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/deactivate` | `tables.manage` | Deactivate a table (row kept). | TenantTablesController.cs |
+| POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/{tableId:guid}/reactivate` | `tables.manage` | Reactivate a table; fails with 409 if the number is taken. | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/staff` | `TenantOwner` | Create staff in an active branch (201 + Location header). Duplicate tenant email returns 409. | TenantStaffController.cs |
 | GET | `t/{slug}/api/v1/staff` | `staff.read` | List staff. Branch scope applies before filters, count and paging. | TenantStaffController.cs |
 | GET | `t/{slug}/api/v1/staff/{staffId:guid}` | `staff.read` | Get one staff member within scope. | TenantStaffController.cs |
@@ -63,7 +71,7 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | `SuperAdmin` | `CafeHub.WebApi.Authorization.PlatformAuthorizationPolicies` | Super administrator |
 | `TenantUser` | `CafeHub.WebApi.Authorization.TenantPolicies` | Authenticated tenant user (owner or staff) |
 | `TenantOwner` | `CafeHub.WebApi.Authorization.TenantPolicies` | Tenant owner only |
-| `staff.read`, `staff.manage`, `branches.read` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
+| `staff.read`, `staff.manage`, `branches.read`, `tables.manage` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
 | `roles.manage`, `cafe-profile.manage`, `branches.manage` | Tenant permission policy | Reserved for the Owner. These catalog codes are excluded from staff grants and effective permissions. |
 
 Tenant policies read current grants from the tenant database. The grant query verifies that the staff member still belongs to the active branch captured at authentication and used to scope the request. Missing credentials and permissions return generic 401 and 403 responses. Out-of-scope resources return the same 404 as missing resources. Suspended branches block delegated staff operations and branch reads, while active accounts retain sign-in, refresh, cafe-profile reads, and self-service.
