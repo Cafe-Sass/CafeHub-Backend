@@ -28,6 +28,8 @@ namespace CafeHub.UnitTests
 
         public int CommitCount { get; private set; }
 
+        public int RollbackCount { get; private set; }
+
         public Task BeginTransactionAsync(CancellationToken cancellationToken)
         {
             BeginCount++;
@@ -41,6 +43,10 @@ namespace CafeHub.UnitTests
             return Task.CompletedTask;
         }
 
-        public Task RollbackTransactionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            RollbackCount++;
+            return Task.CompletedTask;
+        }
     }
 }

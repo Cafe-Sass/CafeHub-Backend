@@ -352,6 +352,93 @@ namespace CafeHub.Infrastructure.Tables
                 table => table.BranchId == branchId && table.Status == BranchTableStatus.Active,
                 cancellationToken);
 
+        public Task<TableQrData?> GetQrAsync(Guid branchId, Guid tableId, CancellationToken cancellationToken) =>
+            ProjectQrData(context.BranchTables.AsNoTracking()
+                .Where(table => table.BranchId == branchId && table.Id == tableId))
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public async Task<IReadOnlyList<TableQrData>?> GetQrSheetAsync(Guid branchId, CancellationToken cancellationToken)
+        {
+            if (!await context.Branches.AnyAsync(branch => branch.Id == branchId, cancellationToken))
+            {
+                return null;
+            }
+
+            return await ProjectQrData(context.BranchTables.AsNoTracking()
+                .Where(table => table.BranchId == branchId && table.Status == BranchTableStatus.Active)
+                .OrderBy(table => table.Number))
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<Result<TableQrData>> RegenerateQrAsync(
+            Guid branchId,
+            Guid tableId,
+            string concurrencyToken,
+            Guid actorUserId,
+            CancellationToken cancellationToken)
+        {
+            await context.LockBranchesAsync(cancellationToken, branchId);
+            var table = await LoadInScopeAsync(tableId, branchId, cancellationToken);
+            if (table is null)
+            {
+                return Result.Failure<TableQrData>(TablesErrors.NotFound());
+            }
+
+            if (table.Status != BranchTableStatus.Active)
+            {
+                return Result.Failure<TableQrData>(TablesErrors.TableNotActive());
+            }
+
+            if (!uint.TryParse(concurrencyToken, NumberStyles.None, CultureInfo.InvariantCulture, out var token))
+            {
+                return Result.Failure<TableQrData>(TablesErrors.InvalidConcurrencyToken());
+            }
+
+            var version = context.Entry(table).Property<uint>("xmin");
+            if (version.CurrentValue != token)
+            {
+                return Result.Failure<TableQrData>(TablesErrors.ConcurrencyConflict());
+            }
+
+            var replacementCode = qrCodeGenerator.Generate();
+            if (string.Equals(table.QrCode, replacementCode, StringComparison.Ordinal))
+            {
+                return Result.Failure<TableQrData>(TablesErrors.QrCodeConflict());
+            }
+
+            table.RegenerateQrCode(replacementCode, timeProvider.GetUtcNow(), actorUserId);
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "tables.qr_regenerated.succeeded",
+                TargetType = TargetType,
+                TargetId = table.Id,
+                ActorUserId = actorUserId,
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure<TableQrData>(auditResult.Error!);
+            }
+
+            var saveError = await TrySaveAsync(cancellationToken);
+            return saveError is null
+                ? Result.Success(new TableQrData(table.Id, table.Number, table.Label, table.QrCode, version.CurrentValue))
+                : Result.Failure<TableQrData>(saveError);
+        }
+
+        public Task<GuestQrContext?> ResolveGuestQrAsync(string code, CancellationToken cancellationToken) =>
+            (from table in context.BranchTables.AsNoTracking()
+             join branch in context.Branches on table.BranchId equals branch.Id
+             from settings in context.CafeSettings
+             where table.QrCode == code
+                 && table.Status == BranchTableStatus.Active
+                 && branch.LifecycleStatus == BranchLifecycleStatus.Active
+             select new GuestQrContext(settings.CafeName, branch.Id, branch.Name, table.Id, table.Number))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        private static IQueryable<TableQrData> ProjectQrData(IQueryable<BranchTable> tables) =>
+            tables.Select(table => new TableQrData(
+                table.Id, table.Number, table.Label, table.QrCode, EF.Property<uint>(table, "xmin")));
+
         public Task<int?> MaxActiveNumberAsync(Guid branchId, CancellationToken cancellationToken) =>
             context.BranchTables
                 .Where(table => table.BranchId == branchId && table.Status == BranchTableStatus.Active)
@@ -461,14 +548,11 @@ namespace CafeHub.Infrastructure.Tables
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException
             {
                 SqlState: PostgresErrorCodes.UniqueViolation,
-            } violation)
+            } violation && violation.ConstraintName is ActiveNumberIndex or QrCodeIndex)
             {
-                return violation.ConstraintName switch
-                {
-                    ActiveNumberIndex => TablesErrors.NumberConflict(),
-                    QrCodeIndex => TablesErrors.QrCodeConflict(),
-                    _ => null,
-                };
+                return violation.ConstraintName == ActiveNumberIndex
+                    ? TablesErrors.NumberConflict()
+                    : TablesErrors.QrCodeConflict();
             }
         }
 

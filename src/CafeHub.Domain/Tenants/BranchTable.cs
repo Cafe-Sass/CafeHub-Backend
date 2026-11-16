@@ -86,6 +86,26 @@ namespace CafeHub.Domain.Tenants
             UpdatedBy = updatedBy;
         }
 
+        public void RegenerateQrCode(string qrCode, DateTimeOffset updatedAt, Guid updatedBy)
+        {
+            if (Status != BranchTableStatus.Active)
+            {
+                throw new InvalidOperationException("An inactive table cannot regenerate its QR code.");
+            }
+
+            if (string.Equals(QrCode, qrCode, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("The replacement QR code must be different.", nameof(qrCode));
+            }
+
+            QrCode = ValidateQrCode(qrCode);
+            UpdatedAt = updatedAt;
+            UpdatedBy = updatedBy;
+        }
+
+        public static bool IsValidQrCode(string? qrCode) =>
+            qrCode is { Length: QrCodeLength } && qrCode.All(IsValidQrCodeCharacter);
+
         private static int ValidateNumber(int number)
         {
             if (number < MinimumNumber || number > MaximumNumber)
@@ -123,9 +143,7 @@ namespace CafeHub.Domain.Tenants
 
         private static string ValidateQrCode(string qrCode)
         {
-            if (qrCode is null
-                || qrCode.Length != QrCodeLength
-                || !qrCode.All(IsValidQrCodeCharacter))
+            if (!IsValidQrCode(qrCode))
             {
                 throw new ArgumentException(
                     "The table QR code must be 22 URL-safe base64url characters.",

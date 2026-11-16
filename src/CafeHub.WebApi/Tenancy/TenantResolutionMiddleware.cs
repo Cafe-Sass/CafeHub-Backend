@@ -1,6 +1,8 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Tenancy;
+using CafeHub.Domain.Tenants;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -29,6 +31,12 @@ namespace CafeHub.WebApi.Tenancy
             if (!IsTenantPath(context.Request.Path))
             {
                 await next(context);
+                return;
+            }
+
+            if (IsGuestQr(context) && !BranchTable.IsValidQrCode(context.Request.RouteValues["code"] as string))
+            {
+                await GuestQrProblem.WriteNotFoundAsync(context, correlationIdAccessor, context.RequestAborted);
                 return;
             }
 
@@ -80,6 +88,12 @@ namespace CafeHub.WebApi.Tenancy
 
         private static async Task WriteUnavailableAsync(HttpContext context, ICorrelationIdAccessor? correlationIdAccessor)
         {
+            if (IsGuestQr(context))
+            {
+                await GuestQrProblem.WriteNotFoundAsync(context, correlationIdAccessor, context.RequestAborted);
+                return;
+            }
+
             var problem = ErrorProblemDetailsMapper.Map(
                 TenancyErrors.TenantUnavailable(),
                 context.TraceIdentifier,
@@ -89,5 +103,8 @@ namespace CafeHub.WebApi.Tenancy
             context.Response.ContentType = ProblemJson;
             await context.Response.WriteAsJsonAsync(problem, options: null, contentType: ProblemJson, cancellationToken: context.RequestAborted);
         }
+
+        private static bool IsGuestQr(HttpContext context) =>
+            context.GetEndpoint()?.Metadata.GetMetadata<TableQrEndpointAttribute>() is { IsGuest: true };
     }
 }

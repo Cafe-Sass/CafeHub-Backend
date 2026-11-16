@@ -53,7 +53,10 @@ TenantDatabases__MaxPoolSize
 Jwt__Issuer
 Jwt__Audience
 Jwt__SigningKey
+Public__AppBaseUrl
 ```
+
+Set `Public__AppBaseUrl` to the public app origin before starting the API. Use an HTTPS origin for deployed environments and HTTP loopback only in Development. The app serves `/t/{slug}/q/{code}` and calls the guest resolver. Before issuing stickers, verify that the proxy, access logs, app analytics, and trace exporters suppress the raw URL and response body for QR routes. Use route templates for telemetry and keep EF and Npgsql parameter values and PostgreSQL error detail disabled.
 
 Tenant connection strings are assembled at runtime from the validated tenant registry record and the shared provisioning credential derivation. The `TenantDatabases` values come from User Secrets locally and environment variables in deployed environments. Configure `TenantDatabases:SslMode` as `Require` or stronger in deployed environments; `Prefer` is the local default for development PostgreSQL instances without TLS.
 

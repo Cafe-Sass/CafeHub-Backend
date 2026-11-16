@@ -271,6 +271,39 @@ namespace CafeHub.UnitTests.Tables
         public List<TableListRequest> ListRequests { get; } = new();
         public List<TableResponse> ListResponses { get; } = new();
 
+        public List<(Guid BranchId, Guid TableId)> QrReads { get; } = [];
+        public List<Guid> QrSheetReads { get; } = [];
+        public List<(Guid BranchId, Guid TableId, string Version, Guid ActorId)> QrRotations { get; } = [];
+        public List<string> GuestQrReads { get; } = [];
+        public TableQrData? QrData { get; set; }
+        public IReadOnlyList<TableQrData>? QrSheet { get; set; }
+        public GuestQrContext? GuestContext { get; set; }
+
+        public Task<TableQrData?> GetQrAsync(Guid branchId, Guid tableId, CancellationToken cancellationToken)
+        {
+            QrReads.Add((branchId, tableId));
+            return Task.FromResult(QrData);
+        }
+
+        public Task<IReadOnlyList<TableQrData>?> GetQrSheetAsync(Guid branchId, CancellationToken cancellationToken)
+        {
+            QrSheetReads.Add(branchId);
+            return Task.FromResult(QrSheet);
+        }
+
+        public Task<Result<TableQrData>> RegenerateQrAsync(
+            Guid branchId, Guid tableId, string concurrencyToken, Guid actorUserId, CancellationToken cancellationToken)
+        {
+            QrRotations.Add((branchId, tableId, concurrencyToken, actorUserId));
+            return Failure is null ? Respond(QrData!) : Task.FromResult(Result.Failure<TableQrData>(Failure));
+        }
+
+        public Task<GuestQrContext?> ResolveGuestQrAsync(string code, CancellationToken cancellationToken)
+        {
+            GuestQrReads.Add(code);
+            return Task.FromResult(GuestContext);
+        }
+
         public Task<int> CountActiveAsync(Guid branchId, CancellationToken cancellationToken) =>
             Task.FromResult(0);
 
