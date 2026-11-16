@@ -12,6 +12,8 @@ namespace CafeHub.Infrastructure.Audit
         private const string CafeSettingsTarget = "cafe_settings";
         private const string BranchesTarget = "branches";
         private const string TenantUsersTarget = "tenant_users";
+        private const string ProductsTarget = "products";
+        private const string PriceFieldPrefix = "price.";
 
         private static readonly IReadOnlyDictionary<string, HashSet<string>> AllowLists =
             new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
@@ -68,6 +70,22 @@ namespace CafeHub.Infrastructure.Audit
                     "fromNumber",
                     "toNumber",
                 },
+                [ProductsTarget] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "Kind",
+                    "Caffeine",
+                    "PreparationMinutes",
+                    "Status",
+                    "CategoryId",
+                    "StationId",
+                },
+            };
+
+        private static readonly IReadOnlyDictionary<string, string[]> AllowedPrefixes =
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                [ProductsTarget] = [PriceFieldPrefix],
             };
 
         private static readonly HashSet<string> DeniedNames = new(StringComparer.Ordinal)
@@ -108,7 +126,7 @@ namespace CafeHub.Infrastructure.Audit
                 if (field is null
                     || string.IsNullOrWhiteSpace(field.Name)
                     || IsDeniedName(field.Name)
-                    || !allowList.Contains(field.Name))
+                    || !IsAllowedField(targetType, allowList, field.Name))
                 {
                     continue;
                 }
@@ -149,6 +167,18 @@ namespace CafeHub.Infrastructure.Audit
             }
 
             return Result.Success(new Snapshots(beforeState, afterState));
+        }
+
+        private static bool IsAllowedField(string targetType, HashSet<string> allowList, string name)
+        {
+            if (allowList.Contains(name))
+            {
+                return true;
+            }
+
+            return AllowedPrefixes.TryGetValue(targetType, out var prefixes)
+                && prefixes.Any(prefix => name.Length > prefix.Length
+                    && name.StartsWith(prefix, StringComparison.Ordinal));
         }
 
         private static bool IsDeniedName(string name)

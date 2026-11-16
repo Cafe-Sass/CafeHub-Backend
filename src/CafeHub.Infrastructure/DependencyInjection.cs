@@ -135,6 +135,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IBranchStore, BranchStore>();
             services.AddScoped<IStationStore, StationStore>();
             services.AddScoped<IMenuCategoryStore, MenuCategoryStore>();
+            services.AddScoped<IProductStore, ProductStore>();
             services.AddScoped<IStationScope, StationScope>();
             services.AddScoped<ITableStore, TableStore>();
             services.AddScoped<IStaffStore, StaffStore>();

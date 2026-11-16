@@ -56,6 +56,36 @@ namespace CafeHub.Domain.Tenants
             };
         }
 
+        public bool Update(string name, decimal price, bool isDefault, DateTimeOffset now, Guid actorId)
+        {
+            var validatedName = ValidateName(name);
+            var validatedPrice = ValidatePrice(price);
+            if (Name == validatedName && Price == validatedPrice && IsDefault == isDefault
+                && Status == ProductComponentStatus.Active)
+            {
+                return false;
+            }
+
+            Name = validatedName;
+            Price = validatedPrice;
+            IsDefault = isDefault;
+            Status = ProductComponentStatus.Active;
+            UpdatedAt = now;
+            UpdatedBy = actorId;
+            return true;
+        }
+
+        public static bool IsValidName(string? name)
+        {
+            var trimmed = name?.Trim();
+            return !string.IsNullOrEmpty(trimmed)
+                && trimmed.Length <= MaximumNameLength
+                && !trimmed.Any(char.IsControl);
+        }
+
+        public static bool IsValidPrice(decimal price) =>
+            price >= 0m && price <= MaximumPrice && decimal.Round(price, 2) == price;
+
         internal void AssignProduct(Guid productId)
         {
             if (productId == Guid.Empty)
@@ -75,25 +105,19 @@ namespace CafeHub.Domain.Tenants
 
         private static string ValidateName(string name)
         {
-            var trimmed = name?.Trim();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.Length > MaximumNameLength)
+            if (!IsValidName(name))
             {
                 throw new ArgumentException(
-                    "The size name must be between 1 and 32 characters after trimming.",
+                    "The size name must be between 1 and 32 characters after trimming, with no control characters.",
                     nameof(name));
             }
 
-            if (trimmed.Any(char.IsControl))
-            {
-                throw new ArgumentException("The size name must not contain control characters.", nameof(name));
-            }
-
-            return trimmed;
+            return name.Trim();
         }
 
         private static decimal ValidatePrice(decimal price)
         {
-            if (price < 0m || price > MaximumPrice || decimal.Round(price, 2) != price)
+            if (!IsValidPrice(price))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(price),

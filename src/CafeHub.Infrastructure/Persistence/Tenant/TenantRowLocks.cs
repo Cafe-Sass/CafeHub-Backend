@@ -16,6 +16,14 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
             context.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT id FROM menu_categories WHERE id = {id} FOR UPDATE", cancellationToken);
 
+        internal static Task LockStationAsync(this TenantDbContext context, Guid id, CancellationToken cancellationToken) =>
+            context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT id FROM stations WHERE id = {id} FOR UPDATE", cancellationToken);
+
+        internal static Task LockProductAsync(this TenantDbContext context, Guid id, CancellationToken cancellationToken) =>
+            context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT id FROM products WHERE id = {id} FOR UPDATE", cancellationToken);
+
         internal static async Task<bool> LockBranchStaffAsync(
             this TenantDbContext context, Guid id, Guid branchId, CancellationToken cancellationToken)
         {
