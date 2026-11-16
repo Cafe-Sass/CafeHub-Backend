@@ -16,6 +16,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "branch_tables",
             "stations",
             "menu_categories",
+            "products",
+            "product_sizes",
+            "product_addons",
+            "product_tags",
             "tenant_user_stations",
             "cafe_settings",
             "tenant_audit_records",
@@ -28,6 +32,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             var entityTypes = typeof(TenantUser).Assembly
                 .GetTypes()
                 .Where(t => t.Namespace == "CafeHub.Domain.Tenants" && t.IsClass && !t.IsAbstract && !t.IsEnum)
+                .Where(t => !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
                 .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun))
                 .ToList();
 
@@ -48,6 +53,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "branch_tables" => nameof(BranchTable),
                     "stations" => nameof(Station),
                     "menu_categories" => nameof(MenuCategory),
+                    "products" => nameof(Product),
+                    "product_sizes" => nameof(ProductSize),
+                    "product_addons" => nameof(ProductAddon),
+                    "product_tags" => nameof(ProductTag),
                     "tenant_user_stations" => nameof(TenantUserStation),
                     "cafe_settings" => nameof(CafeSettings),
                     "tenant_audit_records" => nameof(TenantAuditRecord),

@@ -32,6 +32,10 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "stations",
             "tenant_user_stations",
             "menu_categories",
+            "products",
+            "product_sizes",
+            "product_addons",
+            "product_tags",
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",
@@ -433,10 +437,18 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal("primary_color", primaryColor.GetColumnName());
             Assert.True(primaryColor.IsNullable);
 
+            var currencyCode = entity.FindProperty(nameof(CafeSettings.CurrencyCode));
+            Assert.NotNull(currencyCode);
+            Assert.Equal("currency_code", currencyCode.GetColumnName());
+            Assert.False(currencyCode.IsNullable);
+            Assert.Equal("text", currencyCode.GetColumnType());
+            Assert.Equal(CafeSettings.DefaultCurrencyCode, currencyCode.GetDefaultValue());
+
             var checks = entity.GetCheckConstraints().ToList();
             Assert.Contains(checks, c => c.Name == "ck_cafe_settings_cafe_name_length");
             Assert.Contains(checks, c => c.Name == "ck_cafe_settings_color_format");
             Assert.Contains(checks, c => c.Name == "ck_cafe_settings_timezone");
+            Assert.Contains(checks, c => c.Name == "ck_cafe_settings_currency_code_format");
         }
 
         [Fact]
@@ -583,6 +595,188 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(typeof(uint), xmin.ClrType);
             Assert.True(xmin.IsConcurrencyToken);
             Assert.False(xmin.IsNullable);
+        }
+
+        [Fact]
+        public void ProductsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(Product));
+            Assert.NotNull(entity);
+
+            Assert.Equal("products", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_products", pk.GetName());
+            Assert.Equal("id", Assert.Single(pk.Properties).GetColumnName());
+
+            var categoryId = entity.FindProperty(nameof(Product.CategoryId));
+            Assert.NotNull(categoryId);
+            Assert.Equal("category_id", categoryId.GetColumnName());
+            Assert.False(categoryId.IsNullable);
+
+            var stationId = entity.FindProperty(nameof(Product.StationId));
+            Assert.NotNull(stationId);
+            Assert.Equal("station_id", stationId.GetColumnName());
+            Assert.True(stationId.IsNullable);
+
+            Assert.Equal("name", entity.FindProperty(nameof(Product.Name))!.GetColumnName());
+            Assert.Equal("description", entity.FindProperty(nameof(Product.Description))!.GetColumnName());
+            Assert.Equal("ingredients", entity.FindProperty(nameof(Product.Ingredients))!.GetColumnName());
+            Assert.Equal("kind", entity.FindProperty(nameof(Product.Kind))!.GetColumnName());
+            Assert.Equal("caffeine", entity.FindProperty(nameof(Product.Caffeine))!.GetColumnName());
+            Assert.Equal("preparation_minutes", entity.FindProperty(nameof(Product.PreparationMinutes))!.GetColumnName());
+            Assert.Equal("sort_order", entity.FindProperty(nameof(Product.SortOrder))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(Product.Status))!.GetColumnName());
+            Assert.False(entity.FindProperty(nameof(Product.Name))!.IsNullable);
+            Assert.True(entity.FindProperty(nameof(Product.Description))!.IsNullable);
+            Assert.True(entity.FindProperty(nameof(Product.Ingredients))!.IsNullable);
+            Assert.True(entity.FindProperty(nameof(Product.PreparationMinutes))!.IsNullable);
+
+            foreach (var index in new[]
+            {
+                "ix_products_category_id",
+                "ix_products_station_id",
+                "ix_products_created_by",
+                "ix_products_updated_by",
+            })
+            {
+                Assert.Contains(entity.GetIndexes(), candidate => candidate.GetDatabaseName() == index);
+            }
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_products_name_length");
+            Assert.Contains(checks, c => c.Name == "ck_products_description_length");
+            Assert.Contains(checks, c => c.Name == "ck_products_ingredients_length");
+            Assert.Contains(checks, c => c.Name == "ck_products_kind");
+            Assert.Contains(checks, c => c.Name == "ck_products_preparation_minutes");
+            Assert.Contains(checks, c => c.Name == "ck_products_sort_order");
+            Assert.Contains(checks, c => c.Name == "ck_products_status");
+
+            Assert.Equal(
+                typeof(MenuCategory),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_products_category_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(Station),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_products_station_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_products_created_by").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_products_updated_by").PrincipalEntityType.ClrType);
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.True(xmin.IsConcurrencyToken);
+            Assert.False(xmin.IsNullable);
+        }
+
+        [Fact]
+        public void ProductSizesTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(ProductSize));
+            Assert.NotNull(entity);
+
+            Assert.Equal("product_sizes", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_product_sizes", pk.GetName());
+            Assert.Equal("id", Assert.Single(pk.Properties).GetColumnName());
+
+            Assert.Equal("product_id", entity.FindProperty(nameof(ProductSize.ProductId))!.GetColumnName());
+            Assert.Equal("name", entity.FindProperty(nameof(ProductSize.Name))!.GetColumnName());
+            Assert.Equal("price", entity.FindProperty(nameof(ProductSize.Price))!.GetColumnName());
+            Assert.Equal("is_default", entity.FindProperty(nameof(ProductSize.IsDefault))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(ProductSize.Status))!.GetColumnName());
+            Assert.False(entity.FindProperty(nameof(ProductSize.ProductId))!.IsNullable);
+
+            var price = entity.FindProperty(nameof(ProductSize.Price))!;
+            Assert.Equal("numeric(12,2)", price.GetColumnType());
+            Assert.Equal(12, price.GetPrecision());
+            Assert.Equal(2, price.GetScale());
+
+            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "ix_product_sizes_product_id");
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_product_sizes_name_length");
+            Assert.Contains(checks, c => c.Name == "ck_product_sizes_price_range");
+            Assert.Contains(checks, c => c.Name == "ck_product_sizes_status");
+
+            var productFk = entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_product_sizes_product_id");
+            Assert.Equal(typeof(Product), productFk.PrincipalEntityType.ClrType);
+            Assert.Equal(DeleteBehavior.Restrict, productFk.DeleteBehavior);
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+        }
+
+        [Fact]
+        public void ProductAddonsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(ProductAddon));
+            Assert.NotNull(entity);
+
+            Assert.Equal("product_addons", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_product_addons", pk.GetName());
+            Assert.Equal("id", Assert.Single(pk.Properties).GetColumnName());
+
+            Assert.Equal("product_id", entity.FindProperty(nameof(ProductAddon.ProductId))!.GetColumnName());
+            Assert.Equal("name", entity.FindProperty(nameof(ProductAddon.Name))!.GetColumnName());
+            Assert.Equal("price", entity.FindProperty(nameof(ProductAddon.Price))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(ProductAddon.Status))!.GetColumnName());
+
+            var price = entity.FindProperty(nameof(ProductAddon.Price))!;
+            Assert.Equal("numeric(12,2)", price.GetColumnType());
+            Assert.Equal(12, price.GetPrecision());
+            Assert.Equal(2, price.GetScale());
+
+            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "ix_product_addons_product_id");
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_product_addons_name_length");
+            Assert.Contains(checks, c => c.Name == "ck_product_addons_price_range");
+            Assert.Contains(checks, c => c.Name == "ck_product_addons_status");
+
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+        }
+
+        [Fact]
+        public void ProductTagsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(ProductTag));
+            Assert.NotNull(entity);
+
+            Assert.Equal("product_tags", entity.GetTableName());
+
+            var pk = entity.FindPrimaryKey();
+            Assert.NotNull(pk);
+            Assert.Equal("pk_product_tags", pk.GetName());
+            Assert.Equal(
+                new[] { "product_id", "tag" },
+                pk.Properties.Select(property => property.GetColumnName()));
+
+            Assert.False(entity.FindProperty(nameof(ProductTag.ProductId))!.IsNullable);
+            Assert.Equal("tag", entity.FindProperty(nameof(ProductTag.Tag))!.GetColumnName());
+            Assert.Equal("created_at", entity.FindProperty(nameof(ProductTag.CreatedAt))!.GetColumnName());
+
+            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "ix_product_tags_tag");
+
+            var checks = entity.GetCheckConstraints().ToList();
+            Assert.Contains(checks, c => c.Name == "ck_product_tags_tag_length");
+            Assert.Contains(checks, c => c.Name == "ck_product_tags_tag_lowercase");
+            Assert.Contains(checks, c => c.Name == "ck_product_tags_tag_format");
+
+            var productFk = entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_product_tags_product_id");
+            Assert.Equal(typeof(Product), productFk.PrincipalEntityType.ClrType);
+            Assert.Equal(DeleteBehavior.Restrict, productFk.DeleteBehavior);
         }
     }
 }
