@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 12 tables after adding `tenant_user_stations` for staff station assignment in Story CFMD-386; earlier stories added `stations` and `refresh_tokens` for owner and staff authentication sessions, and `branch_tables` for cafe table numbering in Story CFMD-387, and the baseline 8-table scope included neither.
+The Tenant model contains 13 tables, including `menu_categories` for the cafe-wide menu hierarchy in Task 46.
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. `CFMD-74` consumes this ERD for entity classes and migrations; no entity, migration, or DbContext change is made in this story.
 
@@ -49,6 +49,13 @@ erDiagram
         uuid id PK
         uuid branch_id FK
         text name
+        text status
+    }
+    menu_categories {
+        uuid id PK
+        uuid parent_id FK
+        text name
+        integer sort_order
         text status
     }
     branch_tables {
@@ -98,6 +105,7 @@ erDiagram
     tenant_users ||--o{ refresh_tokens : "sessions"
     branches ||--o{ tenant_users : "staff branch"
     branches ||--o{ stations : "stations"
+    menu_categories |o--o{ menu_categories : "parent"
     branches ||--o{ branch_tables : "tables"
     tenant_users ||--o{ tenant_user_stations : "station assignments"
     stations ||--o{ tenant_user_stations : "assigned staff"
@@ -235,6 +243,19 @@ Purpose: the numbered physical tables of one branch (FR-CAF-003), each carrying 
 - The PostgreSQL system column `xmin` is mapped as a row version for optimistic concurrency on table updates.
 - `uq_branch_tables_branch_active_number` — unique partial index on `(branch_id, number)` WHERE `status = 'Active'`; a number is unique among a branch's active tables, while an inactive table frees its number. Reactivation fails when an active table already uses the number. The partial index is hand-written raw SQL in the migration, following `architecture/database-conventions.md`.
 
+### menu_categories
+
+Purpose: the cafe-wide, two-level category tree (FR-MENU-001).
+
+- `id uuid NOT NULL` — app-generated UUIDv7, `pk_menu_categories`.
+- `parent_id uuid NULL` — immutable; `fk_menu_categories_parent_id` references `menu_categories.id` with ON DELETE RESTRICT. `ck_menu_categories_parent_not_self` rejects self-parenting. The write path validates that a new child references an active root and takes the parent lock before checking parent state. `ix_menu_categories_parent_id_sort_order_id` on `(parent_id, sort_order, id)` supports the FK and sibling order.
+- `name text NOT NULL` — trimmed, case-preserving, 1 to 64 Unicode scalars on UTF-8 (`ck_menu_categories_name_length`); no Unicode normalization.
+- `sort_order integer NOT NULL` — `ck_menu_categories_sort_order` enforces nonnegative order. Ties are allowed; sibling reads sort by `sort_order, id`.
+- `status text NOT NULL` — `ck_menu_categories_status` permits `Active` and `Inactive`. Parent lifecycle changes never change child status. A child is visible only when it and its parent are active.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL`, `updated_by uuid NULL`. Each actor FK references `tenant_users.id` with ON DELETE RESTRICT and its own index.
+- PostgreSQL `xmin` is mapped as the row version.
+- `uq_menu_categories_active_root_name` uniquely indexes `lower(name)` where `parent_id IS NULL AND status = 'Active'`. `uq_menu_categories_active_child_name` uniquely indexes `(parent_id, lower(name))` where `parent_id IS NOT NULL AND status = 'Active'`. An active child under an inactive root still reserves its name. Both expression indexes use the Tenant database's default collation. Run the [category-name preflight](../database/postgresql-commands.md#task-46-category-name-preflight) before applying the migration.
+
 ### cafe_settings
 
 Purpose: the cafe's profile and branding configuration (FR-CAF-001) and the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition). A singleton row: created once by provisioning (see the seeding section above) with no acting user.
@@ -277,7 +298,7 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
-- Menu management — categories, products, sizes, add-ons, per-branch availability, OCR-assisted import, and promotional banners (FR-MENU-001 through FR-MENU-006).
+- Menu products, sizes, add-ons, per-branch availability, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006).
 - Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).

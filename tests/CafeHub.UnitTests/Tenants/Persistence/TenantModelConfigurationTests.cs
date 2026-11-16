@@ -31,6 +31,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "branch_tables",
             "stations",
             "tenant_user_stations",
+            "menu_categories",
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",

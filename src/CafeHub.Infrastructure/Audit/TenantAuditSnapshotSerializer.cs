@@ -44,6 +44,13 @@ namespace CafeHub.Infrastructure.Audit
                     "Status",
                     "PermissionCodes",
                 },
+                ["menu_categories"] = new(StringComparer.Ordinal)
+                {
+                    "ParentId",
+                    "Name",
+                    "SortOrder",
+                    "Status",
+                },
                 ["stations"] = new(StringComparer.Ordinal)
                 {
                     "Name",

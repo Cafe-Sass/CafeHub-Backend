@@ -266,6 +266,76 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.MenuCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_menu_categories");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_menu_categories_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_menu_categories_updated_by");
+
+                    b.HasIndex("ParentId", "SortOrder", "Id")
+                        .HasDatabaseName("ix_menu_categories_parent_id_sort_order_id");
+
+                    b.ToTable("menu_categories", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_menu_categories_name_length", "char_length(name) BETWEEN 1 AND 64");
+
+                            t.HasCheckConstraint("ck_menu_categories_parent_not_self", "parent_id <> id");
+
+                            t.HasCheckConstraint("ck_menu_categories_sort_order", "sort_order >= 0");
+
+                            t.HasCheckConstraint("ck_menu_categories_status", "status IN ('Active', 'Inactive')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Station", b =>
                 {
                     b.Property<Guid>("Id")
@@ -896,6 +966,29 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_cafe_settings_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.MenuCategory", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_categories_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.MenuCategory", "Parent")
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_categories_parent_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_categories_updated_by");
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Station", b =>

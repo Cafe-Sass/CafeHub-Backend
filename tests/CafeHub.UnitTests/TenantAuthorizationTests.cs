@@ -112,6 +112,43 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task MenuManagePreservesOwnerDelegationBranchGateAndTenantIsolation()
+        {
+            var grants = new FakeTenantPermissionReader { Codes = [TenantPermissions.MenuManage] };
+            using var provider = CreateServices(permissions: grants);
+            var authorization = provider.GetRequiredService<IAuthorizationService>();
+            var branch = Guid.NewGuid();
+            var owner = AccessContext(new TenantAccountAccess(false, null, false));
+            var staffAccount = new TenantAccountAccess(true, "staff", true) { BranchId = branch };
+            var staff = AccessContext(staffAccount);
+            var suspended = AccessContext(staffAccount with { HasActiveBranch = false });
+
+            Assert.True((await authorization.AuthorizeAsync(Principal(TenantId), owner, TenantPermissions.MenuManage)).Succeeded);
+            Assert.True((await authorization.AuthorizeAsync(Principal(TenantId), staff, TenantPermissions.MenuManage)).Succeeded);
+            Assert.Equal(branch, grants.ExpectedBranchId);
+            Assert.False((await authorization.AuthorizeAsync(Principal(TenantId), suspended, TenantPermissions.MenuManage)).Succeeded);
+            Assert.True((await authorization.AuthorizeAsync(Principal(TenantId), suspended, TenantPolicies.TenantUser)).Succeeded);
+            Assert.False((await authorization.AuthorizeAsync(Principal(Guid.NewGuid()), staff, TenantPermissions.MenuManage)).Succeeded);
+
+            grants.Codes = [];
+            Assert.False((await authorization.AuthorizeAsync(Principal(TenantId), staff, TenantPermissions.MenuManage)).Succeeded);
+            Assert.True((await authorization.AuthorizeAsync(Principal(TenantId), staff, TenantPolicies.TenantUser)).Succeeded);
+        }
+
+        [Fact]
+        public void MenuPermissionDoesNotChangeStationTableOrQrPolicies()
+        {
+            Assert.Equal(TenantPermissions.StationsManage, typeof(TenantStationsController)
+                .GetMethod(nameof(TenantStationsController.Create))!.GetCustomAttribute<TenantAuthorizeAttribute>()!.Policy);
+            Assert.Equal(TenantPermissions.TablesManage, typeof(TenantTablesController)
+                .GetMethod(nameof(TenantTablesController.Create))!.GetCustomAttribute<TenantAuthorizeAttribute>()!.Policy);
+            Assert.Equal(TenantPermissions.TablesManage, typeof(TenantTablesController)
+                .GetMethod(nameof(TenantTablesController.RegenerateQr))!.GetCustomAttribute<TenantAuthorizeAttribute>()!.Policy);
+            Assert.NotNull(typeof(TenantGuestQrController)
+                .GetMethod(nameof(TenantGuestQrController.Resolve))!.GetCustomAttribute<AllowAnonymousAttribute>());
+        }
+
+        [Fact]
         public async Task PlatformAnonymousAndCrossTenantPrincipals_SatisfyNeitherPolicy()
         {
             using var provider = CreateServices();

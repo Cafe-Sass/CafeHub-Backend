@@ -221,6 +221,18 @@ The provisioning workflow that actually creates tenants is automated (FR-ONB-006
 
 **Rejected alternative.** Granting the application role `CREATE` on its schema "so app-side tooling works": the role would then be able to create objects (probe C3 below), breaking the migration-only DDL policy the repository's EF history depends on.
 
+### Task 46 category-name preflight
+
+Before applying `20261116061125_AddMenuCategories`, run [CheckMenuCategoriesCollation.sql](scripts/CheckMenuCategoriesCollation.sql) on the target Tenant database with an approved read-only connection. Verify the template used for future Tenant databases by running the same check in a disposable database created from that template. Provisioning sets the database owner and inherits the template's encoding and locale. The category indexes use the Tenant database's default collation for `lower(name)`.
+
+```powershell
+psql -X -v ON_ERROR_STOP=1 -d "service=<tenant-preflight-service>" -f database/scripts/CheckMenuCategoriesCollation.sql
+```
+
+Confirm the reported database name is the intended Tenant. Record the server encoding, locale provider, effective expression collation, locale settings, and recorded and actual collation versions alongside the result. Proceed only if the single row reports `preflight_pass = t`. The check requires UTF-8, matching collation versions where reported, matching ASCII and accented case pairs, preserved accents and Arabic text, distinct composed and decomposed forms, and Unicode scalar length for supplementary and combining characters.
+
+An error, a missing result, or `preflight_pass = f` means the target is unverified. Investigate the encoding or locale before applying the migration. Review collation drift with the database operator before rebuilding indexes or refreshing the recorded version. Keep the existing `lower(name)` index definitions until a compatible target configuration or a justified schema change has been approved. This probe reads PostgreSQL settings and evaluates literals. It requires no Tenant tables and does not test index enforcement or lock behavior.
+
 ## 7. Required extensions
 
 **No extension is required by these conventions.** Run no `CREATE EXTENSION` in the Master database, any tenant database, or the role-creation scripts.
