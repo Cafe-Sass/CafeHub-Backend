@@ -74,15 +74,8 @@ namespace CafeHub.Domain.Tenants
                 throw new ArgumentException("The product id is required.", nameof(id));
             }
 
-            if (categoryId == Guid.Empty)
-            {
-                throw new ArgumentException("The category id is required.", nameof(categoryId));
-            }
-
-            if (stationId == Guid.Empty)
-            {
-                throw new ArgumentException("The station id cannot be empty.", nameof(stationId));
-            }
+            ValidateCategoryId(categoryId);
+            ValidateStationId(stationId);
 
             if (!Enum.IsDefined(kind))
             {
@@ -133,6 +126,195 @@ namespace CafeHub.Domain.Tenants
 
             return product;
         }
+
+        public bool Update(
+            Guid categoryId,
+            Guid? stationId,
+            string name,
+            string? description,
+            string? ingredients,
+            ProductKind kind,
+            bool caffeine,
+            int? preparationMinutes,
+            int sortOrder,
+            DateTimeOffset now,
+            Guid actorId)
+        {
+            ValidateCategoryId(categoryId);
+            ValidateStationId(stationId);
+            if (!Enum.IsDefined(kind))
+            {
+                throw new ArgumentOutOfRangeException(nameof(kind));
+            }
+
+            ValidatePreparationMinutes(preparationMinutes);
+            ArgumentOutOfRangeException.ThrowIfNegative(sortOrder);
+            var validatedName = ValidateName(name);
+            var validatedDescription = NormalizeOptionalText(description, MaximumDescriptionLength, nameof(description));
+            var validatedIngredients = NormalizeOptionalText(ingredients, MaximumIngredientsLength, nameof(ingredients));
+
+            if (CategoryId == categoryId && StationId == stationId && Name == validatedName
+                && Description == validatedDescription && Ingredients == validatedIngredients
+                && Kind == kind && Caffeine == caffeine && PreparationMinutes == preparationMinutes
+                && SortOrder == sortOrder)
+            {
+                return false;
+            }
+
+            CategoryId = categoryId;
+            StationId = stationId;
+            Name = validatedName;
+            Description = validatedDescription;
+            Ingredients = validatedIngredients;
+            Kind = kind;
+            Caffeine = caffeine;
+            PreparationMinutes = preparationMinutes;
+            SortOrder = sortOrder;
+            Touch(now, actorId);
+            return true;
+        }
+
+        public bool ChangeStatus(ProductStatus status, DateTimeOffset now, Guid actorId)
+        {
+            if (!Enum.IsDefined(status))
+            {
+                throw new ArgumentOutOfRangeException(nameof(status));
+            }
+
+            if (status == Status)
+            {
+                return false;
+            }
+
+            Status = status;
+            Touch(now, actorId);
+            return true;
+        }
+
+        public bool ReplaceSizes(
+            IReadOnlyCollection<ProductSizeInput> replacements, DateTimeOffset now, Guid actorId)
+        {
+            ArgumentNullException.ThrowIfNull(replacements);
+            if (replacements.Count == 0)
+            {
+                throw new ArgumentException("A product requires at least one size.", nameof(replacements));
+            }
+
+            ValidateSizeReplacements(replacements);
+
+            var kept = new HashSet<Guid>();
+            var changed = false;
+            foreach (var replacement in replacements)
+            {
+                if (replacement.Id is { } sizeId)
+                {
+                    var existing = sizes.Single(size => size.Id == sizeId);
+                    changed |= existing.Update(
+                        replacement.Name, replacement.Price, replacement.IsDefault, now, actorId);
+                    kept.Add(sizeId);
+                }
+                else
+                {
+                    var created = ProductSize.Create(
+                        Guid.CreateVersion7(), replacement.Name, replacement.Price, replacement.IsDefault, now, actorId);
+                    created.AssignProduct(Id);
+                    sizes.Add(created);
+                    kept.Add(created.Id);
+                    changed = true;
+                }
+            }
+
+            foreach (var size in sizes.Where(size => size.Status == ProductComponentStatus.Active && !kept.Contains(size.Id)))
+            {
+                size.Deactivate(now, actorId);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                Touch(now, actorId);
+            }
+
+            return changed;
+        }
+
+        public bool ReplaceAddons(
+            IReadOnlyCollection<ProductAddonInput> replacements, DateTimeOffset now, Guid actorId)
+        {
+            ArgumentNullException.ThrowIfNull(replacements);
+            ValidateAddonReplacements(replacements);
+
+            var kept = new HashSet<Guid>();
+            var changed = false;
+            foreach (var replacement in replacements)
+            {
+                if (replacement.Id is { } addonId)
+                {
+                    var existing = addons.Single(addon => addon.Id == addonId);
+                    changed |= existing.Update(replacement.Name, replacement.Price, now, actorId);
+                    kept.Add(addonId);
+                }
+                else
+                {
+                    var created = ProductAddon.Create(
+                        Guid.CreateVersion7(), replacement.Name, replacement.Price, now, actorId);
+                    created.AssignProduct(Id);
+                    addons.Add(created);
+                    kept.Add(created.Id);
+                    changed = true;
+                }
+            }
+
+            foreach (var addon in addons.Where(addon => addon.Status == ProductComponentStatus.Active && !kept.Contains(addon.Id)))
+            {
+                addon.Deactivate(now, actorId);
+                changed = true;
+            }
+
+            if (changed)
+            {
+                Touch(now, actorId);
+            }
+
+            return changed;
+        }
+
+        public bool ReplaceTags(IEnumerable<string> productTags, DateTimeOffset now, Guid actorId)
+        {
+            var normalized = NormalizeTags(productTags);
+            var current = tags.Select(tag => tag.Tag).OrderBy(tag => tag, StringComparer.Ordinal).ToArray();
+            var next = normalized.OrderBy(tag => tag, StringComparer.Ordinal).ToArray();
+            if (current.SequenceEqual(next, StringComparer.Ordinal))
+            {
+                return false;
+            }
+
+            tags.Clear();
+            foreach (var tag in normalized)
+            {
+                tags.Add(ProductTag.Create(Id, tag, now));
+            }
+
+            Touch(now, actorId);
+            return true;
+        }
+
+        public static bool IsValidName(string? name)
+        {
+            var trimmed = name?.Trim();
+            return !string.IsNullOrEmpty(trimmed)
+                && trimmed.Length <= MaximumNameLength
+                && !trimmed.Any(char.IsControl);
+        }
+
+        public static bool IsValidOptionalText(string? value, int maximumLength)
+        {
+            var trimmed = value?.Trim();
+            return string.IsNullOrEmpty(trimmed) || (trimmed.Length <= maximumLength && !trimmed.Contains('\0'));
+        }
+
+        public static bool IsValidPreparationMinutes(int? preparationMinutes) =>
+            preparationMinutes is null or (>= 0 and <= MaximumPreparationMinutes);
 
         public bool AddSize(ProductSize size, DateTimeOffset now, Guid actorId)
         {
@@ -230,6 +412,103 @@ namespace CafeHub.Domain.Tenants
             return true;
         }
 
+        private void ValidateSizeReplacements(IReadOnlyCollection<ProductSizeInput> replacements)
+        {
+            var ids = new HashSet<Guid>();
+            foreach (var replacement in replacements)
+            {
+                if (!ProductSize.IsValidName(replacement.Name))
+                {
+                    throw new ArgumentException("The size name is invalid.", nameof(replacements));
+                }
+
+                if (!ProductSize.IsValidPrice(replacement.Price))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(replacements), "The size price is invalid.");
+                }
+
+                if (replacement.Id is { } sizeId)
+                {
+                    if (sizeId == Guid.Empty || !ids.Add(sizeId)
+                        || sizes.All(size => size.Id != sizeId))
+                    {
+                        throw new ArgumentException("The size id is invalid.", nameof(replacements));
+                    }
+                }
+            }
+
+            if (replacements.Count(size => size.IsDefault) != 1)
+            {
+                throw new ArgumentException("A product requires exactly one default size.", nameof(replacements));
+            }
+
+            if (HasDuplicateNames(replacements.Select(size => size.Name)))
+            {
+                throw new ArgumentException("Active size names must be unique within a product.", nameof(replacements));
+            }
+
+            var names = replacements.Select(size => size.Name.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (sizes.Any(size => size.Status == ProductComponentStatus.Active
+                && !ids.Contains(size.Id) && names.Contains(size.Name)))
+            {
+                throw new ArgumentException("Active size names must be unique within a product.", nameof(replacements));
+            }
+        }
+
+        private void ValidateAddonReplacements(IReadOnlyCollection<ProductAddonInput> replacements)
+        {
+            var ids = new HashSet<Guid>();
+            foreach (var replacement in replacements)
+            {
+                if (!ProductAddon.IsValidName(replacement.Name))
+                {
+                    throw new ArgumentException("The add-on name is invalid.", nameof(replacements));
+                }
+
+                if (!ProductAddon.IsValidPrice(replacement.Price))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(replacements), "The add-on price is invalid.");
+                }
+
+                if (replacement.Id is { } addonId
+                    && (addonId == Guid.Empty || !ids.Add(addonId) || addons.All(addon => addon.Id != addonId)))
+                {
+                    throw new ArgumentException("The add-on id is invalid.", nameof(replacements));
+                }
+            }
+
+            if (HasDuplicateNames(replacements.Select(addon => addon.Name)))
+            {
+                throw new ArgumentException("Active add-on names must be unique within a product.", nameof(replacements));
+            }
+
+            var names = replacements.Select(addon => addon.Name.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (addons.Any(addon => addon.Status == ProductComponentStatus.Active
+                && !ids.Contains(addon.Id) && names.Contains(addon.Name)))
+            {
+                throw new ArgumentException("Active add-on names must be unique within a product.", nameof(replacements));
+            }
+        }
+
+        private static bool HasDuplicateNames(IEnumerable<string> names) =>
+            names.GroupBy(name => name.Trim(), StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1);
+
+        private static void ValidateCategoryId(Guid categoryId)
+        {
+            if (categoryId == Guid.Empty)
+            {
+                throw new ArgumentException("The category id is required.", nameof(categoryId));
+            }
+        }
+
+        private static void ValidateStationId(Guid? stationId)
+        {
+            if (stationId == Guid.Empty)
+            {
+                throw new ArgumentException("The station id cannot be empty.", nameof(stationId));
+            }
+        }
+
         private static void ValidateSizes(IReadOnlyCollection<ProductSize> productSizes)
         {
             ArgumentNullException.ThrowIfNull(productSizes);
@@ -314,43 +593,27 @@ namespace CafeHub.Domain.Tenants
 
         private static string ValidateName(string name)
         {
-            var trimmed = name?.Trim();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.Length > MaximumNameLength)
+            if (!IsValidName(name))
             {
                 throw new ArgumentException(
-                    "The product name must be between 1 and 96 characters after trimming.",
+                    "The product name must be between 1 and 96 characters after trimming, with no control characters.",
                     nameof(name));
             }
 
-            if (trimmed.Any(char.IsControl))
-            {
-                throw new ArgumentException("The product name must not contain control characters.", nameof(name));
-            }
-
-            return trimmed;
+            return name.Trim();
         }
 
         private static string? NormalizeOptionalText(string? value, int maximumLength, string parameterName)
         {
-            var trimmed = value?.Trim();
-            if (string.IsNullOrEmpty(trimmed))
-            {
-                return null;
-            }
-
-            if (trimmed.Length > maximumLength)
+            if (!IsValidOptionalText(value, maximumLength))
             {
                 throw new ArgumentException(
-                    $"The text must not exceed {maximumLength} characters after trimming.",
+                    $"The text must not exceed {maximumLength} characters after trimming or contain NUL.",
                     parameterName);
             }
 
-            if (trimmed.Contains('\0'))
-            {
-                throw new ArgumentException("The text must not contain NUL.", parameterName);
-            }
-
-            return trimmed;
+            var trimmed = value?.Trim();
+            return string.IsNullOrEmpty(trimmed) ? null : trimmed;
         }
 
         private static void ValidatePreparationMinutes(int? preparationMinutes)

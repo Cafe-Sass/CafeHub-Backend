@@ -200,5 +200,66 @@ namespace CafeHub.Infrastructure.Audit
                     string.Join(",", stationIds.OrderBy(id => id).Select(id => id.ToString()))),
             });
         }
+
+        public static TenantAuditChanges ProductCreate(Product product)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+            var fields = new List<TenantAuditChanges.FieldChange>
+            {
+                new(nameof(Product.Name), null, product.Name),
+                new(nameof(Product.Kind), null, product.Kind.ToString()),
+                new(nameof(Product.Caffeine), null, product.Caffeine.ToString()),
+                new(nameof(Product.PreparationMinutes), null, FormatNumber(product.PreparationMinutes)),
+                new(nameof(Product.Status), null, product.Status.ToString()),
+                new(nameof(Product.CategoryId), null, product.CategoryId.ToString()),
+                new(nameof(Product.StationId), null, product.StationId?.ToString()),
+            };
+            fields.AddRange(product.Sizes.Select(size =>
+                new TenantAuditChanges.FieldChange($"price.{size.Name}", null, FormatNumber(size.Price))));
+            fields.AddRange(product.Addons.Select(addon =>
+                new TenantAuditChanges.FieldChange($"price.{addon.Name}", null, FormatNumber(addon.Price))));
+            return TenantAuditChanges.Create(fields);
+        }
+
+        public static TenantAuditChanges ProductUpdate(
+            Product product,
+            string oldName,
+            ProductKind oldKind,
+            bool oldCaffeine,
+            int? oldPreparationMinutes,
+            Guid oldCategoryId,
+            Guid? oldStationId,
+            IReadOnlyCollection<TenantAuditChanges.FieldChange> priceChanges)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+            ArgumentNullException.ThrowIfNull(priceChanges);
+            var fields = new List<TenantAuditChanges.FieldChange>
+            {
+                new(nameof(Product.Name), oldName, product.Name),
+                new(nameof(Product.Kind), oldKind.ToString(), product.Kind.ToString()),
+                new(nameof(Product.Caffeine), oldCaffeine.ToString(), product.Caffeine.ToString()),
+                new(nameof(Product.PreparationMinutes), FormatNumber(oldPreparationMinutes), FormatNumber(product.PreparationMinutes)),
+                new(nameof(Product.CategoryId), oldCategoryId.ToString(), product.CategoryId.ToString()),
+                new(nameof(Product.StationId), oldStationId?.ToString(), product.StationId?.ToString()),
+            };
+            fields.AddRange(priceChanges);
+            return TenantAuditChanges.Update(fields);
+        }
+
+        public static TenantAuditChanges ProductLifecycleStatus(Product product, ProductStatus oldStatus)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(Product.Status),
+                    oldStatus.ToString(),
+                    product.Status.ToString()),
+            });
+        }
+
+        private static string? FormatNumber(int? value) => value?.ToString(CultureInfo.InvariantCulture);
+
+        private static string FormatNumber(decimal value) => value.ToString(CultureInfo.InvariantCulture);
     }
 }

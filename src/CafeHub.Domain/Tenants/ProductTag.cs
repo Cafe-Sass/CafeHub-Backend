@@ -31,24 +31,24 @@ namespace CafeHub.Domain.Tenants
 
         internal static string Normalize(string? tag)
         {
+            if (!IsValid(tag))
+            {
+                throw new ArgumentException(
+                    "The tag must be 1 to 32 lower-case letters, digits, hyphens, or spaces after trimming.",
+                    nameof(tag));
+            }
+
+            return tag!.Trim().ToLowerInvariant();
+        }
+
+        public static bool IsValid(string? tag)
+        {
             var trimmed = tag?.Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(trimmed) || trimmed.Length > MaximumTagLength)
-            {
-                throw new ArgumentException(
-                    "The tag must be between 1 and 32 characters after trimming.",
-                    nameof(tag));
-            }
-
-            if (trimmed.Any(character => !char.IsAsciiLetterLower(character)
-                && !char.IsAsciiDigit(character)
-                && character is not '-' and not ' '))
-            {
-                throw new ArgumentException(
-                    "The tag may contain only lower-case letters, digits, hyphens, and spaces.",
-                    nameof(tag));
-            }
-
-            return trimmed;
+            return !string.IsNullOrEmpty(trimmed)
+                && trimmed.Length <= MaximumTagLength
+                && trimmed.All(character => char.IsAsciiLetterLower(character)
+                    || char.IsAsciiDigit(character)
+                    || character is '-' or ' ');
         }
     }
 }
