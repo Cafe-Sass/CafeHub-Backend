@@ -202,6 +202,7 @@ namespace CafeHub.UnitTests
                 [nameof(TenantStaffController.SetRoles)] = TenantPermissions.RolesManage,
                 [nameof(TenantStaffController.SetPermissions)] = TenantPermissions.RolesManage,
                 [nameof(TenantStaffController.EffectivePermissions)] = TenantPermissions.RolesManage,
+                [nameof(TenantStaffController.SetStaffStations)] = TenantPermissions.StationsManage,
             };
 
             foreach (var (action, policy) in policies)
