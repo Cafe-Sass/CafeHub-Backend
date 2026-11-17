@@ -21,6 +21,9 @@ namespace CafeHub.Application.Menu
         public static Error InvalidStation() =>
             ValidationError.Create([new("stationId", "The station is not active or does not exist.")]);
 
+        public static Error InvalidKind() =>
+            ValidationError.Create([new("kind", "The kind must be Food or Drink.")]);
+
         public static Error InvalidSize() =>
             ValidationError.Create([new("sizes", "The sizes are invalid for this product.")]);
 

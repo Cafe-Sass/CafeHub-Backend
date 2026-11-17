@@ -47,6 +47,12 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | PUT | `t/{slug}/api/v1/menu/categories/{id:guid}` | `menu.manage` | Update `name` and `sortOrder` using `concurrencyToken`. Managers may edit hidden or inactive rows. | TenantMenuCategoriesController.cs |
 | POST | `t/{slug}/api/v1/menu/categories/{id:guid}/deactivate` | `menu.manage` | Deactivate this row using `concurrencyToken`. Child statuses are preserved. | TenantMenuCategoriesController.cs |
 | POST | `t/{slug}/api/v1/menu/categories/{id:guid}/reactivate` | `menu.manage` | Reactivate this row using `concurrencyToken`. A child transition requires an active parent. | TenantMenuCategoriesController.cs |
+| POST | `t/{slug}/api/v1/menu/products` | `menu.manage` | Create an active product with sizes, add-ons, and tags (201 + Location). | TenantProductsController.cs |
+| GET | `t/{slug}/api/v1/menu/products` | `TenantUser` | Page the cafe's products with category, kind, caffeine, tag, status, and name filters. Read-only callers see Active products only. | TenantProductsController.cs |
+| GET | `t/{slug}/api/v1/menu/products/{id:guid}` | `TenantUser` | Get one product with sizes, add-ons, tags, and station. Read-only callers see Active products only. | TenantProductsController.cs |
+| PUT | `t/{slug}/api/v1/menu/products/{id:guid}` | `menu.manage` | Replace sizes, add-ons, and tags using `concurrencyToken`. | TenantProductsController.cs |
+| POST | `t/{slug}/api/v1/menu/products/{id:guid}/deactivate` | `menu.manage` | Deactivate a product using `concurrencyToken` (row kept). | TenantProductsController.cs |
+| POST | `t/{slug}/api/v1/menu/products/{id:guid}/reactivate` | `menu.manage` | Reactivate a product using `concurrencyToken`. | TenantProductsController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables` | `tables.manage` | Add one table to an active branch (201 + Location header). | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-add` | `tables.manage` | Add N tables (1 to 200) numbered after the highest active number. | TenantTablesController.cs |
 | POST | `t/{slug}/api/v1/branches/{branchId:guid}/tables/bulk-deactivate-highest` | `tables.manage` | Deactivate the highest N active tables. | TenantTablesController.cs |
@@ -85,6 +91,8 @@ The management QR response contains `tableId`, `number`, `label`, `path`, `url`,
 Menu category responses contain `id`, `parentId`, `name`, `sortOrder`, `status`, and `concurrencyToken`. Tree roots also have `children`. Both levels sort by `sortOrder` and then `id`. The tree uses `page`, `pageSize`, and `includeTotalCount` for roots. The default `includeInactive=false` shows active roots and their active children. A granted expansion includes inactive and parent-hidden rows in their original hierarchy. An unauthorized expansion returns `403 Identity.Forbidden`.
 
 Invalid create parents return a generic `400 Validation.Failed` for `parentId`. Category state conflicts return `409 MenuCategories.NameConflict`, `409 MenuCategories.ConcurrencyConflict`, or `409 MenuCategories.ParentInactive`. Missing and inaccessible category IDs return `404 MenuCategories.NotFound`. Update and lifecycle success return 200 with the category. A current-token request that leaves the row unchanged preserves its token and creates no mutation audit record. Repeating a create while its active sibling name is reserved returns a name conflict.
+
+Product list items return `id`, `name`, `kind`, `caffeine`, `categoryId`, `defaultSizePrice`, and `status`; the default size price is null when no active default size exists. Full product responses return sizes, add-ons, tags, station, and `concurrencyToken`. Read-only callers always receive Active products only; inactive and missing products return `404 Products.NotFound`. Size and add-on price changes are audited as `price.<name>` with old and new values. Name conflicts on active sizes or add-ons return `409 Products.NameConflict`; default-size conflicts return `409 Products.DefaultSizeConflict`; stale tokens return `409 Products.ConcurrencyConflict`.
 
 ### Policy names
 

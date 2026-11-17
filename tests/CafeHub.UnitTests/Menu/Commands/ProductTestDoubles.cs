@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Menu.Contracts;
 using CafeHub.Application.Menu.DTOs;
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.UnitTests.Menu.Commands
@@ -34,6 +35,32 @@ namespace CafeHub.UnitTests.Menu.Commands
             return Reply();
         }
 
+        public List<ListProductsCall> Listed { get; } = new();
+        public List<Guid> Gotten { get; } = new();
+
+        public Task<OffsetPage<ProductListItemResponse>> ListAsync(
+            Guid? categoryId,
+            ProductKind? kind,
+            bool? caffeine,
+            string? tag,
+            ProductStatus? status,
+            string? search,
+            int page,
+            int pageSize,
+            IReadOnlyList<SortTerm> sort,
+            bool includeTotalCount,
+            CancellationToken cancellationToken)
+        {
+            Listed.Add(new ListProductsCall(categoryId, kind, caffeine, tag, status, search, page, pageSize, sort, includeTotalCount));
+            return Task.FromResult(OffsetPage<ProductListItemResponse>.Create([], page, pageSize, null));
+        }
+
+        public Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
+        {
+            Gotten.Add(id);
+            return Task.FromResult(Response);
+        }
+
         public static ProductResponse Product(Guid? id = null) => new()
         {
             Id = id ?? Guid.NewGuid(),
@@ -65,4 +92,16 @@ namespace CafeHub.UnitTests.Menu.Commands
     internal sealed record ProductUpdateCall(Guid Id, ProductWriteModel Product, uint Version, Guid ActorId);
 
     internal sealed record ProductStatusCall(Guid Id, ProductStatus Status, uint Version, Guid ActorId);
+
+    internal sealed record ListProductsCall(
+        Guid? CategoryId,
+        ProductKind? Kind,
+        bool? Caffeine,
+        string? Tag,
+        ProductStatus? Status,
+        string? Search,
+        int Page,
+        int PageSize,
+        IReadOnlyList<SortTerm> Sort,
+        bool IncludeTotalCount);
 }
