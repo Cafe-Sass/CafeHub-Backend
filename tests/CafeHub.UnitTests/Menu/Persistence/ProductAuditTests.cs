@@ -1,7 +1,6 @@
 using CafeHub.Application.Menu.Contracts;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
-using CafeHub.Infrastructure.Menu;
 
 namespace CafeHub.UnitTests.Menu.Persistence
 {
@@ -14,7 +13,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
         public void ProductCreate_SnapshotsAttributesAndEveryInitialPrice()
         {
             var size = ProductSize.Create(Guid.NewGuid(), "Regular", 10.50m, true, Now, Actor);
-            var addon = ProductAddon.Create(Guid.NewGuid(), "Milk", 2m, Now, Actor);
+            var addon = ProductAddon.Create(Guid.NewGuid(), "Regular", 2m, Now, Actor);
             var product = CreateProduct(sizes: [size], addons: [addon]);
 
             var changes = TenantAuditChangeSets.ProductCreate(product);
@@ -25,8 +24,8 @@ namespace CafeHub.UnitTests.Menu.Persistence
             Assert.Contains("\"Kind\":\"Drink\"", snapshot.AfterState);
             Assert.Contains("\"Caffeine\":\"True\"", snapshot.AfterState);
             Assert.Contains("\"Status\":\"Active\"", snapshot.AfterState);
-            Assert.Contains("\"price.Regular\":\"10.50\"", snapshot.AfterState);
-            Assert.Contains("\"price.Milk\":\"2\"", snapshot.AfterState);
+            Assert.Contains($"\"price.size.{size.Id:D}\":\"10.50\"", snapshot.AfterState);
+            Assert.Contains($"\"price.addon.{addon.Id:D}\":\"2\"", snapshot.AfterState);
         }
 
         [Fact]
@@ -57,6 +56,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 ],
                 []);
 
+            var before = TenantAuditChangeSets.ProductFields(product);
             product.Update(
                 product.CategoryId,
                 product.StationId,
@@ -69,30 +69,21 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 model.SortOrder,
                 Now.AddMinutes(1),
                 Actor);
-            var prices = ProductStore.PriceChanges(
-                model,
-                new Dictionary<Guid, decimal> { [sizeId] = 10m },
-                new Dictionary<Guid, decimal> { [addonId] = 2m });
-            var changes = TenantAuditChangeSets.ProductUpdate(
-                product,
-                "Latte",
-                ProductKind.Drink,
-                true,
-                null,
-                product.CategoryId,
-                product.StationId,
-                prices);
+            product.ReplaceSizes(model.Sizes, Now.AddMinutes(1), Actor);
+            product.ReplaceAddons(model.Addons, Now.AddMinutes(1), Actor);
+            var changes = TenantAuditChangeSets.ProductUpdate(before, product);
+
             var snapshot = TenantAuditSnapshotSerializer.Create("products", changes).Value;
 
             Assert.Contains("\"Name\":\"Latte\"", snapshot.BeforeState);
             Assert.Contains("\"Name\":\"Flat White\"", snapshot.AfterState);
             Assert.Contains("\"PreparationMinutes\":\"5\"", snapshot.AfterState);
-            Assert.Contains("\"price.Small\":\"10\"", snapshot.BeforeState);
-            Assert.Contains("\"price.Small\":\"12.50\"", snapshot.AfterState);
-            Assert.Contains("\"price.Large\":\"18\"", snapshot.AfterState);
-            Assert.Contains("\"price.Shot\":\"5\"", snapshot.AfterState);
-            Assert.DoesNotContain("price.Milk", snapshot.BeforeState);
-            Assert.DoesNotContain("price.Milk", snapshot.AfterState);
+            Assert.Contains($"\"price.size.{sizeId:D}\":\"10\"", snapshot.BeforeState);
+            Assert.Contains($"\"price.size.{sizeId:D}\":\"12.50\"", snapshot.AfterState);
+            Assert.Contains($"\"price.size.{product.Sizes.Single(item => item.Name == "Large").Id:D}\":\"18\"", snapshot.AfterState);
+            Assert.Contains($"\"price.addon.{product.Addons.Single(item => item.Name == "Shot").Id:D}\":\"5\"", snapshot.AfterState);
+            Assert.DoesNotContain($"price.addon.{addonId:D}", snapshot.BeforeState);
+            Assert.DoesNotContain($"price.addon.{addonId:D}", snapshot.AfterState);
         }
 
         [Fact]
@@ -100,36 +91,10 @@ namespace CafeHub.UnitTests.Menu.Persistence
         {
             var sizeId = Guid.NewGuid();
             var product = CreateProduct(sizes: [ProductSize.Create(sizeId, "Regular", 10m, true, Now, Actor)]);
-            var model = new ProductWriteModel(
-                product.CategoryId,
-                product.StationId,
-                product.Name,
-                product.Description,
-                product.Ingredients,
-                product.Kind,
-                product.Caffeine,
-                product.PreparationMinutes,
-                product.SortOrder,
-                [new ProductSizeInput(sizeId, "Regular", 10m, true)],
-                [],
-                []);
-
-            var prices = ProductStore.PriceChanges(
-                model,
-                new Dictionary<Guid, decimal> { [sizeId] = 10m },
-                new Dictionary<Guid, decimal>());
-            var changes = TenantAuditChangeSets.ProductUpdate(
-                product,
-                product.Name,
-                product.Kind,
-                product.Caffeine,
-                product.PreparationMinutes,
-                product.CategoryId,
-                product.StationId,
-                prices);
+            var changes = TenantAuditChangeSets.ProductUpdate(TenantAuditChangeSets.ProductFields(product), product);
             var snapshot = TenantAuditSnapshotSerializer.Create("products", changes).Value;
 
-            Assert.Empty(prices);
+            Assert.Empty(changes.Fields);
             Assert.Null(snapshot.BeforeState);
             Assert.Null(snapshot.AfterState);
         }

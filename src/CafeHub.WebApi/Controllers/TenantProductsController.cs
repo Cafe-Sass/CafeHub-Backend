@@ -21,6 +21,7 @@ namespace CafeHub.WebApi.Controllers
     [Route("t/{slug}/api/v1/menu/products")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     public sealed class TenantProductsController(
         ISender sender,
         IAuthorizationService authorization,
@@ -45,7 +46,7 @@ namespace CafeHub.WebApi.Controllers
             var result = await sender.Send(
                 new CreateProductCommand(
                     request.CategoryId,
-                    request.StationId,
+                    null,
                     request.Name,
                     request.Description,
                     request.Ingredients,
@@ -63,6 +64,7 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
         [TenantAuthorize(TenantPolicies.TenantUser)]
         [ProducesResponseType<OffsetPage<ProductListItemResponse>>(StatusCodes.Status200OK, "application/json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
@@ -72,6 +74,12 @@ namespace CafeHub.WebApi.Controllers
             CancellationToken cancellationToken)
         {
             var canManage = (await authorization.AuthorizeAsync(User, HttpContext, TenantPermissions.MenuManage)).Succeeded;
+            if (request.IncludeHiddenCategories && !canManage)
+            {
+                return Result.Failure<OffsetPage<ProductListItemResponse>>(AuthErrors.Forbidden())
+                    .ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
             var status = canManage ? request.Status : ProductStatus.Active;
 
             var result = await sender.Send(request with { Status = status }, cancellationToken);
@@ -79,16 +87,24 @@ namespace CafeHub.WebApi.Controllers
         }
 
         [HttpGet("{id:guid}")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
         [TenantAuthorize(TenantPolicies.TenantUser)]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
         [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK, "application/json")]
-        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
         public async Task<ActionResult<ProductResponse>> Get(
             [FromRoute] string slug,
             [FromRoute] Guid id,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            [FromQuery] bool includeHiddenCategories = false)
         {
             var canManage = (await authorization.AuthorizeAsync(User, HttpContext, TenantPermissions.MenuManage)).Succeeded;
-            var result = await sender.Send(new GetProductQuery(id), cancellationToken);
+            if (includeHiddenCategories && !canManage)
+            {
+                return Result.Failure<ProductResponse>(AuthErrors.Forbidden())
+                    .ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            var result = await sender.Send(new GetProductQuery(id, includeHiddenCategories), cancellationToken);
             if (result.IsFailure)
             {
                 return result.ToProblemResult(HttpContext, correlationIdAccessor);
@@ -106,7 +122,6 @@ namespace CafeHub.WebApi.Controllers
         [HttpPut("{id:guid}")]
         [TenantAuthorize(TenantPermissions.MenuManage)]
         [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK, "application/json")]
-        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
         public async Task<ActionResult<ProductResponse>> Update(
@@ -125,7 +140,7 @@ namespace CafeHub.WebApi.Controllers
                 new UpdateProductCommand(
                     id,
                     request.CategoryId,
-                    request.StationId,
+                    null,
                     request.Name,
                     request.Description,
                     request.Ingredients,
@@ -144,32 +159,44 @@ namespace CafeHub.WebApi.Controllers
         [HttpPost("{id:guid}/deactivate")]
         [TenantAuthorize(TenantPermissions.MenuManage)]
         [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK, "application/json")]
-        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
         public async Task<ActionResult<ProductResponse>> Deactivate(
             [FromRoute] string slug,
             [FromRoute] Guid id,
             [FromBody] ProductLifecycleRequest request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            [FromQuery] bool includeHiddenCategories = false)
         {
-            var result = await sender.Send(new DeactivateProductCommand(id, request.ConcurrencyToken), cancellationToken);
+            if (includeHiddenCategories && !(await authorization.AuthorizeAsync(User, HttpContext, TenantPermissions.MenuManage)).Succeeded)
+            {
+                return Result.Failure<ProductResponse>(AuthErrors.Forbidden()).ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            var result = await sender.Send(
+                new DeactivateProductCommand(id, request.ConcurrencyToken, includeHiddenCategories), cancellationToken);
             return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
 
         [HttpPost("{id:guid}/reactivate")]
         [TenantAuthorize(TenantPermissions.MenuManage)]
         [ProducesResponseType<ProductResponse>(StatusCodes.Status200OK, "application/json")]
-        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
         [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
         public async Task<ActionResult<ProductResponse>> Reactivate(
             [FromRoute] string slug,
             [FromRoute] Guid id,
             [FromBody] ProductLifecycleRequest request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            [FromQuery] bool includeHiddenCategories = false)
         {
-            var result = await sender.Send(new ReactivateProductCommand(id, request.ConcurrencyToken), cancellationToken);
+            if (includeHiddenCategories && !(await authorization.AuthorizeAsync(User, HttpContext, TenantPermissions.MenuManage)).Succeeded)
+            {
+                return Result.Failure<ProductResponse>(AuthErrors.Forbidden()).ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            var result = await sender.Send(
+                new ReactivateProductCommand(id, request.ConcurrencyToken, includeHiddenCategories), cancellationToken);
             return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
     }

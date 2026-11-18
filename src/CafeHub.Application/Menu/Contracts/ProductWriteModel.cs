@@ -14,5 +14,5 @@ namespace CafeHub.Application.Menu.Contracts
         int SortOrder,
         IReadOnlyList<ProductSizeInput> Sizes,
         IReadOnlyList<ProductAddonInput> Addons,
-        IReadOnlyList<string> Tags);
+        IReadOnlyList<ProductTagInput> Tags);
 }

@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 17 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), and the cafe currency used by menu prices.
+The Tenant model contains 20 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), and the cafe currency used by menu prices.
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; later entities and migrations consume this ERD through their own stories.
 
@@ -84,7 +84,23 @@ erDiagram
         numeric price
         text status
     }
+    product_branch_station_slots {
+        uuid product_id PK, FK
+        uuid branch_id PK, FK
+    }
+    product_station_assignments {
+        uuid id PK
+        uuid product_id FK
+        uuid branch_id FK
+        uuid station_id FK
+        timestamptz ended_at
+    }
+    product_routing_readiness {
+        boolean singleton PK
+        timestamptz verified_at
+    }
     product_tags {
+        uuid id PK
         uuid product_id FK
         text tag
     }
@@ -138,7 +154,11 @@ erDiagram
     branches ||--o{ stations : "stations"
     menu_categories |o--o{ menu_categories : "parent"
     menu_categories ||--o{ products : "catalog"
-    stations |o--o{ products : "routing"
+    stations |o--o{ products : "legacy scalar before contract"
+    products ||--o{ product_branch_station_slots : "routing versions"
+    branches ||--o{ product_branch_station_slots : "branch routing"
+    product_branch_station_slots ||--o{ product_station_assignments : "assignment history"
+    stations ||--o{ product_station_assignments : "assigned station"
     products ||--o{ product_sizes : "sizes"
     products ||--o{ product_addons : "add-ons"
     products ||--o{ product_tags : "tags"
@@ -298,7 +318,7 @@ Purpose: the cafe-wide sellable menu items (FR-MENU-002) with kind, caffeine sig
 
 - `id uuid NOT NULL` — app-generated UUIDv7, `pk_products`.
 - `category_id uuid NOT NULL` — `fk_products_category_id` references `menu_categories.id` with ON DELETE RESTRICT; `ix_products_category_id` supports category filters and the foreign key. The category may be top-level or a sub-category; the write path requires an Active category.
-- `station_id uuid NULL` — `fk_products_station_id` references `stations.id` with ON DELETE RESTRICT; `ix_products_station_id` supports routing reads and the foreign key. NULL means the product is visible to every station of every branch with order permissions; when present, the write path requires an Active station of this cafe.
+- Legacy station_id stays nullable until the approved Contract phase. The migration may treat a scalar reference only as a candidate in the station's actual branch.
 - `name text NOT NULL` (CHECK length 1..96, `ck_products_name_length`) — application validation trims the value and rejects control characters.
 - `description text NULL` (CHECK `description IS NULL OR length(description) >= 1 AND length(description) <= 1000`, `ck_products_description_length`) — application validation trims the value and stores an empty result as NULL.
 - `ingredients text NULL` (CHECK `ingredients IS NULL OR length(ingredients) >= 1 AND length(ingredients) <= 1000`, `ck_products_ingredients_length`) — application validation trims the value and stores an empty result as NULL.
@@ -310,6 +330,21 @@ Purpose: the cafe-wide sellable menu items (FR-MENU-002) with kind, caffeine sig
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`. Each actor FK uses ON DELETE RESTRICT and its own index.
 - PostgreSQL `xmin` is mapped as the row version for optimistic concurrency on product updates, including the whole size/add-on/tag replacement.
 - The product aggregate enforces at least one Active size, exactly one Active default size, and unique Active size/add-on names. Child rows are retained and deactivated rather than deleted.
+
+### Product station remediation (CFMD-397)
+
+Product-to-station routing is branch-specific. The expansion retains the legacy scalar
+until the approved contract phase. The new assignment history has at most one current
+row per product and branch, with an end timestamp for explicit replacement or removal.
+Branch and station lifecycle changes preserve assignment history. A current assignment
+to an inactive station blocks guest ordering. Only a genuinely unassigned product in
+a ready, active branch is routed to the manual queue. Existing order snapshots remain
+immutable. Queue authorization and handling of affected existing orders belong to Task 50.
+
+New routing is gated per Tenant after approved backfill, reconciliation and integrity
+verification. The legacy scalar is a candidate only in the referenced station's actual
+branch. Backfill execution and production cutover remain open. Product images remain
+deferred under FR-MENU-002.
 
 ### product_sizes
 
@@ -344,10 +379,11 @@ Purpose: normalized filter tags for one product, at most 10 per product (applica
 
 - `product_id uuid NOT NULL` — `fk_product_tags_product_id` references `products.id` with ON DELETE RESTRICT.
 - `tag text NOT NULL` — stored lower-case and trimmed, 1 to 32 characters (`ck_product_tags_tag_length`); `ck_product_tags_tag_lowercase` enforces `tag = lower(tag)` and `ck_product_tags_tag_format` permits lower-case ASCII letters, digits, hyphens, and spaces only (`^[a-z0-9 -]+$`).
-- `pk_product_tags` — composite primary key on `(product_id, tag)`, which enforces one row per product and tag and indexes the product foreign key.
-- `ix_product_tags_tag` — index on `tag` for exact lower-case tag filters.
+- After verified backfill, the tag uses an application-generated UUIDv7 primary key. The active (product_id, tag) partial unique index allows logical history.
+  Finalization adds the ck_product_tags_normalized_label constraint to enforce trimmed, nonempty labels.
+- The active tag search index uses (tag, product_id). A separate index covers the product foreign key, including inactive tags.
 - `created_at timestamptz NOT NULL`.
-- Tags are current assignment state; replacing a product's tags may physically remove removed tag rows under the documented assignment-state exception. The product row itself is never deleted.
+- Tag replacement uses stable IDs, preserves retained rows and logically deactivates omitted rows. The expansion adds nullable IDs without assigning identities to existing records.
 - **Proposed, pending owner confirmation**: ASCII letters are used for the allowed character set because the tag is matched exactly and exposed as a simple filter; rejected alternative: Unicode letters, which widen normalization and matching rules without an approved need.
 
 ### cafe_settings

@@ -19,6 +19,11 @@ namespace CafeHub.Application.Audit
 
         public static TenantAuditChanges Update(IEnumerable<FieldChange> fields) => new(false, fields);
 
-        public sealed record FieldChange(string Name, string? Before, string? After);
+        public sealed record FieldChange(
+            string Name, string? Before, string? After, bool BeforePresent = true, bool AfterPresent = true)
+        {
+            public bool HasChanged => BeforePresent != AfterPresent
+                || (BeforePresent && !string.Equals(Before, After, StringComparison.Ordinal));
+        }
     }
 }

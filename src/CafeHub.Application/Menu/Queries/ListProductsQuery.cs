@@ -13,6 +13,8 @@ namespace CafeHub.Application.Menu.Queries
 
         public bool IncludeTotalCount { get; init; }
 
+        public bool IncludeHiddenCategories { get; init; }
+
         public string? Sort { get; init; }
 
         public SortDirection SortDirection { get; init; } = SortDirection.Asc;

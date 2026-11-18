@@ -24,7 +24,7 @@ namespace CafeHub.Application.Menu.Queries
                 return Result.Failure<OffsetPage<ProductListItemResponse>>(resolvedSort.Error!);
             }
 
-            var page = await store.ListAsync(
+            return await store.ListAsync(
                 query.CategoryId,
                 query.Kind,
                 query.Caffeine,
@@ -35,8 +35,8 @@ namespace CafeHub.Application.Menu.Queries
                 pageSize,
                 resolvedSort.Value,
                 query.IncludeTotalCount,
-                cancellationToken);
-            return Result.Success(page);
+                cancellationToken,
+                query.IncludeHiddenCategories);
         }
     }
 }

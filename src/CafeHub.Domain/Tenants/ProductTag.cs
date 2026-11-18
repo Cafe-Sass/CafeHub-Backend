@@ -8,6 +8,10 @@ namespace CafeHub.Domain.Tenants
         {
         }
 
+        public Guid Id { get; private set; }
+
+        public ProductComponentStatus Status { get; private set; }
+
         public Guid ProductId { get; private set; }
 
         public string Tag { get; private set; } = string.Empty;
@@ -23,10 +27,24 @@ namespace CafeHub.Domain.Tenants
 
             return new ProductTag
             {
+                Id = Guid.CreateVersion7(),
+                Status = ProductComponentStatus.Active,
                 ProductId = productId,
                 Tag = Normalize(tag),
                 CreatedAt = now,
             };
+        }
+
+        internal bool Set(string label, ProductComponentStatus status)
+        {
+            if (Tag == label && Status == status)
+            {
+                return false;
+            }
+
+            Tag = label;
+            Status = status;
+            return true;
         }
 
         internal static string Normalize(string? tag)

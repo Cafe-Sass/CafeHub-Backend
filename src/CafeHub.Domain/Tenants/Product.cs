@@ -281,23 +281,55 @@ namespace CafeHub.Domain.Tenants
 
         public bool ReplaceTags(IEnumerable<string> productTags, DateTimeOffset now, Guid actorId)
         {
-            var normalized = NormalizeTags(productTags);
-            var current = tags.Select(tag => tag.Tag).OrderBy(tag => tag, StringComparer.Ordinal).ToArray();
-            var next = normalized.OrderBy(tag => tag, StringComparer.Ordinal).ToArray();
-            if (current.SequenceEqual(next, StringComparer.Ordinal))
-            {
-                return false;
-            }
-
-            tags.Clear();
-            foreach (var tag in normalized)
-            {
-                tags.Add(ProductTag.Create(Id, tag, now));
-            }
-
-            Touch(now, actorId);
-            return true;
+            var activeByLabel = tags.Where(tag => tag.Status == ProductComponentStatus.Active)
+                .ToDictionary(tag => tag.Tag, StringComparer.Ordinal);
+            return ReplaceTagsById(NormalizeTags(productTags).Select(label =>
+                new ProductTagInput(activeByLabel.GetValueOrDefault(label)?.Id, label)), now, actorId);
         }
+
+        public bool ReplaceTagsById(IEnumerable<ProductTagInput> inputs, DateTimeOffset now, Guid actorId)
+        {
+            ArgumentNullException.ThrowIfNull(inputs);
+            var replacements = inputs.ToArray();
+            var normalized = NormalizeTags(replacements.Select(item => item.Tag));
+            var existing = tags.Where(tag => tag.Status == ProductComponentStatus.Active)
+                .ToDictionary(tag => tag.Id);
+            var retained = new HashSet<Guid>();
+            foreach (var input in replacements)
+            {
+                if (input.Id is { } id && (!existing.ContainsKey(id) || !retained.Add(id)))
+                {
+                    throw new ArgumentException("The tag id is inactive, invalid, or duplicated.", nameof(inputs));
+                }
+            }
+
+            var changed = false;
+            foreach (var tag in tags.Where(tag => !retained.Contains(tag.Id)))
+            {
+                changed |= tag.Set(tag.Tag, ProductComponentStatus.Inactive);
+            }
+
+            for (var i = 0; i < replacements.Length; i++)
+            {
+                if (replacements[i].Id is { } id)
+                {
+                    changed |= existing[id].Set(normalized[i], ProductComponentStatus.Active);
+                }
+                else
+                {
+                    tags.Add(ProductTag.Create(Id, normalized[i], now));
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                Touch(now, actorId);
+            }
+
+            return changed;
+        }
+
 
         public static bool IsValidName(string? name)
         {

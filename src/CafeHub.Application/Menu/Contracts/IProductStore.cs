@@ -14,9 +14,10 @@ namespace CafeHub.Application.Menu.Contracts
             Guid id, ProductWriteModel product, uint version, Guid actorId, CancellationToken cancellationToken);
 
         Task<Result<ProductResponse>> ChangeStatusAsync(
-            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken);
+            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken,
+            bool includeHiddenCategories = false);
 
-        Task<OffsetPage<ProductListItemResponse>> ListAsync(
+        Task<Result<OffsetPage<ProductListItemResponse>>> ListAsync(
             Guid? categoryId,
             ProductKind? kind,
             bool? caffeine,
@@ -27,8 +28,9 @@ namespace CafeHub.Application.Menu.Contracts
             int pageSize,
             IReadOnlyList<SortTerm> sort,
             bool includeTotalCount,
-            CancellationToken cancellationToken);
+            CancellationToken cancellationToken,
+            bool includeHiddenCategories = false);
 
-        Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken);
+        Task<Result<ProductResponse>> GetAsync(Guid id, CancellationToken cancellationToken, bool includeHiddenCategories = false);
     }
 }

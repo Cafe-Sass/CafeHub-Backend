@@ -87,7 +87,7 @@ namespace CafeHub.Application.Upgrades
                 return Result.Failure<TenantSchemaUpgradeRun>(TenantSchemaUpgradeErrors.NoMigrationAvailable());
             }
 
-            if (string.Equals(database.SchemaMigrationId, targetMigrationId, StringComparison.Ordinal))
+            if (string.CompareOrdinal(database.SchemaMigrationId, targetMigrationId) >= 0)
             {
                 return Result.Failure<TenantSchemaUpgradeRun>(TenantSchemaUpgradeErrors.AlreadyCurrent());
             }

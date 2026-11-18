@@ -192,10 +192,26 @@ namespace CafeHub.UnitTests.Menu
 
             var changed = product.ReplaceTags([" Hot ", "new"], Now.AddMinutes(2), Actor);
             Assert.True(changed);
-            Assert.Equal(new[] { "hot", "new" }, product.Tags.Select(tag => tag.Tag).OrderBy(tag => tag));
+            Assert.Equal(new[] { "hot", "new" }, product.Tags.Where(tag => tag.Status == ProductComponentStatus.Active).Select(tag => tag.Tag).OrderBy(tag => tag));
             Assert.Equal(Now.AddMinutes(2), product.UpdatedAt);
 
             Assert.Throws<ArgumentException>(() => product.ReplaceTags(["hot", "HOT"], Now, Actor));
+        }
+
+        [Fact]
+        public void ReplaceTagsByIdRenamesExistingTagsAndRetainsInactiveHistory()
+        {
+            var product = Create(tags: ["hot", "dairy"]);
+            var hot = product.Tags.Single(tag => tag.Tag == "hot");
+            var dairy = product.Tags.Single(tag => tag.Tag == "dairy");
+
+            Assert.True(product.ReplaceTagsById([new(hot.Id, "warm")], Now.AddMinutes(1), Actor));
+            Assert.Equal("warm", hot.Tag);
+            Assert.Equal(ProductComponentStatus.Inactive, dairy.Status);
+            Assert.Throws<ArgumentException>(() =>
+                product.ReplaceTagsById([new(dairy.Id, "dairy")], Now.AddMinutes(2), Actor));
+            Assert.Equal(ProductComponentStatus.Active, hot.Status);
+            Assert.Equal(2, product.Tags.Count);
         }
 
         [Fact]

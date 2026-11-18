@@ -121,4 +121,3 @@ INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
 VALUES ('20261116122028_AddMenuProducts', '10.0.13');
 
 COMMIT;
-

@@ -25,7 +25,8 @@ namespace CafeHub.Application.Menu.Commands
                     [new("concurrencyToken", "The concurrency token is invalid.")])));
             }
 
-            return store.ChangeStatusAsync(command.Id, ProductStatus.Inactive, version, actorId, cancellationToken);
+            return store.ChangeStatusAsync(command.Id, ProductStatus.Inactive, version, actorId, cancellationToken,
+                command.IncludeHiddenCategories);
         }
     }
 }

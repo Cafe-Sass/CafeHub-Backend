@@ -35,6 +35,9 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "products",
             "product_sizes",
             "product_addons",
+            "product_branch_station_slots",
+            "product_station_assignments",
+            "product_routing_readiness",
             "product_tags",
             "cafe_settings",
             "tenant_audit_records",
@@ -760,14 +763,16 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.NotNull(pk);
             Assert.Equal("pk_product_tags", pk.GetName());
             Assert.Equal(
-                new[] { "product_id", "tag" },
+                new[] { "id" },
                 pk.Properties.Select(property => property.GetColumnName()));
 
             Assert.False(entity.FindProperty(nameof(ProductTag.ProductId))!.IsNullable);
             Assert.Equal("tag", entity.FindProperty(nameof(ProductTag.Tag))!.GetColumnName());
             Assert.Equal("created_at", entity.FindProperty(nameof(ProductTag.CreatedAt))!.GetColumnName());
 
-            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "ix_product_tags_tag");
+            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "ix_product_tags_active_tag");
+            Assert.Contains(entity.GetIndexes(), index => index.GetDatabaseName() == "uq_product_tags_active_label"
+                && index.IsUnique && index.GetFilter() == "status = 'Active'");
 
             var checks = entity.GetCheckConstraints().ToList();
             Assert.Contains(checks, c => c.Name == "ck_product_tags_tag_length");

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.WebApi.Controllers
 {
@@ -6,9 +7,9 @@ namespace CafeHub.WebApi.Controllers
 
     public sealed record CreateProductAddonRequest(Guid? Id, string Name, decimal Price);
 
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed record CreateProductRequest(
         Guid CategoryId,
-        Guid? StationId,
         string Name,
         string? Description,
         string? Ingredients,
@@ -18,5 +19,5 @@ namespace CafeHub.WebApi.Controllers
         [property: JsonRequired] int SortOrder,
         IReadOnlyList<CreateProductSizeRequest> Sizes,
         IReadOnlyList<CreateProductAddonRequest> Addons,
-        IReadOnlyList<string> Tags);
+        [property: JsonRequired] IReadOnlyList<ProductTagInput> Tags);
 }

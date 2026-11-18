@@ -18,6 +18,12 @@ namespace CafeHub.Application.Menu
         public static Error InvalidCategory() =>
             ValidationError.Create([new("categoryId", "The category is not active or does not exist.")]);
 
+        public static Error CatalogSchemaNotReady() =>
+            Error.Conflict("Products.CatalogSchemaNotReady", "The product catalog is awaiting tenant schema finalization.");
+
+        public static Error RoutingNotReady() =>
+            Error.Conflict("Products.RoutingNotReady", "Product routing is awaiting tenant migration verification.");
+
         public static Error InvalidStation() =>
             ValidationError.Create([new("stationId", "The station is not active or does not exist.")]);
 

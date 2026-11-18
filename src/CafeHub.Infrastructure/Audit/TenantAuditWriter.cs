@@ -44,18 +44,22 @@ namespace CafeHub.Infrastructure.Audit
                 return Task.FromResult(Result.Failure(TenantAuditErrors.InvalidEntry()));
             }
 
-            string? beforeState = null;
-            string? afterState = null;
+            IReadOnlyList<TenantAuditSnapshotSerializer.Snapshots> snapshots = [new(null, null)];
             if (entry.Changes is not null)
             {
                 var snapshotResult = TenantAuditSnapshotSerializer.Create(entry.TargetType, entry.Changes);
-                if (snapshotResult.IsFailure)
+                if (snapshotResult.IsSuccess)
+                {
+                    snapshots = [snapshotResult.Value];
+                }
+                else if (entry.TargetType == "products" && snapshotResult.Error!.Code == "Audit.SnapshotTooLarge")
+                {
+                    snapshots = ProductAuditSnapshotParts.Create(entry.Changes);
+                }
+                else
                 {
                     return Task.FromResult(Result.Failure(snapshotResult.Error!));
                 }
-
-                beforeState = snapshotResult.Value.BeforeState;
-                afterState = snapshotResult.Value.AfterState;
             }
 
             var tenantContext = tenantContextAccessor.GetRequired();
@@ -67,16 +71,20 @@ namespace CafeHub.Infrastructure.Audit
                 : entry.ActorUserId;
             var actorKind = actorId.HasValue ? TenantAuditRecordKind.User : TenantAuditRecordKind.System;
 
-            context.TenantAuditRecords.Add(TenantAuditRecord.Create(
-                Guid.CreateVersion7(),
-                timeProvider.GetUtcNow(),
-                actorId,
-                actorKind,
-                entry.Action,
-                entry.TargetType,
-                entry.TargetId,
-                beforeState,
-                afterState));
+            var recordedAt = timeProvider.GetUtcNow();
+            foreach (var snapshot in snapshots)
+            {
+                context.TenantAuditRecords.Add(TenantAuditRecord.Create(
+                    Guid.CreateVersion7(),
+                    recordedAt,
+                    actorId,
+                    actorKind,
+                    entry.Action,
+                    entry.TargetType,
+                    entry.TargetId,
+                    snapshot.BeforeState,
+                    snapshot.AfterState));
+            }
 
             return Task.FromResult(Result.Success());
         }

@@ -89,7 +89,8 @@ namespace CafeHub.Infrastructure.Provisioning
                     cancellationToken);
                 await _executor.ExecuteTenantStatementAsync(
                     databaseName,
-                    $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {SqlIdentifier.Quote(applicationRoleName)}",
+                    $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {SqlIdentifier.Quote(applicationRoleName)}; "
+                    + TenantReadinessPrivileges.ReadOnlySql,
                     cancellationToken);
                 await _executor.ExecuteTenantStatementAsync(
                     databaseName,

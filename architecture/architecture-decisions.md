@@ -169,6 +169,69 @@ The WebApi reads real credentials locally through User Secrets or environment va
 - Revisit option: a later decision may clear the hash column after provisioning succeeded, keeping the record itself — clearing a column is not a record deletion and stays consistent with the logical-deletion policy (PRD section 9, rule 23). Clearing is not scheduled now; it is recorded as an explicit option so the retention is a reversible choice rather than a permanent necessity.
 - Rejected alternative: keeping no registration data on the Master (provisioning would consume transiently-passed values with no durable, auditable source, losing the traceability and retry safety the seed needs); retaining it in plaintext (never — the database only ever sees a hasher-produced value, PRD section 11.1).
 
+## Task 47 — Menu Products (CFMD-397)
+
+- **Station cardinality — Approved by Owner.** A product may have zero or one active station
+  assignment per branch. Products without an active assignment are routed to the branch's
+  manual/unassigned queue.
+- **Unassigned products — Approved by Owner.** Products without a station assignment appear in a
+  manual/unassigned queue accessible to authorized staff within the relevant branch.
+- **Station reactivation — Approved by Owner.** Preserve existing product-station assignments when
+  a station or branch becomes inactive. Routing resumes automatically when both are active again,
+  provided the assignment remains valid.
+- **Inactive Assigned Station — Approved by Owner**
+  - When an assigned station becomes inactive while its branch remains active, the product becomes
+    temporarily unavailable for new guest orders.
+  - Do not automatically move the product to the manual/unassigned queue.
+  - Preserve the existing station assignment.
+  - When the station is reactivated, routing resumes automatically if the assignment remains valid
+    and the product and branch are active.
+  - Do not expose the product as orderable to guests while its assigned station is inactive.
+  - Existing orders retain their original station snapshot and must not be automatically rerouted.
+  - Handling existing affected orders remains OPEN for Task 50 design.
+- **Hidden category management — Approved by Owner.** Users with `menu.manage` can access products
+  in effectively hidden categories only through an explicit administrative filter. Ordinary menu
+  reads enforce effective category visibility, which requires an active category and, for a child
+  category, an active parent.
+- **Station API — Approved by Owner.** Manage product-station assignments exclusively through a
+  separate branch-scoped API resource.
+- **Product images — Approved by Owner.** Product images are deferred from the Task 47 remediation
+  and remain an outstanding PRD `FR-MENU-002` requirement.
+
+**OPEN** — Client compatibility, legacy data migration, backfill, deployment cutover, API request
+and response details, concurrency semantics, and all other undecided matters.
+
+### Compatibility and cutover — Approved by Owner
+
+- **Coordinated cutover.** Use a coordinated release only after verifying that all deployed
+  clients and integrations can upgrade together. If any consumer cannot move during that release,
+  stop and report the specific dependency to the owner. A compatibility window requires a separate
+  owner decision.
+- **Legacy station writes.** End support for product-level `stationId` writes at cutover.
+  Dual writing between the legacy scalar and branch-specific assignments is prohibited.
+- **Migration sequence.** Expand → Backfill → Reconcile → Cutover → Contract.
+- **Tenant readiness.** Enable new routing for a Tenant only after its backfill, reconciliation
+  and integrity checks have passed. Before readiness is established, treat a missing assignment row
+  as unresolved for migration purposes.
+- **Legacy column and history.** Keep `products.station_id` through reconciliation and approved
+  cutover. Remove it only during Contract. Preserve historical data and audit records.
+- **Tag writes.** The new write contract uses stable tag IDs. After cutover, legacy text-only writes
+  cannot overwrite or rebuild identity-based tag state.
+
+**OPEN** — Complete inventory of deployed frontend/admin clients, SDKs, integrations and backend
+instances. Actual production request and response usage and deployed OpenAPI consumers.
+PostgreSQL preflight results for each applicable Tenant. Backfill mapping, exception handling and
+execution details. Deployment timing and final cutover approval.
+
+### Remediation wire contract — Approved by Owner
+
+Use the Revision 2 wire proposal for the separate branch assignment API and stable-ID tag writes.
+Concurrency for station assignment writes uses a branch-local token. Routing has exactly four
+states: Assigned, Unassigned, StationInactive and BranchInactive. Product availability and
+tenant routing readiness are evaluated independently.
+
+Manual Queue permissions and handling of existing affected orders remain **OPEN** for Task 50.
+
 ## Open decisions
 
 - Result/Error model placement — the model lives in Application (CFMD-241); Domain cannot reference it until a later decision.

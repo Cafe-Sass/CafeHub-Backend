@@ -17,7 +17,7 @@ namespace CafeHub.Application.Menu.Commands
         int SortOrder,
         IReadOnlyList<ProductSizeInput> Sizes,
         IReadOnlyList<ProductAddonInput> Addons,
-        IReadOnlyList<string> Tags) : ICommand<ProductResponse>, ITenantTransactionalCommand
+        IReadOnlyList<ProductTagInput> Tags) : ICommand<ProductResponse>, ITenantTransactionalCommand
     {
         internal ProductWriteModel ToWriteModel() => new(
             CategoryId, StationId, Name, Description, Ingredients, Kind, Caffeine,
