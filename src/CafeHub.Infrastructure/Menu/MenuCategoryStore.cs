@@ -119,8 +119,8 @@ namespace CafeHub.Infrastructure.Menu
         public async Task<MenuCategoryResponse?> GetVisibleAsync(Guid id, CancellationToken cancellationToken)
         {
             var row = await context.MenuCategories.AsNoTracking()
-                .Where(category => category.Id == id && category.Status == MenuCategoryStatus.Active
-                    && (category.ParentId == null || category.Parent!.Status == MenuCategoryStatus.Active))
+                .EffectivelyVisible()
+                .Where(category => category.Id == id)
                 .Select(category => new { Category = category, Version = EF.Property<uint>(category, "xmin") })
                 .SingleOrDefaultAsync(cancellationToken);
             return row is null ? null : ToResponse(row.Category, row.Version);

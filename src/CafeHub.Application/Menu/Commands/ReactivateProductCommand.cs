@@ -3,6 +3,6 @@ using CafeHub.Application.Menu.DTOs;
 
 namespace CafeHub.Application.Menu.Commands
 {
-    public sealed record ReactivateProductCommand(Guid Id, string ConcurrencyToken)
+    public sealed record ReactivateProductCommand(Guid Id, string ConcurrencyToken, bool IncludeHiddenCategories = false)
         : ICommand<ProductResponse>, ITenantTransactionalCommand;
 }

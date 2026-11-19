@@ -8,8 +8,6 @@ namespace CafeHub.Application.Menu.DTOs
 
         public required Guid CategoryId { get; init; }
 
-        public required Guid? StationId { get; init; }
-
         public required string Name { get; init; }
 
         public required string? Description { get; init; }
@@ -30,7 +28,7 @@ namespace CafeHub.Application.Menu.DTOs
 
         public required IReadOnlyList<ProductAddonResponse> Addons { get; init; }
 
-        public required IReadOnlyList<string> Tags { get; init; }
+        public required IReadOnlyList<ProductTagResponse> Tags { get; init; }
 
         public required DateTimeOffset CreatedAt { get; init; }
 
@@ -47,7 +45,6 @@ namespace CafeHub.Application.Menu.DTOs
             {
                 Id = product.Id,
                 CategoryId = product.CategoryId,
-                StationId = product.StationId,
                 Name = product.Name,
                 Description = product.Description,
                 Ingredients = product.Ingredients,
@@ -58,7 +55,10 @@ namespace CafeHub.Application.Menu.DTOs
                 Status = product.Status.ToString(),
                 Sizes = product.Sizes.Select(size => ProductSizeResponse.From(size)).ToArray(),
                 Addons = product.Addons.Select(addon => ProductAddonResponse.From(addon)).ToArray(),
-                Tags = product.Tags.Select(tag => tag.Tag).OrderBy(tag => tag, StringComparer.Ordinal).ToArray(),
+                Tags = product.Tags.Where(tag => tag.Status == ProductComponentStatus.Active)
+                    .OrderBy(tag => tag.Tag, StringComparer.Ordinal)
+                    .Select(tag => new ProductTagResponse(tag.Id, tag.Tag, tag.Status.ToString()))
+                    .ToArray(),
                 CreatedAt = product.CreatedAt,
                 UpdatedAt = product.UpdatedAt,
                 ConcurrencyToken = concurrencyToken,

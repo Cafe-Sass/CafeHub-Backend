@@ -1,4 +1,3 @@
-using System.Data;
 using System.Globalization;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
@@ -15,7 +14,8 @@ using Npgsql;
 
 namespace CafeHub.Infrastructure.Menu
 {
-    internal sealed class ProductStore(TenantDbContext context, ITenantAuditWriter auditWriter, TimeProvider timeProvider)
+    internal sealed class ProductStore(
+        TenantDbContext context, ITenantAuditWriter auditWriter, TimeProvider timeProvider, IProductCatalogSchema catalogSchema)
         : IProductStore
     {
         private const string TargetType = "products";
@@ -23,31 +23,65 @@ namespace CafeHub.Infrastructure.Menu
         private const string ActiveSizeNameIndex = "uq_product_sizes_active_name";
         private const string ActiveAddonNameIndex = "uq_product_addons_active_name";
 
-        public async Task<Result<ProductResponse>> CreateAsync(
+        public Task<Result<ProductResponse>> CreateAsync(
+            ProductWriteModel product, Guid actorId, CancellationToken cancellationToken) =>
+            catalogSchema.RunAsync(() => CreateCoreAsync(product, actorId, cancellationToken), cancellationToken);
+
+        public Task<Result<ProductResponse>> UpdateAsync(
+            Guid id, ProductWriteModel product, uint version, Guid actorId, CancellationToken cancellationToken) =>
+            catalogSchema.RunAsync(() => UpdateCoreAsync(id, product, version, actorId, cancellationToken), cancellationToken);
+
+        public Task<Result<ProductResponse>> ChangeStatusAsync(
+            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken,
+            bool includeHiddenCategories = false) =>
+            catalogSchema.RunAsync(() => ChangeStatusCoreAsync(id, status, version, actorId, cancellationToken,
+                includeHiddenCategories), cancellationToken);
+
+        public Task<Result<OffsetPage<ProductListItemResponse>>> ListAsync(
+            Guid? categoryId,
+            ProductKind? kind,
+            bool? caffeine,
+            string? tag,
+            ProductStatus? status,
+            string? search,
+            int page,
+            int pageSize,
+            IReadOnlyList<SortTerm> sort,
+            bool includeTotalCount,
+            CancellationToken cancellationToken,
+            bool includeHiddenCategories = false) =>
+            catalogSchema.RunAsync(() => ListCoreAsync(categoryId, kind, caffeine, tag, status, search, page, pageSize,
+                sort, includeTotalCount, cancellationToken, includeHiddenCategories), cancellationToken, includeTotalCount);
+
+        public Task<Result<ProductResponse>> GetAsync(
+            Guid id, CancellationToken cancellationToken, bool includeHiddenCategories = false) =>
+            catalogSchema.RunAsync(() => GetCoreAsync(id, cancellationToken, includeHiddenCategories), cancellationToken);
+
+        private async Task<Result<ProductResponse>> CreateCoreAsync(
             ProductWriteModel product, Guid actorId, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            await context.LockMenuCategoryAsync(product.CategoryId, cancellationToken);
-            if (!await IsCategoryVisibleAsync(product.CategoryId, cancellationToken))
+            if (!await LockVisibleCategoryAsync(product.CategoryId, cancellationToken))
             {
                 return Result.Failure<ProductResponse>(ProductErrors.InvalidCategory());
             }
 
-            if (product.StationId is { } stationId)
+            if (product.StationId is not null)
             {
-                await context.LockStationAsync(stationId, cancellationToken);
-                if (!await IsStationActiveAsync(stationId, cancellationToken))
-                {
-                    return Result.Failure<ProductResponse>(ProductErrors.InvalidStation());
-                }
+                return Result.Failure<ProductResponse>(ProductErrors.InvalidStation());
+            }
+
+            if (product.Tags.Any(tag => tag.Id is not null))
+            {
+                return Result.Failure<ProductResponse>(ProductErrors.InvalidTags());
             }
 
             var now = timeProvider.GetUtcNow();
             var created = Product.Create(
                 Guid.CreateVersion7(),
                 product.CategoryId,
-                product.StationId,
+                null,
                 product.Name,
                 product.Description,
                 product.Ingredients,
@@ -63,7 +97,7 @@ namespace CafeHub.Infrastructure.Menu
                     .Select(addon => ProductAddon.Create(
                         Guid.CreateVersion7(), addon.Name, addon.Price, now, actorId))
                     .ToArray(),
-                product.Tags,
+                product.Tags.Select(tag => tag.Tag),
                 now,
                 actorId);
 
@@ -76,7 +110,7 @@ namespace CafeHub.Infrastructure.Menu
                 cancellationToken);
         }
 
-        public async Task<Result<ProductResponse>> UpdateAsync(
+        private async Task<Result<ProductResponse>> UpdateCoreAsync(
             Guid id,
             ProductWriteModel product,
             uint version,
@@ -85,19 +119,14 @@ namespace CafeHub.Infrastructure.Menu
         {
             ArgumentNullException.ThrowIfNull(product);
 
-            await context.LockMenuCategoryAsync(product.CategoryId, cancellationToken);
-            if (!await IsCategoryVisibleAsync(product.CategoryId, cancellationToken))
+            if (!await LockVisibleCategoryAsync(product.CategoryId, cancellationToken))
             {
                 return Result.Failure<ProductResponse>(ProductErrors.InvalidCategory());
             }
 
-            if (product.StationId is { } stationId)
+            if (product.StationId is not null)
             {
-                await context.LockStationAsync(stationId, cancellationToken);
-                if (!await IsStationActiveAsync(stationId, cancellationToken))
-                {
-                    return Result.Failure<ProductResponse>(ProductErrors.InvalidStation());
-                }
+                return Result.Failure<ProductResponse>(ProductErrors.InvalidStation());
             }
 
             var existing = await LockAndLoadAsync(id, cancellationToken);
@@ -112,19 +141,20 @@ namespace CafeHub.Infrastructure.Menu
             }
 
             await LoadComponentsAsync(existing, cancellationToken);
-            var oldName = existing.Name;
-            var oldKind = existing.Kind;
-            var oldCaffeine = existing.Caffeine;
-            var oldPreparationMinutes = existing.PreparationMinutes;
-            var oldCategoryId = existing.CategoryId;
-            var oldStationId = existing.StationId;
-            var oldSizePrices = existing.Sizes.ToDictionary(size => size.Id, size => size.Price);
-            var oldAddonPrices = existing.Addons.ToDictionary(addon => addon.Id, addon => addon.Price);
+            var previousDefault = existing.Sizes.SingleOrDefault(size =>
+                size.Status == ProductComponentStatus.Active && size.IsDefault);
+            var before = TenantAuditChangeSets.ProductFields(existing);
+            var activeSizeNames = existing.Sizes.Where(size => size.Status == ProductComponentStatus.Active)
+                .ToDictionary(size => size.Id, size => size.Name);
+            var activeAddonNames = existing.Addons.Where(addon => addon.Status == ProductComponentStatus.Active)
+                .ToDictionary(addon => addon.Id, addon => addon.Name);
+            var activeTagLabels = existing.Tags.Where(tag => tag.Status == ProductComponentStatus.Active)
+                .ToDictionary(tag => tag.Id, tag => tag.Tag);
 
             var now = timeProvider.GetUtcNow();
             var changed = existing.Update(
                 product.CategoryId,
-                product.StationId,
+                existing.StationId,
                 product.Name,
                 product.Description,
                 product.Ingredients,
@@ -155,7 +185,7 @@ namespace CafeHub.Infrastructure.Menu
 
             try
             {
-                changed |= existing.ReplaceTags(product.Tags, now, actorId);
+                changed |= existing.ReplaceTagsById(product.Tags, now, actorId);
             }
             catch (ArgumentException)
             {
@@ -167,28 +197,105 @@ namespace CafeHub.Infrastructure.Menu
                 return Result.Success(ToResponse(existing, version));
             }
 
-            var priceChanges = PriceChanges(product, oldSizePrices, oldAddonPrices);
+            var releasedSizeNames = existing.Sizes.Where(size => activeSizeNames.TryGetValue(size.Id, out var oldName)
+                    && (size.Status != ProductComponentStatus.Active || size.Name != oldName)).ToArray();
+            if (releasedSizeNames.Length > 0)
+            {
+                var ids = releasedSizeNames.Select(size => size.Id).ToArray();
+                var released = await context.ProductSizes.Where(size => size.ProductId == id
+                    && ids.Contains(size.Id) && size.Status == ProductComponentStatus.Active)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(size => size.Status, ProductComponentStatus.Inactive),
+                        cancellationToken);
+                if (released != ids.Length)
+                {
+                    return Result.Failure<ProductResponse>(ProductErrors.ConcurrencyConflict());
+                }
+
+                foreach (var size in releasedSizeNames.Where(size => size.Status == ProductComponentStatus.Active))
+                {
+                    context.Entry(size).Property(item => item.Status).IsModified = true;
+                }
+            }
+
+            var releasedAddonNames = existing.Addons.Where(addon => activeAddonNames.TryGetValue(addon.Id, out var oldName)
+                    && (addon.Status != ProductComponentStatus.Active || addon.Name != oldName)).ToArray();
+            if (releasedAddonNames.Length > 0)
+            {
+                var ids = releasedAddonNames.Select(addon => addon.Id).ToArray();
+                var released = await context.ProductAddons.Where(addon => addon.ProductId == id
+                    && ids.Contains(addon.Id) && addon.Status == ProductComponentStatus.Active)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(addon => addon.Status, ProductComponentStatus.Inactive),
+                        cancellationToken);
+                if (released != ids.Length)
+                {
+                    return Result.Failure<ProductResponse>(ProductErrors.ConcurrencyConflict());
+                }
+
+                foreach (var addon in releasedAddonNames.Where(addon => addon.Status == ProductComponentStatus.Active))
+                {
+                    context.Entry(addon).Property(item => item.Status).IsModified = true;
+                }
+            }
+
+            if (previousDefault is not null && !releasedSizeNames.Contains(previousDefault)
+                && (previousDefault.Status != ProductComponentStatus.Active || !previousDefault.IsDefault))
+            {
+                var released = await context.ProductSizes
+                    .Where(size => size.ProductId == id && size.Id == previousDefault.Id
+                        && size.Status == ProductComponentStatus.Active && size.IsDefault)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(size => size.Status, previousDefault.Status)
+                        .SetProperty(size => size.IsDefault, previousDefault.IsDefault), cancellationToken);
+                if (released != 1)
+                {
+                    return Result.Failure<ProductResponse>(ProductErrors.ConcurrencyConflict());
+                }
+            }
+
+            var changedTags = existing.Tags.Where(tag => activeTagLabels.TryGetValue(tag.Id, out var oldLabel)
+                && (tag.Status != ProductComponentStatus.Active || tag.Tag != oldLabel)).ToArray();
+            if (changedTags.Length > 0)
+            {
+                var ids = changedTags.Select(tag => tag.Id).ToArray();
+                var released = await context.ProductTags.Where(tag => tag.ProductId == id
+                    && ids.Contains(tag.Id) && tag.Status == ProductComponentStatus.Active)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(tag => tag.Status, ProductComponentStatus.Inactive),
+                        cancellationToken);
+                if (released != ids.Length)
+                {
+                    return Result.Failure<ProductResponse>(ProductErrors.ConcurrencyConflict());
+                }
+
+                foreach (var tag in changedTags.Where(tag => tag.Status == ProductComponentStatus.Active))
+                {
+                    context.Entry(tag).Property(item => item.Status).IsModified = true;
+                }
+            }
+
+            context.Entry(existing).Property(row => row.UpdatedAt).IsModified = true;
+
             context.Entry(existing).Property<uint>("xmin").OriginalValue = version;
             return await SaveAsync(
                 existing,
                 actorId,
                 "products.updated.succeeded",
-                TenantAuditChangeSets.ProductUpdate(
-                    existing,
-                    oldName,
-                    oldKind,
-                    oldCaffeine,
-                    oldPreparationMinutes,
-                    oldCategoryId,
-                    oldStationId,
-                    priceChanges),
+                TenantAuditChangeSets.ProductUpdate(before, existing),
                 cancellationToken);
         }
 
-        public async Task<Result<ProductResponse>> ChangeStatusAsync(
-            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken)
+        private async Task<Result<ProductResponse>> ChangeStatusCoreAsync(
+            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken,
+            bool includeHiddenCategories)
         {
-            var product = await LockAndLoadAsync(id, cancellationToken);
+            var candidates = CatalogProducts(includeHiddenCategories).Where(row => row.Id == id);
+            if (!includeHiddenCategories && !await candidates.AnyAsync(cancellationToken))
+            {
+                return Result.Failure<ProductResponse>(ProductErrors.NotFound());
+            }
+
+            await context.LockProductAsync(id, cancellationToken);
+            // Recheck visibility after the lock in case the product or its category changed while waiting.
+            var product = await candidates.AsTracking().SingleOrDefaultAsync(cancellationToken);
             if (product is null)
             {
                 return Result.Failure<ProductResponse>(ProductErrors.NotFound());
@@ -218,7 +325,7 @@ namespace CafeHub.Infrastructure.Menu
                 cancellationToken);
         }
 
-        public async Task<OffsetPage<ProductListItemResponse>> ListAsync(
+        private async Task<Result<OffsetPage<ProductListItemResponse>>> ListCoreAsync(
             Guid? categoryId,
             ProductKind? kind,
             bool? caffeine,
@@ -229,11 +336,12 @@ namespace CafeHub.Infrastructure.Menu
             int pageSize,
             IReadOnlyList<SortTerm> sort,
             bool includeTotalCount,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeHiddenCategories = false)
         {
             ArgumentNullException.ThrowIfNull(sort);
 
-            var query = context.Products.AsNoTracking();
+            var query = CatalogProducts(includeHiddenCategories);
             if (status is { } statusFilter)
             {
                 query = query.Where(product => product.Status == statusFilter);
@@ -245,12 +353,9 @@ namespace CafeHub.Infrastructure.Menu
 
             if (categoryId is { } categoryIdValue)
             {
-                var categoryIds = new List<Guid> { categoryIdValue };
-                categoryIds.AddRange(await context.MenuCategories.AsNoTracking()
-                    .Where(category => category.ParentId == categoryIdValue)
-                    .Select(category => category.Id)
-                    .ToListAsync(cancellationToken));
-                query = query.Where(product => categoryIds.Contains(product.CategoryId));
+                query = query.Where(product => context.MenuCategories.Any(category =>
+                    category.Id == product.CategoryId
+                    && (category.Id == categoryIdValue || category.ParentId == categoryIdValue)));
             }
 
             if (kind is { } kindFilter)
@@ -266,18 +371,15 @@ namespace CafeHub.Infrastructure.Menu
             if (!string.IsNullOrWhiteSpace(tag))
             {
                 var normalizedTag = tag.Trim().ToLowerInvariant();
-                query = query.Where(product => product.Tags.Any(tagRow => tagRow.Tag == normalizedTag));
+                query = query.Where(product => product.Tags.Any(tagRow => tagRow.Status == ProductComponentStatus.Active && tagRow.Tag == normalizedTag));
             }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var pattern = $"%{EscapeLike(search.Trim())}%";
-                query = query.Where(product => EF.Functions.ILike(product.Name, pattern));
+                query = query.Where(product => EF.Functions.ILike(product.Name, pattern, @"\"));
             }
 
-            await using var transaction = includeTotalCount
-                ? await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken)
-                : null;
 
             int? totalCount = includeTotalCount ? await query.CountAsync(cancellationToken) : null;
 
@@ -287,25 +389,24 @@ namespace CafeHub.Infrastructure.Menu
                 .Select(product => new
                 {
                     Product = product,
-                    DefaultSizePrice = product.Sizes.Where(size => size.IsDefault).Select(size => size.Price).FirstOrDefault(),
+                    DefaultSizePrice = product.Sizes
+                        .Where(size => size.IsDefault && size.Status == ProductComponentStatus.Active)
+                        .Select(size => (decimal?)size.Price)
+                        .FirstOrDefault(),
                 })
                 .ToListAsync(cancellationToken);
 
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-
-            return OffsetPage<ProductListItemResponse>.Create(
+            return Result.Success(OffsetPage<ProductListItemResponse>.Create(
                 fetchedItems.Select(row => ProductListItemResponse.From(row.Product, row.DefaultSizePrice)).ToArray(),
                 page,
                 pageSize,
-                totalCount);
+                totalCount));
         }
 
-        public async Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
+        private async Task<Result<ProductResponse>> GetCoreAsync(
+            Guid id, CancellationToken cancellationToken, bool includeHiddenCategories = false)
         {
-            var row = await context.Products.AsNoTracking()
+            var row = await CatalogProducts(includeHiddenCategories)
                 .Include(product => product.Sizes)
                 .Include(product => product.Addons)
                 .Include(product => product.Tags)
@@ -317,8 +418,8 @@ namespace CafeHub.Infrastructure.Menu
                 })
                 .SingleOrDefaultAsync(cancellationToken);
             return row is null
-                ? null
-                : ProductResponse.From(row.Product, row.Version.ToString(CultureInfo.InvariantCulture));
+                ? Result.Failure<ProductResponse>(ProductErrors.NotFound())
+                : Result.Success(ProductResponse.From(row.Product, row.Version.ToString(CultureInfo.InvariantCulture)));
         }
 
         private static IOrderedQueryable<Product> ApplySort(
@@ -394,18 +495,36 @@ namespace CafeHub.Infrastructure.Menu
             await context.Entry(product).Collection(row => row.Tags).LoadAsync(cancellationToken);
         }
 
-        private async Task<bool> IsCategoryVisibleAsync(Guid categoryId, CancellationToken cancellationToken)
+        private IQueryable<Product> CatalogProducts(bool includeHiddenCategories)
         {
-            var category = await context.MenuCategories.AsNoTracking()
-                .Where(row => row.Id == categoryId)
-                .Select(row => new { row.ParentId, row.Status })
-                .SingleOrDefaultAsync(cancellationToken);
-            if (category is null || category.Status != MenuCategoryStatus.Active)
+            var query = context.Products.AsNoTracking();
+            return includeHiddenCategories
+                ? query
+                : query.Where(product => context.MenuCategories.EffectivelyVisible()
+                    .Any(category => category.Id == product.CategoryId));
+        }
+
+        private async Task<bool> LockVisibleCategoryAsync(Guid categoryId, CancellationToken cancellationToken)
+        {
+            var key = await ReadCategoryAsync();
+            if (key is null)
             {
                 return false;
             }
 
-            if (category.ParentId is not { } parentId)
+            if (key.Value.ParentId is { } rootId)
+            {
+                await context.LockMenuCategoryAsync(rootId, cancellationToken);
+            }
+
+            await context.LockMenuCategoryAsync(categoryId, cancellationToken);
+            var category = await ReadCategoryAsync();
+            if (category is null || category.Value.Status != MenuCategoryStatus.Active)
+            {
+                return false;
+            }
+
+            if (category.Value.ParentId is not { } parentId)
             {
                 return true;
             }
@@ -415,58 +534,15 @@ namespace CafeHub.Infrastructure.Menu
                 .Select(row => (MenuCategoryStatus?)row.Status)
                 .SingleOrDefaultAsync(cancellationToken);
             return parentStatus == MenuCategoryStatus.Active;
-        }
 
-        private async Task<bool> IsStationActiveAsync(Guid stationId, CancellationToken cancellationToken)
-        {
-            var status = await context.Stations.AsNoTracking()
-                .Where(row => row.Id == stationId)
-                .Select(row => (StationStatus?)row.Status)
-                .SingleOrDefaultAsync(cancellationToken);
-            return status == StationStatus.Active;
-        }
-
-        internal static List<TenantAuditChanges.FieldChange> PriceChanges(
-            ProductWriteModel product,
-            IReadOnlyDictionary<Guid, decimal> oldSizePrices,
-            IReadOnlyDictionary<Guid, decimal> oldAddonPrices)
-        {
-            var changes = new List<TenantAuditChanges.FieldChange>();
-            foreach (var size in product.Sizes)
+            async Task<(Guid? ParentId, MenuCategoryStatus Status)?> ReadCategoryAsync()
             {
-                if (size.Id is { } sizeId)
-                {
-                    if (oldSizePrices[sizeId] != size.Price)
-                    {
-                        changes.Add(new TenantAuditChanges.FieldChange(
-                            $"price.{size.Name.Trim()}", FormatPrice(oldSizePrices[sizeId]), FormatPrice(size.Price)));
-                    }
-                }
-                else
-                {
-                    changes.Add(new TenantAuditChanges.FieldChange(
-                        $"price.{size.Name.Trim()}", null, FormatPrice(size.Price)));
-                }
+                var row = await context.MenuCategories.AsNoTracking()
+                    .Where(item => item.Id == categoryId)
+                    .Select(item => new { item.ParentId, item.Status })
+                    .SingleOrDefaultAsync(cancellationToken);
+                return row is null ? null : (row.ParentId, row.Status);
             }
-
-            foreach (var addon in product.Addons)
-            {
-                if (addon.Id is { } addonId)
-                {
-                    if (oldAddonPrices[addonId] != addon.Price)
-                    {
-                        changes.Add(new TenantAuditChanges.FieldChange(
-                            $"price.{addon.Name.Trim()}", FormatPrice(oldAddonPrices[addonId]), FormatPrice(addon.Price)));
-                    }
-                }
-                else
-                {
-                    changes.Add(new TenantAuditChanges.FieldChange(
-                        $"price.{addon.Name.Trim()}", null, FormatPrice(addon.Price)));
-                }
-            }
-
-            return changes;
         }
 
         private async Task<Result<ProductResponse>> SaveAsync(
@@ -516,7 +592,5 @@ namespace CafeHub.Infrastructure.Menu
 
         private static ProductResponse ToResponse(Product product, uint version) =>
             ProductResponse.From(product, version.ToString(CultureInfo.InvariantCulture));
-
-        private static string FormatPrice(decimal price) => price.ToString(CultureInfo.InvariantCulture);
     }
 }

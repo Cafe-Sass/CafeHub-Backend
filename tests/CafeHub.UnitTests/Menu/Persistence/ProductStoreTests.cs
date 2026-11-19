@@ -3,6 +3,7 @@ using System.Data.Common;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Menu;
 using CafeHub.Application.Menu.Contracts;
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Menu;
@@ -14,6 +15,28 @@ namespace CafeHub.UnitTests.Menu.Persistence
 {
     public sealed class ProductStoreTests
     {
+        [Fact]
+        public async Task CatalogSearchPassesLiteralWildcardsAndProjectsOnlyAnActiveDefault()
+        {
+            var stub = new TenantCommandStub((command, _) =>
+            {
+                Assert.Contains("ILIKE", command.CommandText);
+                Assert.Contains("ESCAPE", command.CommandText);
+                Assert.Contains("menu_categories", command.CommandText);
+                Assert.Contains("is_default", command.CommandText);
+                Assert.Matches(@"FROM product_sizes[\s\S]*is_default[\s\S]*status = 'Active'", command.CommandText);
+                Assert.Contains(command.Parameters.Cast<DbParameter>(), parameter => Equals(parameter.Value, @"%\%\_\\%"));
+                return new DataTable();
+            });
+            await using var context = stub.CreateContext();
+            var store = new ProductStore(context, new RecordingTenantAuditWriter(), new FixedTimeProvider(Now), new FinalizedCatalog());
+
+            var result = await store.ListAsync(null, null, null, null, null, @"%_\", 1, 10,
+                [new("id", SortDirection.Asc)], false, default);
+
+            Assert.Empty(result.Value.Items);
+        }
+
         private static readonly DateTimeOffset Now = new(2026, 11, 16, 0, 0, 0, TimeSpan.Zero);
         private static readonly Guid Actor = Guid.NewGuid();
         private const uint Version = 13;
@@ -31,7 +54,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 : kind == "parent-inactive" ? StatusRow("Inactive") : new DataTable(), _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.CreateAsync(Model(categoryId), Actor, default);
 
@@ -54,7 +77,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.CreateAsync(Model(Guid.NewGuid(), stationId), Actor, default);
 
@@ -70,7 +93,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
             var stub = new TenantCommandStub((_, _) => CategoryRow("Active"), _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.CreateAsync(Model(Guid.NewGuid()), Actor, default);
 
@@ -81,13 +104,13 @@ namespace CafeHub.UnitTests.Menu.Persistence
             Assert.Equal(10m, result.Value.Sizes.Single().Price);
             Assert.True(result.Value.Sizes.Single().IsDefault);
             Assert.Single(result.Value.Addons);
-            Assert.Equal(["hot"], result.Value.Tags);
+            Assert.Equal("hot", Assert.Single(result.Value.Tags).Tag);
             Assert.All(product.Sizes, size => Assert.Equal(product.Id, size.ProductId));
             var entry = Assert.Single(audit.Entries);
             Assert.Equal("products.created.succeeded", entry.Action);
             Assert.Equal(product.Id, entry.TargetId);
             Assert.Equal(Actor, entry.ActorUserId);
-            Assert.Contains("\"price.Regular\":\"10\"", TenantAuditSnapshotSerializer.Create("products", entry.Changes!).Value.AfterState);
+            Assert.Contains($"\"price.size.{product.Sizes.Single().Id:D}\":\"10\"", TenantAuditSnapshotSerializer.Create("products", entry.Changes!).Value.AfterState);
         }
 
         [Fact]
@@ -101,7 +124,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.UpdateAsync(product.Id, Model(product.CategoryId), Version - 1, Actor, default);
 
@@ -120,7 +143,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
             var model = new ProductWriteModel(
                 product.CategoryId,
                 null,
@@ -136,7 +159,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                     new ProductSizeInput(null, "Large", 18m, false),
                 ],
                 [new ProductAddonInput(addon.Id, "Milk", 2m)],
-                ["hot"]);
+                [new ProductTagInput(product.Tags.Single().Id, "hot")]);
 
             var result = await store.UpdateAsync(product.Id, model, Version, Actor, default);
 
@@ -148,10 +171,10 @@ namespace CafeHub.UnitTests.Menu.Persistence
             var entry = Assert.Single(audit.Entries);
             Assert.Equal("products.updated.succeeded", entry.Action);
             var snapshot = TenantAuditSnapshotSerializer.Create("products", entry.Changes!).Value;
-            Assert.Contains("\"price.Regular\":\"10\"", snapshot.BeforeState);
-            Assert.Contains("\"price.Regular\":\"12.50\"", snapshot.AfterState);
-            Assert.Contains("\"price.Large\":\"18\"", snapshot.AfterState);
-            Assert.DoesNotContain("price.Milk", snapshot.AfterState);
+            Assert.Contains($"\"price.size.{size.Id:D}\":\"10\"", snapshot.BeforeState);
+            Assert.Contains($"\"price.size.{size.Id:D}\":\"12.50\"", snapshot.AfterState);
+            Assert.Contains($"\"price.size.{tracked.Sizes.Single(item => item.Name == "Large").Id:D}\":\"18\"", snapshot.AfterState);
+            Assert.DoesNotContain($"price.addon.{addon.Id:D}", snapshot.AfterState);
         }
 
         [Theory]
@@ -171,7 +194,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 (command, data) => Read(command, data, product), _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.ChangeStatusAsync(product.Id, requested, Version, Actor, default);
 
@@ -199,7 +222,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 (command, data) => Read(command, data, product), _ => { });
             var audit = new RecordingTenantAuditWriter();
             await using var context = stub.CreateContext(new SaveStub());
-            var store = new ProductStore(context, audit, new FixedTimeProvider(Now));
+            var store = new ProductStore(context, audit, new FixedTimeProvider(Now), new FinalizedCatalog());
 
             var result = await store.ChangeStatusAsync(
                 product.Id, ProductStatus.Inactive, Version + 1, Actor, default);
@@ -217,6 +240,11 @@ namespace CafeHub.UnitTests.Menu.Persistence
             ProductTag? tag = null)
         {
             var text = command.CommandText;
+            if (text.Contains("SELECT EXISTS", StringComparison.Ordinal) && text.Contains("menu_categories", StringComparison.Ordinal))
+            {
+                return TenantCommandStub.Scalars(true);
+            }
+
             if (text.Contains("FROM product_sizes", StringComparison.Ordinal))
             {
                 return size is null ? new DataTable() : TenantCommandStub.EntityRow(command, data, size, Version);
@@ -253,7 +281,7 @@ namespace CafeHub.UnitTests.Menu.Persistence
                 0,
                 [new ProductSizeInput(null, "Regular", 10m, true)],
                 [new ProductAddonInput(null, "Milk", 2m)],
-                ["hot"]);
+                [new ProductTagInput(null, "hot")]);
 
         private static Product CreateProduct(
             IReadOnlyCollection<ProductSize>? sizes = null,
@@ -298,6 +326,13 @@ namespace CafeHub.UnitTests.Menu.Persistence
             public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
                 DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default) =>
                 ValueTask.FromResult(InterceptionResult<int>.SuppressWithResult(1));
+        }
+
+        private sealed class FinalizedCatalog : IProductCatalogSchema
+        {
+            public Task<Result<T>> RunAsync<T>(
+                Func<Task<Result<T>>> operation, CancellationToken cancellationToken, bool repeatableRead = false) =>
+                operation();
         }
     }
 }

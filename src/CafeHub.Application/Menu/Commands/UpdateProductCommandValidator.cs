@@ -9,7 +9,7 @@ namespace CafeHub.Application.Menu.Commands
         {
             RuleForEach(command => command.Sizes).SetValidator(new ProductSizeInputValidator());
             RuleForEach(command => command.Addons).SetValidator(new ProductAddonInputValidator());
-            RuleForEach(command => command.Tags).Must(ProductTag.IsValid)
+            RuleForEach(command => command.Tags).Must(item => ProductTag.IsValid(item.Tag))
                 .WithMessage("Tags must be 1 to 32 lower-case letters, digits, hyphens, or spaces.");
 
             RuleFor(command => command.Id).NotEmpty();
@@ -46,7 +46,7 @@ namespace CafeHub.Application.Menu.Commands
             RuleFor(command => command.Tags).Must(tags => tags is not null && tags.Count <= Product.MaximumTagCount)
                 .WithMessage("A product can have at most 10 tags.");
             RuleFor(command => command.Tags).Must(tags => tags is not null
-                    && tags.Select(tag => (tag ?? string.Empty).Trim().ToLowerInvariant())
+                    && tags.Select(tag => (tag.Tag ?? string.Empty).Trim().ToLowerInvariant())
                         .Distinct(StringComparer.Ordinal).Count() == tags.Count)
                 .WithMessage("Tags must be unique within a product.");
 

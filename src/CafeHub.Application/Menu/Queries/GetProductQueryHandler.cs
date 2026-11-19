@@ -7,14 +7,11 @@ namespace CafeHub.Application.Menu.Queries
 {
     public sealed class GetProductQueryHandler(IProductStore store) : IQueryHandler<GetProductQuery, ProductResponse>
     {
-        public async Task<Result<ProductResponse>> Handle(GetProductQuery query, CancellationToken cancellationToken)
+        public Task<Result<ProductResponse>> Handle(GetProductQuery query, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(query);
 
-            var product = await store.GetAsync(query.Id, cancellationToken);
-            return product is null
-                ? Result.Failure<ProductResponse>(ProductErrors.NotFound())
-                : Result.Success(product);
+            return store.GetAsync(query.Id, cancellationToken, query.IncludeHiddenCategories);
         }
     }
 }

@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Menu;
 using CafeHub.Application.Menu.Contracts;
 using CafeHub.Application.Menu.DTOs;
 using CafeHub.Application.Pagination;
@@ -29,16 +30,17 @@ namespace CafeHub.UnitTests.Menu.Commands
         }
 
         public Task<Result<ProductResponse>> ChangeStatusAsync(
-            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken)
+            Guid id, ProductStatus status, uint version, Guid actorId, CancellationToken cancellationToken,
+            bool includeHiddenCategories = false)
         {
-            StatusChanges.Add(new ProductStatusCall(id, status, version, actorId));
+            StatusChanges.Add(new ProductStatusCall(id, status, version, actorId, includeHiddenCategories));
             return Reply();
         }
 
         public List<ListProductsCall> Listed { get; } = new();
         public List<Guid> Gotten { get; } = new();
 
-        public Task<OffsetPage<ProductListItemResponse>> ListAsync(
+        public Task<Result<OffsetPage<ProductListItemResponse>>> ListAsync(
             Guid? categoryId,
             ProductKind? kind,
             bool? caffeine,
@@ -49,23 +51,29 @@ namespace CafeHub.UnitTests.Menu.Commands
             int pageSize,
             IReadOnlyList<SortTerm> sort,
             bool includeTotalCount,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeHiddenCategories = false)
         {
             Listed.Add(new ListProductsCall(categoryId, kind, caffeine, tag, status, search, page, pageSize, sort, includeTotalCount));
-            return Task.FromResult(OffsetPage<ProductListItemResponse>.Create([], page, pageSize, null));
+            return Task.FromResult(Failure is null
+                ? Result.Success(OffsetPage<ProductListItemResponse>.Create([], page, pageSize, null))
+                : Result.Failure<OffsetPage<ProductListItemResponse>>(Failure));
         }
 
-        public Task<ProductResponse?> GetAsync(Guid id, CancellationToken cancellationToken)
+        public Task<Result<ProductResponse>> GetAsync(Guid id, CancellationToken cancellationToken, bool includeHiddenCategories = false)
         {
             Gotten.Add(id);
-            return Task.FromResult(Response);
+            return Task.FromResult(Failure is { } error
+                ? Result.Failure<ProductResponse>(error)
+                : Response is { } product
+                    ? Result.Success(product)
+                    : Result.Failure<ProductResponse>(ProductErrors.NotFound()));
         }
 
         public static ProductResponse Product(Guid? id = null) => new()
         {
             Id = id ?? Guid.NewGuid(),
             CategoryId = Guid.NewGuid(),
-            StationId = null,
             Name = "Latte",
             Description = null,
             Ingredients = null,
@@ -91,7 +99,7 @@ namespace CafeHub.UnitTests.Menu.Commands
 
     internal sealed record ProductUpdateCall(Guid Id, ProductWriteModel Product, uint Version, Guid ActorId);
 
-    internal sealed record ProductStatusCall(Guid Id, ProductStatus Status, uint Version, Guid ActorId);
+    internal sealed record ProductStatusCall(Guid Id, ProductStatus Status, uint Version, Guid ActorId, bool IncludeHiddenCategories);
 
     internal sealed record ListProductsCall(
         Guid? CategoryId,

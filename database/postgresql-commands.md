@@ -423,3 +423,37 @@ Every row states the command to run (sections have the full syntax with placehol
 | X1 | Disposable environment destroyed after checks | local teardown | section 10 | `DROP` messages + server stop; data directory gone; port refuses connections | ☐ |
 
 Pass rule: a checklist row marks pass only when the observed output matches the documented expected result for that row; any deviation stops release sign-off until it is explained and remedied — under PRD section 14 (MVP Acceptance and Release Gate) an exception requires a documented owner and explicit risk acceptance.
+
+## Task 47 remediation migration gates
+
+Deploy this change in the approved order **Expand → Backfill → Reconcile → Cutover → Contract**.
+`ExpandTask47ProductRemediation` adds the branch slot, assignment history, tenant readiness
+marker table and nullable tag IDs. It preserves the old station column and tag records.
+`FinalizeTask47ProductTagIdentity` requires populated, normalized tag IDs before it can change
+the key and create the active-label indexes. It locks product_tags before checking normalization
+and keeps the lock through the key change. A database check enforces trimmed, nonempty labels
+after finalization.
+Routine provisioning and tenant upgrades stop at Expand. A routine run against a finalized tenant
+keeps its newer schema. Apply the finalizer separately under the approved release procedure, even
+for an empty tenant. Keep the remediated catalog service on the approved cutover schedule because it
+requires the finalized tag schema. Its operations return 409 Products.CatalogSchemaNotReady
+until the tenant's tag identity key is finalized, regardless of routing readiness.
+
+Backfill execution, exception handling, production deployment timing and final cutover are open.
+A legacy station is a candidate only in the branch it actually belongs to. No legacy reference,
+missing mapping or incomplete reconciliation grants permission to route a product to the manual
+queue. Use `CheckTask47ProductRemediation.sql` for candidate and tag checks alongside the approved
+per-branch mapping. Checks alone do not attest to tenant readiness.
+
+`product_routing_readiness` stays empty until the authorized deployment process verifies and
+approves the tenant. The runtime role can read this marker and the deployment role controls writes.
+At the approved cutover, stop legacy writes before applying the tag finalizer. Verify reconciliation
+against the final write boundary before enabling the remediated API. It rejects scalar station input
+and accepts tag objects. Keep `products.station_id` until the separately approved
+Contract phase. Mixed branch assignments and historical identities cannot safely be collapsed
+back to the old representation. Down migrations lock affected tables before evaluating rollback
+guards, then block when downgrading would discard records.
+
+Task 48 and Task 49 must consume the same branch routing policy for display and order validation.
+Task 49 owns immutable order snapshots. Task 50 manual queue permissions and handling affected
+existing orders remain open. Product images remain deferred under FR-MENU-002.

@@ -18,7 +18,7 @@ namespace CafeHub.Application.Menu.Commands
         int SortOrder,
         IReadOnlyList<ProductSizeInput> Sizes,
         IReadOnlyList<ProductAddonInput> Addons,
-        IReadOnlyList<string> Tags,
+        IReadOnlyList<ProductTagInput> Tags,
         string ConcurrencyToken) : ICommand<ProductResponse>, ITenantTransactionalCommand
     {
         internal ProductWriteModel ToWriteModel() => new(

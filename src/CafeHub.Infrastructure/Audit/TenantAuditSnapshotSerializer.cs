@@ -13,7 +13,7 @@ namespace CafeHub.Infrastructure.Audit
         private const string BranchesTarget = "branches";
         private const string TenantUsersTarget = "tenant_users";
         private const string ProductsTarget = "products";
-        private const string PriceFieldPrefix = "price.";
+
 
         private static readonly IReadOnlyDictionary<string, HashSet<string>> AllowLists =
             new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
@@ -76,16 +76,15 @@ namespace CafeHub.Infrastructure.Audit
                     "Kind",
                     "Caffeine",
                     "PreparationMinutes",
+                    "Description",
+                    "Ingredients",
+                    "SortOrder",
                     "Status",
                     "CategoryId",
+                    "BranchId",
+                    "AssignmentId",
                     "StationId",
                 },
-            };
-
-        private static readonly IReadOnlyDictionary<string, string[]> AllowedPrefixes =
-            new Dictionary<string, string[]>(StringComparer.Ordinal)
-            {
-                [ProductsTarget] = [PriceFieldPrefix],
             };
 
         private static readonly HashSet<string> DeniedNames = new(StringComparer.Ordinal)
@@ -121,6 +120,7 @@ namespace CafeHub.Infrastructure.Audit
             var after = new SortedDictionary<string, string?>(StringComparer.Ordinal);
             var seenAllowedFields = new HashSet<string>(StringComparer.Ordinal);
 
+            var hasFields = false;
             foreach (var field in changes.Fields)
             {
                 if (field is null
@@ -138,20 +138,33 @@ namespace CafeHub.Infrastructure.Audit
                         "The audit snapshot contains a duplicate field."));
                 }
 
-                if (changes.IsCreate)
+                if (changes.IsCreate || field.HasChanged)
                 {
-                    after.Add(field.Name, field.After);
-                }
-                else if (!string.Equals(field.Before, field.After, StringComparison.Ordinal))
-                {
-                    before.Add(field.Name, field.Before);
-                    after.Add(field.Name, field.After);
+                    hasFields = true;
+                    if (!changes.IsCreate && field.BeforePresent)
+                    {
+                        before.Add(field.Name, field.Before);
+                    }
+
+                    if (field.AfterPresent)
+                    {
+                        after.Add(field.Name, field.After);
+                    }
                 }
             }
 
-            if (after.Count == 0)
+            if (!hasFields)
             {
                 return Result.Success(new Snapshots(null, null));
+            }
+
+            if (targetType == ProductsTarget)
+            {
+                var exactBefore = changes.IsCreate ? null : JsonSerializer.Serialize(before);
+                var exactAfter = JsonSerializer.Serialize(after);
+                return exactBefore?.Length > maximumStateLength || exactAfter.Length > maximumStateLength
+                    ? Result.Failure<Snapshots>(SnapshotTooLarge())
+                    : Result.Success(new Snapshots(exactBefore, exactAfter));
             }
 
             string? beforeState = null;
@@ -169,6 +182,9 @@ namespace CafeHub.Infrastructure.Audit
             return Result.Success(new Snapshots(beforeState, afterState));
         }
 
+        internal static bool IsAllowedProductField(string name) =>
+            !IsDeniedName(name) && IsAllowedField(ProductsTarget, AllowLists[ProductsTarget], name);
+
         private static bool IsAllowedField(string targetType, HashSet<string> allowList, string name)
         {
             if (allowList.Contains(name))
@@ -176,9 +192,18 @@ namespace CafeHub.Infrastructure.Audit
                 return true;
             }
 
-            return AllowedPrefixes.TryGetValue(targetType, out var prefixes)
-                && prefixes.Any(prefix => name.Length > prefix.Length
-                    && name.StartsWith(prefix, StringComparison.Ordinal));
+            if (targetType != ProductsTarget)
+            {
+                return false;
+            }
+
+            var parts = name.Split('.');
+            return parts.Length == 3 && (
+                (parts[0] == "price" && parts[1] is "size" or "addon" && Guid.TryParseExact(parts[2], "D", out _))
+                || (Guid.TryParseExact(parts[1], "D", out _) && (
+                    (parts[0] == "size" && parts[2] is "name" or "status" or "default")
+                    || (parts[0] == "addon" && parts[2] is "name" or "status")
+                    || (parts[0] == "tag" && parts[2] is "label" or "status"))));
         }
 
         private static bool IsDeniedName(string name)

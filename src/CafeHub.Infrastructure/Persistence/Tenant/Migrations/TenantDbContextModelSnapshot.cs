@@ -512,6 +512,54 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductBranchStationSlot", b =>
+                {
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("ProductId", "BranchId")
+                        .HasName("pk_product_branch_station_slots");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_product_branch_station_slots_branch_id");
+
+                    b.ToTable("product_branch_station_slots", (string)null);
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductRoutingReadiness", b =>
+                {
+                    b.Property<bool>("Singleton")
+                        .HasColumnType("boolean")
+                        .HasColumnName("singleton");
+
+                    b.Property<DateTimeOffset>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.HasKey("Singleton")
+                        .HasName("pk_product_routing_readiness");
+
+                    b.ToTable("product_routing_readiness", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_product_routing_readiness_singleton", "singleton");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.ProductSize", b =>
                 {
                     b.Property<Guid>("Id")
@@ -579,30 +627,111 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductTag", b =>
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductStationAssignment", b =>
                 {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid?>("EndedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ended_by");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
 
-                    b.Property<string>("Tag")
-                        .HasColumnType("text")
-                        .HasColumnName("tag");
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid?>("StartedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_by");
+
+                    b.Property<Guid>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_station_assignments");
+
+                    b.HasIndex("EndedBy")
+                        .HasDatabaseName("ix_product_station_assignments_ended_by");
+
+                    b.HasIndex("StartedBy")
+                        .HasDatabaseName("ix_product_station_assignments_started_by");
+
+                    b.HasIndex("BranchId", "StationId")
+                        .HasDatabaseName("ix_product_station_assignments_station");
+
+                    b.HasIndex(new[] { "ProductId", "BranchId" }, "CurrentProductBranchAssignment")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_station_assignments_current")
+                        .HasFilter("ended_at IS NULL");
+
+                    b.HasIndex(new[] { "ProductId", "BranchId" }, "ProductBranchHistory")
+                        .HasDatabaseName("ix_product_station_assignments_slot");
+
+                    b.ToTable("product_station_assignments", (string)null);
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductTag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at");
 
-                    b.HasKey("ProductId", "Tag")
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tag");
+
+                    b.HasKey("Id")
                         .HasName("pk_product_tags");
 
-                    b.HasIndex("Tag")
-                        .HasDatabaseName("ix_product_tags_tag");
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_product_tags_product_id");
+
+                    b.HasIndex("ProductId", "Tag")
+                        .IsUnique()
+                        .HasDatabaseName("uq_product_tags_active_label")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("Tag", "ProductId")
+                        .HasDatabaseName("ix_product_tags_active_tag")
+                        .HasFilter("status = 'Active'");
 
                     b.ToTable("product_tags", null, t =>
                         {
+                            t.HasCheckConstraint("ck_product_tags_status", "status IN ('Active', 'Inactive')");
+
                             t.HasCheckConstraint("ck_product_tags_tag_format", "tag ~ '^[a-z0-9 -]+$'");
 
+                            t.HasCheckConstraint("ck_product_tags_normalized_label", "tag = btrim(tag) AND tag <> ''");
                             t.HasCheckConstraint("ck_product_tags_tag_length", "char_length(tag) BETWEEN 1 AND 32");
 
                             t.HasCheckConstraint("ck_product_tags_tag_lowercase", "tag = lower(tag)");
@@ -1314,6 +1443,23 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasConstraintName("fk_product_addons_updated_by");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductBranchStationSlot", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_branch_station_slots_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_branch_station_slots_product_id");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.ProductSize", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
@@ -1334,6 +1480,36 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_sizes_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.ProductStationAssignment", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("EndedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_station_assignments_ended_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("StartedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_product_station_assignments_started_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Station", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId", "StationId")
+                        .HasPrincipalKey("BranchId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_station_assignments_station");
+
+                    b.HasOne("CafeHub.Domain.Tenants.ProductBranchStationSlot", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_station_assignments_slot");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.ProductTag", b =>

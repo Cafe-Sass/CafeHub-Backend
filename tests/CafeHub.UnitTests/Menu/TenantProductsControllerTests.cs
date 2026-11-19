@@ -4,6 +4,7 @@ using System.Text.Json;
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Menu;
 using CafeHub.Application.Menu.Commands;
 using CafeHub.Application.Menu.DTOs;
 using CafeHub.Application.Menu.Queries;
@@ -59,9 +60,9 @@ namespace CafeHub.UnitTests.Menu
                 .ToDictionary(description => ((ControllerActionDescriptor)description.ActionDescriptor).ActionName);
 
             Assert.Equal(6, actions.Count);
-            Verify(nameof(TenantProductsController.Create), typeof(ProductResponse), 201, 400, 401, 403, 409);
-            Verify(nameof(TenantProductsController.List), typeof(OffsetPage<ProductListItemResponse>), 200, 400, 401, 403);
-            Verify(nameof(TenantProductsController.Get), typeof(ProductResponse), 200, 400, 401, 404);
+            Verify(nameof(TenantProductsController.Create), typeof(ProductResponse), 201, 400, 401, 403, 404, 409);
+            Verify(nameof(TenantProductsController.List), typeof(OffsetPage<ProductListItemResponse>), 200, 400, 401, 403, 404, 409);
+            Verify(nameof(TenantProductsController.Get), typeof(ProductResponse), 200, 400, 401, 403, 404, 409);
             Verify(nameof(TenantProductsController.Update), typeof(ProductResponse), 200, 400, 401, 403, 404, 409);
             Verify(nameof(TenantProductsController.Deactivate), typeof(ProductResponse), 200, 400, 401, 403, 404, 409);
             Verify(nameof(TenantProductsController.Reactivate), typeof(ProductResponse), 200, 400, 401, 403, 404, 409);
@@ -87,7 +88,7 @@ namespace CafeHub.UnitTests.Menu
             var controller = CreateController(sender, new PolicyStub(true));
 
             var response = await controller.Create("fixture-cafe", new CreateProductRequest(
-                Guid.NewGuid(), null, "Latte", null, null, "Drink", true, null, 0, [], [], []), default);
+                Guid.NewGuid(), "Latte", null, null, "Drink", true, null, 0, [], [], []), default);
 
             var created = Assert.IsType<CreatedAtActionResult>(response.Result);
             Assert.Equal(nameof(TenantProductsController.Get), created.ActionName);
@@ -111,6 +112,31 @@ namespace CafeHub.UnitTests.Menu
             Assert.IsType<OkObjectResult>(result.Result);
             var query = Assert.IsType<ListProductsQuery>(sender.LastRequest);
             Assert.Equal(ProductStatus.Active, query.Status);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task HiddenCategoryReadsRequireExplicitManagerAccess(bool canManage)
+        {
+            var sender = new RecordingSender { Response = Result.Success(Response(Id)) };
+            var controller = CreateController(sender, new PolicyStub(canManage));
+
+            var result = await controller.Get("fixture-cafe", Id, default, includeHiddenCategories: true);
+
+            if (canManage)
+            {
+                Assert.IsType<OkObjectResult>(result.Result);
+                Assert.True(Assert.IsType<GetProductQuery>(sender.LastRequest).IncludeHiddenCategories);
+            }
+            else
+            {
+                Assert.Equal(403, Assert.IsType<ObjectResult>(result.Result).StatusCode);
+                Assert.Null(sender.LastRequest);
+                var list = await controller.List("fixture-cafe", new ListProductsQuery { IncludeHiddenCategories = true }, default);
+                Assert.Equal(403, Assert.IsType<ObjectResult>(list.Result).StatusCode);
+                Assert.Null(sender.LastRequest);
+            }
         }
 
         [Fact]
@@ -148,6 +174,115 @@ namespace CafeHub.UnitTests.Menu
             Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ProductLifecycleRequest>("""{}""", options));
         }
 
+        [Theory]
+        [InlineData(false, "1")]
+        [InlineData(true, "1")]
+        [InlineData(false, "0")]
+        [InlineData(true, "0")]
+        public async Task LifecycleMapsNotFoundWithoutASecondRequest(bool activate, string token)
+        {
+            var notFound = ProductErrors.NotFound();
+            var sender = new RecordingSender { Response = Result.Failure<ProductResponse>(notFound) };
+            var controller = CreateController(sender, new PolicyStub(true));
+
+            var response = await RunLifecycleAsync(controller, activate, token);
+
+            AssertProblem(response, 404, notFound);
+            Assert.Equal(activate ? (object)new ReactivateProductCommand(Id, token) : new DeactivateProductCommand(Id, token),
+                Assert.Single(sender.Requests));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task LifecycleMapsSuccessWithoutASecondRequest(bool activate)
+        {
+            var product = Response(Id);
+            var sender = new RecordingSender { Response = Result.Success(product) };
+            var controller = CreateController(sender, new PolicyStub(true));
+
+            var response = await RunLifecycleAsync(controller, activate, "1");
+
+            Assert.Same(product, Assert.IsType<OkObjectResult>(response.Result).Value);
+            Assert.Single(sender.Requests);
+        }
+
+        [Theory]
+        [InlineData(false, true, "1")]
+        [InlineData(true, true, "1")]
+        [InlineData(false, true, "0")]
+        [InlineData(true, true, "0")]
+        [InlineData(false, false, "1")]
+        [InlineData(true, false, "1")]
+        public async Task LifecycleOptInPreservesManagerSuccessAndConflict(bool activate, bool canManage, string token)
+        {
+            var product = Response(Id);
+            var conflict = ProductErrors.ConcurrencyConflict();
+            var sender = new RecordingSender
+            {
+                Response = token == "1" ? Result.Success(product) : Result.Failure<ProductResponse>(conflict),
+            };
+            var policy = new PolicyStub(canManage);
+            var controller = CreateController(sender, policy);
+
+            var response = await RunLifecycleAsync(controller, activate, token, includeHiddenCategories: true);
+
+            Assert.Equal(TenantPermissions.MenuManage, Assert.Single(policy.Policies));
+            if (!canManage)
+            {
+                AssertProblem(response, 403, AuthErrors.Forbidden());
+                Assert.Empty(sender.Requests);
+                return;
+            }
+
+            Assert.Equal(activate ? (object)new ReactivateProductCommand(Id, token, true) : new DeactivateProductCommand(Id, token, true),
+                Assert.Single(sender.Requests));
+            if (token == "1")
+            {
+                Assert.Same(product, Assert.IsType<OkObjectResult>(response.Result).Value);
+            }
+            else
+            {
+                AssertProblem(response, 409, conflict);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        public async Task LifecycleWithoutOptInPreservesVisibleConflictsAndSchemaGate(bool activate, bool schemaReady)
+        {
+            var error = schemaReady ? ProductErrors.ConcurrencyConflict() : ProductErrors.CatalogSchemaNotReady();
+            var sender = new RecordingSender { Response = Result.Failure<ProductResponse>(error) };
+            var controller = CreateController(sender, new PolicyStub(true));
+
+            var response = await RunLifecycleAsync(controller, activate, "0");
+
+            AssertProblem(response, 409, error);
+            Assert.Single(sender.Requests);
+        }
+
+        private static void AssertProblem(ActionResult<ProductResponse> response, int status, Error error)
+        {
+            var result = Assert.IsType<ObjectResult>(response.Result);
+            var problem = Assert.IsType<ProblemDetails>(result.Value);
+            Assert.Equal(status, result.StatusCode);
+            Assert.Equal(status, problem.Status);
+            Assert.Equal(error.Code, problem.Extensions["code"]);
+            Assert.Equal(error.Message, problem.Detail);
+        }
+
+        private static Task<ActionResult<ProductResponse>> RunLifecycleAsync(
+            TenantProductsController controller, bool activate, string token, bool includeHiddenCategories = false)
+        {
+            var request = new ProductLifecycleRequest(token);
+            return activate
+                ? controller.Reactivate("fixture-cafe", Id, request, default, includeHiddenCategories)
+                : controller.Deactivate("fixture-cafe", Id, request, default, includeHiddenCategories);
+        }
+
         private static TenantProductsController CreateController(RecordingSender sender, PolicyStub policy) =>
             new(sender, policy, new CorrelationStub()) { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
 
@@ -155,7 +290,6 @@ namespace CafeHub.UnitTests.Menu
         {
             Id = id ?? Guid.NewGuid(),
             CategoryId = Guid.NewGuid(),
-            StationId = null,
             Name = "Latte",
             Description = null,
             Ingredients = null,

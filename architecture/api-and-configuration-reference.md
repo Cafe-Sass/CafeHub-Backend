@@ -49,7 +49,7 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/menu/categories/{id:guid}/reactivate` | `menu.manage` | Reactivate this row using `concurrencyToken`. A child transition requires an active parent. | TenantMenuCategoriesController.cs |
 | POST | `t/{slug}/api/v1/menu/products` | `menu.manage` | Create an active product with sizes, add-ons, and tags (201 + Location). | TenantProductsController.cs |
 | GET | `t/{slug}/api/v1/menu/products` | `TenantUser` | Page the cafe's products with category, kind, caffeine, tag, status, and name filters. Read-only callers see Active products only. | TenantProductsController.cs |
-| GET | `t/{slug}/api/v1/menu/products/{id:guid}` | `TenantUser` | Get one product with sizes, add-ons, tags, and station. Read-only callers see Active products only. | TenantProductsController.cs |
+| GET | `t/{slug}/api/v1/menu/products/{id:guid}` | `TenantUser` | Get one product with sizes, add-ons and stable-ID tags. Read-only callers see Active products only. | TenantProductsController.cs |
 | PUT | `t/{slug}/api/v1/menu/products/{id:guid}` | `menu.manage` | Replace sizes, add-ons, and tags using `concurrencyToken`. | TenantProductsController.cs |
 | POST | `t/{slug}/api/v1/menu/products/{id:guid}/deactivate` | `menu.manage` | Deactivate a product using `concurrencyToken` (row kept). | TenantProductsController.cs |
 | POST | `t/{slug}/api/v1/menu/products/{id:guid}/reactivate` | `menu.manage` | Reactivate a product using `concurrencyToken`. | TenantProductsController.cs |
@@ -92,7 +92,7 @@ Menu category responses contain `id`, `parentId`, `name`, `sortOrder`, `status`,
 
 Invalid create parents return a generic `400 Validation.Failed` for `parentId`. Category state conflicts return `409 MenuCategories.NameConflict`, `409 MenuCategories.ConcurrencyConflict`, or `409 MenuCategories.ParentInactive`. Missing and inaccessible category IDs return `404 MenuCategories.NotFound`. Update and lifecycle success return 200 with the category. A current-token request that leaves the row unchanged preserves its token and creates no mutation audit record. Repeating a create while its active sibling name is reserved returns a name conflict.
 
-Product list items return `id`, `name`, `kind`, `caffeine`, `categoryId`, `defaultSizePrice`, and `status`; the default size price is null when no active default size exists. Full product responses return sizes, add-ons, tags, station, and `concurrencyToken`. Read-only callers always receive Active products only; inactive and missing products return `404 Products.NotFound`. Size and add-on price changes are audited as `price.<name>` with old and new values. Name conflicts on active sizes or add-ons return `409 Products.NameConflict`; default-size conflicts return `409 Products.DefaultSizeConflict`; stale tokens return `409 Products.ConcurrencyConflict`.
+Product list items return `id`, `name`, `kind`, `caffeine`, `categoryId`, `defaultSizePrice`, and `status`; the default size price is null when no active default size exists. Full product responses return sizes, add-ons, stable-ID active tags and `concurrencyToken`. Read-only callers always receive Active products only; inactive and missing products return `404 Products.NotFound`. Size and add-on price changes use `price.size.<id>` and `price.addon.<id>` audit keys. Name conflicts on active sizes or add-ons return `409 Products.NameConflict`; default-size conflicts return `409 Products.DefaultSizeConflict`. Stale tokens return `409 Products.ConcurrencyConflict` subject to the lifecycle visibility rules below.
 
 ### Policy names
 
@@ -163,3 +163,29 @@ Secret keys (shown by name only; values are placeholders, never committed): `Con
 
 - Endpoint table: grep of `src/CafeHub.WebApi/Controllers/*.cs` for `[Route]`, `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[TenantAuthorize]`, `[Authorize]`, `[AllowAnonymous]`; route templates and policy names read directly from each action and controller. Health endpoints are mapped in `src/CafeHub.WebApi/Program.cs` via `MapHealthChecks` and verified by unit tests in `tests/CafeHub.UnitTests`.
 - Configuration table: `src/CafeHub.WebApi/appsettings.template.json` (all keys and defaults) cross-checked against options binder classes in `src/CafeHub.Infrastructure` and `src/CafeHub.Application` (e.g. `JwtOptionsBinder`, `PaginationOptionsBinder`, `PaginationConfigurationKeys`, `GlobalRateLimitOptionsBinder`, `AuthRateLimitOptionsBinder`, `CorsOptionsBinder`, `RequestLimitsOptionsBinder`, `TransportSecurityOptionsBinder`, `PlatformSeedOptionsBinder`, `PaymentOptionsBinder`, `NotificationOptionsBinder`).
+
+## Task 47 branch assignment and catalog changes
+
+`GET` and `PUT /t/{slug}/api/v1/branches/{branchId}/menu/products/{productId}/station-assignment`
+require `menu.manage` and enforce branch scope. Readiness is required. PUT accepts an explicit
+nullable `stationId` and the branch assignment `concurrencyToken`. A null station clears the
+current assignment and retains its history. The token is scoped to the product and branch.
+Routing states are Assigned, Unassigned, StationInactive and BranchInactive. Changes in product
+availability leave the route state unchanged. The ordering policy combines product availability
+with route eligibility. Pending routing migration returns 409 Products.RoutingNotReady.
+
+Product catalog reads and writes return 409 Products.CatalogSchemaNotReady while the tenant has
+the expansion schema. They require the finalized tag identity key. This check is independent of
+routing readiness and leaves unrelated tenant APIs available.
+
+Ordinary product reads enforce effective category visibility. A caller with `menu.manage` may
+request `includeHiddenCategories=true` on catalog list and detail. Product requests use
+`tags` objects with a `tag` label and optional `id`. Updates identify existing active tags by ID.
+Omitted active tags are logically deactivated. Restoration of inactive tag IDs remains open.
+Product lifecycle actions also accept `includeHiddenCategories=true` with `menu.manage`.
+Without authorized opt-in, hidden and missing products both return `404 Products.NotFound`,
+including when the token supplied for a hidden product is stale. The lifecycle command checks
+visibility before acquiring a product row lock or making a change. Both product creation and
+listing also return `404 Tenant.Unavailable` when Tenant resolution fails.
+General catalog writes reject the legacy `stationId` field. Product image support remains deferred
+under FR-MENU-002.

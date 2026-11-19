@@ -54,9 +54,11 @@ namespace CafeHub.UnitTests.Menu.Commands
         }
 
         [Theory]
-        [InlineData("deactivate")]
-        [InlineData("reactivate")]
-        public async Task StatusCommands_RequestTheMatchingStatus(string operation)
+        [InlineData("deactivate", false)]
+        [InlineData("reactivate", false)]
+        [InlineData("deactivate", true)]
+        [InlineData("reactivate", true)]
+        public async Task StatusCommands_ForwardStatusAndVisibility(string operation, bool includeHiddenCategories)
         {
             var id = Guid.NewGuid();
             var deactivate = operation == "deactivate";
@@ -64,18 +66,19 @@ namespace CafeHub.UnitTests.Menu.Commands
             if (deactivate)
             {
                 var handler = new DeactivateProductCommandHandler(store, currentUser, tenantContext);
-                result = await handler.Handle(new DeactivateProductCommand(id, "7"), default);
+                result = await handler.Handle(new DeactivateProductCommand(id, "7", includeHiddenCategories), default);
             }
             else
             {
                 var handler = new ReactivateProductCommandHandler(store, currentUser, tenantContext);
-                result = await handler.Handle(new ReactivateProductCommand(id, "7"), default);
+                result = await handler.Handle(new ReactivateProductCommand(id, "7", includeHiddenCategories), default);
             }
 
             Assert.True(result.IsSuccess);
             var call = Assert.Single(store.StatusChanges);
             Assert.Equal(id, call.Id);
             Assert.Equal(7u, call.Version);
+            Assert.Equal(includeHiddenCategories, call.IncludeHiddenCategories);
             Assert.Equal(deactivate ? ProductStatus.Inactive : ProductStatus.Active, call.Status);
         }
 
@@ -139,7 +142,7 @@ namespace CafeHub.UnitTests.Menu.Commands
                 0,
                 sizes ?? [new ProductSizeInput(null, "Regular", 10m, true)],
                 [new ProductAddonInput(null, "Milk", 2m)],
-                tags ?? ["hot"]);
+                (tags ?? ["hot"]).Select(tag => new ProductTagInput(null, tag)).ToArray());
 
         internal static UpdateProductCommand UpdateCommand(string concurrencyToken = "1") =>
             new(
@@ -155,7 +158,7 @@ namespace CafeHub.UnitTests.Menu.Commands
                 0,
                 [new ProductSizeInput(null, "Regular", 10m, true)],
                 [new ProductAddonInput(null, "Milk", 2m)],
-                ["hot"],
+                [new ProductTagInput(null, "hot")],
                 concurrencyToken);
     }
 }

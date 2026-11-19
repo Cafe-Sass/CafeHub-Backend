@@ -88,7 +88,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal("numeric(12,2)", addon.FindProperty(nameof(ProductAddon.Price))!.GetColumnType());
 
             var tag = context.Model.FindEntityType(typeof(ProductTag))!;
-            Assert.Equal(new[] { nameof(ProductTag.ProductId), nameof(ProductTag.Tag) }, tag.FindPrimaryKey()!.Properties.Select(p => p.Name));
+            Assert.Equal(new[] { nameof(ProductTag.Id) }, tag.FindPrimaryKey()!.Properties.Select(p => p.Name));
 
             var settings = context.Model.FindEntityType(typeof(CafeSettings))!;
             Assert.Equal(CafeSettings.DefaultCurrencyCode, settings.FindProperty(nameof(CafeSettings.CurrencyCode))!.GetDefaultValue());

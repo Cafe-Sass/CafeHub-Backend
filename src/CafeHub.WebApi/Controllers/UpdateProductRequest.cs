@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.WebApi.Controllers
 {
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed record UpdateProductRequest(
         Guid CategoryId,
-        Guid? StationId,
         string Name,
         string? Description,
         string? Ingredients,
@@ -14,6 +15,6 @@ namespace CafeHub.WebApi.Controllers
         [property: JsonRequired] int SortOrder,
         IReadOnlyList<CreateProductSizeRequest> Sizes,
         IReadOnlyList<CreateProductAddonRequest> Addons,
-        IReadOnlyList<string> Tags,
+        [property: JsonRequired] IReadOnlyList<ProductTagInput> Tags,
         [property: JsonRequired] string ConcurrencyToken);
 }

@@ -4,5 +4,5 @@ using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Menu.Queries
 {
-    public sealed record GetProductQuery(Guid Id) : IQuery<ProductResponse>;
+    public sealed record GetProductQuery(Guid Id, bool IncludeHiddenCategories = false) : IQuery<ProductResponse>;
 }

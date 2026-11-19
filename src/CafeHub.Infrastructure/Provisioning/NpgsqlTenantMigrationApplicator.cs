@@ -2,6 +2,8 @@ using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 
 namespace CafeHub.Infrastructure.Provisioning
@@ -12,6 +14,7 @@ namespace CafeHub.Infrastructure.Provisioning
     /// </summary>
     internal sealed class NpgsqlTenantMigrationApplicator : ITenantMigrationApplicator
     {
+        private const string RoutineTargetMigrationId = "20261117233117_ExpandTask47ProductRemediation";
         private readonly TenantSchemaInitializerOptions _options;
 
         public NpgsqlTenantMigrationApplicator(TenantSchemaInitializerOptions options)
@@ -29,13 +32,28 @@ namespace CafeHub.Infrastructure.Provisioning
             using var context = CreateContext(databaseName);
             await context.Database.OpenConnectionAsync(cancellationToken);
             var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+            var history = context.GetService<IHistoryRepository>();
+            await history.CreateIfNotExistsAsync(cancellationToken);
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            await using var migrationLock = await history.AcquireDatabaseLockAsync(cancellationToken);
             var applied = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
             if (applied.Contains(TenantEmailBackfill.InitialTenantMigrationId) && !applied.Contains(TenantEmailBackfill.MigrationId))
             {
                 await TenantEmailBackfill.PrepareAsync(connection, cancellationToken);
             }
 
-            await context.Database.MigrateAsync(cancellationToken);
+            // An explicitly finalized tenant must never be downgraded by a routine run.
+            var known = context.Database.GetMigrations().ToArray();
+            var targetIndex = Array.IndexOf(known, RoutineTargetMigrationId);
+            if (targetIndex < 0)
+            {
+                throw new InvalidOperationException("The routine Tenant migration target is missing.");
+            }
+
+            if (!known.Skip(targetIndex).Any(applied.Contains))
+            {
+                await context.GetService<IMigrator>().MigrateAsync(RoutineTargetMigrationId, cancellationToken);
+            }
 
             var applicationRoleName = TenantDatabaseNaming.ApplicationRoleName(databaseName);
             var quotedRoleName = new NpgsqlCommandBuilder().QuoteIdentifier(applicationRoleName);
@@ -45,8 +63,9 @@ namespace CafeHub.Infrastructure.Provisioning
                 $"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {quotedRoleName}; " +
                 $"GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {quotedRoleName}; " +
                 $"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {quotedRoleName}; " +
-                $"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO {quotedRoleName}";
+                $"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO {quotedRoleName}; " + TenantReadinessPrivileges.ReadOnlySql;
             await command.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
         public async Task<string?> GetLatestAppliedMigrationIdAsync(
@@ -70,12 +89,7 @@ namespace CafeHub.Infrastructure.Provisioning
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var options = new DbContextOptionsBuilder<TenantDbContext>()
-                .UseNpgsql(_options.AdminConnectionString)
-                .Options;
-
-            using var context = new TenantDbContext(options);
-            return Task.FromResult(context.Database.GetMigrations().LastOrDefault());
+            return Task.FromResult<string?>(RoutineTargetMigrationId);
         }
 
         private TenantDbContext CreateContext(string databaseName)

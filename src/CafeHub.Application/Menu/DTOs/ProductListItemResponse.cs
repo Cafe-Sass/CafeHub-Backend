@@ -4,7 +4,7 @@ namespace CafeHub.Application.Menu.DTOs
 {
     /// <summary>
     /// Compact product list item. See <see cref="ProductResponse"/> for the full product including sizes, add-ons,
-    /// tags, and station.
+    /// and tags. Station assignments use the separate branch resource.
     /// </summary>
     public sealed record ProductListItemResponse(
         Guid Id,

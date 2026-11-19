@@ -201,50 +201,64 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
-        public static TenantAuditChanges ProductCreate(Product product)
+        public static TenantAuditChanges ProductCreate(Product product) =>
+            TenantAuditChanges.Create(ProductFields(product)
+                .Select(field => new TenantAuditChanges.FieldChange(field.Key, null, field.Value)));
+
+        public static TenantAuditChanges ProductUpdate(IReadOnlyDictionary<string, string?> before, Product product)
         {
-            ArgumentNullException.ThrowIfNull(product);
-            var fields = new List<TenantAuditChanges.FieldChange>
-            {
-                new(nameof(Product.Name), null, product.Name),
-                new(nameof(Product.Kind), null, product.Kind.ToString()),
-                new(nameof(Product.Caffeine), null, product.Caffeine.ToString()),
-                new(nameof(Product.PreparationMinutes), null, FormatNumber(product.PreparationMinutes)),
-                new(nameof(Product.Status), null, product.Status.ToString()),
-                new(nameof(Product.CategoryId), null, product.CategoryId.ToString()),
-                new(nameof(Product.StationId), null, product.StationId?.ToString()),
-            };
-            fields.AddRange(product.Sizes.Select(size =>
-                new TenantAuditChanges.FieldChange($"price.{size.Name}", null, FormatNumber(size.Price))));
-            fields.AddRange(product.Addons.Select(addon =>
-                new TenantAuditChanges.FieldChange($"price.{addon.Name}", null, FormatNumber(addon.Price))));
-            return TenantAuditChanges.Create(fields);
+            var after = ProductFields(product);
+            return TenantAuditChanges.Update(before.Keys.Union(after.Keys, StringComparer.Ordinal)
+                .Select(key =>
+                {
+                    var beforePresent = before.TryGetValue(key, out var beforeValue);
+                    var afterPresent = after.TryGetValue(key, out var afterValue);
+                    return new TenantAuditChanges.FieldChange(key, beforeValue, afterValue, beforePresent, afterPresent);
+                })
+                .Where(field => field.HasChanged));
         }
 
-        public static TenantAuditChanges ProductUpdate(
-            Product product,
-            string oldName,
-            ProductKind oldKind,
-            bool oldCaffeine,
-            int? oldPreparationMinutes,
-            Guid oldCategoryId,
-            Guid? oldStationId,
-            IReadOnlyCollection<TenantAuditChanges.FieldChange> priceChanges)
+        public static IReadOnlyDictionary<string, string?> ProductFields(Product product)
         {
             ArgumentNullException.ThrowIfNull(product);
-            ArgumentNullException.ThrowIfNull(priceChanges);
-            var fields = new List<TenantAuditChanges.FieldChange>
+            var fields = new Dictionary<string, string?>(StringComparer.Ordinal)
             {
-                new(nameof(Product.Name), oldName, product.Name),
-                new(nameof(Product.Kind), oldKind.ToString(), product.Kind.ToString()),
-                new(nameof(Product.Caffeine), oldCaffeine.ToString(), product.Caffeine.ToString()),
-                new(nameof(Product.PreparationMinutes), FormatNumber(oldPreparationMinutes), FormatNumber(product.PreparationMinutes)),
-                new(nameof(Product.CategoryId), oldCategoryId.ToString(), product.CategoryId.ToString()),
-                new(nameof(Product.StationId), oldStationId?.ToString(), product.StationId?.ToString()),
+                [nameof(Product.Name)] = product.Name,
+                [nameof(Product.Description)] = product.Description,
+                [nameof(Product.Ingredients)] = product.Ingredients,
+                [nameof(Product.Kind)] = product.Kind.ToString(),
+                [nameof(Product.Caffeine)] = product.Caffeine.ToString(),
+                [nameof(Product.PreparationMinutes)] = FormatNumber(product.PreparationMinutes),
+                [nameof(Product.SortOrder)] = product.SortOrder.ToString(CultureInfo.InvariantCulture),
+                [nameof(Product.Status)] = product.Status.ToString(),
+                [nameof(Product.CategoryId)] = product.CategoryId.ToString(),
+                [nameof(Product.StationId)] = product.StationId?.ToString(),
             };
-            fields.AddRange(priceChanges);
-            return TenantAuditChanges.Update(fields);
+
+            foreach (var size in product.Sizes)
+            {
+                fields[$"price.size.{size.Id:D}"] = FormatNumber(size.Price);
+                fields[$"size.{size.Id:D}.name"] = size.Name;
+                fields[$"size.{size.Id:D}.status"] = size.Status.ToString();
+                fields[$"size.{size.Id:D}.default"] = size.IsDefault.ToString();
+            }
+
+            foreach (var addon in product.Addons)
+            {
+                fields[$"price.addon.{addon.Id:D}"] = FormatNumber(addon.Price);
+                fields[$"addon.{addon.Id:D}.name"] = addon.Name;
+                fields[$"addon.{addon.Id:D}.status"] = addon.Status.ToString();
+            }
+
+            foreach (var tag in product.Tags)
+            {
+                fields[$"tag.{tag.Id:D}.label"] = tag.Tag;
+                fields[$"tag.{tag.Id:D}.status"] = tag.Status.ToString();
+            }
+
+            return fields;
         }
+
 
         public static TenantAuditChanges ProductLifecycleStatus(Product product, ProductStatus oldStatus)
         {
