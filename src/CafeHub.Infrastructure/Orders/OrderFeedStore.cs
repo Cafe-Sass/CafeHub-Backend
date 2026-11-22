@@ -87,7 +87,7 @@ namespace CafeHub.Infrastructure.Orders
                             .Where(station => station.Id == item.StationId)
                             .Select(station => (string?)station.Name)
                             .FirstOrDefault(),
-                        item.Addons.Select(addon => addon.AddonName).ToList()))
+                        item.Addons.OrderBy(addon => addon.Id).Select(addon => addon.AddonName).ToList()))
                     .ToList()));
     }
 }
