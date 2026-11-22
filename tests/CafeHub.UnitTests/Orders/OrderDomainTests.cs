@@ -169,6 +169,63 @@ namespace CafeHub.UnitTests.Orders
                 Guid.NewGuid(), null, " ", 1m, Now, null));
         }
 
+        [Fact]
+        public void Reject_StoresTheTrimmedReasonAndTheDecisionActor()
+        {
+            var order = CreateOrder();
+
+            order.Reject(Actor, "  out of oat milk  ", Now);
+
+            Assert.Equal(OrderStatus.Rejected, order.Status);
+            Assert.Equal("out of oat milk", order.RejectionReason);
+            Assert.Equal(Actor, order.RespondedByUserId);
+            Assert.Equal(Now, order.RespondedAt);
+            Assert.Equal(Now, order.UpdatedAt);
+            Assert.Equal(Actor, order.UpdatedBy);
+        }
+
+        [Fact]
+        public void Accept_DecidesTheOrderWithoutAReason()
+        {
+            var order = CreateOrder();
+
+            order.Accept(Actor, Now);
+
+            Assert.Equal(OrderStatus.Accepted, order.Status);
+            Assert.Null(order.RejectionReason);
+            Assert.Equal(Actor, order.RespondedByUserId);
+            Assert.Equal(Now, order.RespondedAt);
+        }
+
+        [Fact]
+        public void Reject_OnlyAPendingOrderCanBeDecided()
+        {
+            var order = CreateOrder();
+            order.Accept(Actor, Now);
+
+            Assert.Throws<InvalidOperationException>(() => order.Reject(Actor, "out of oat milk", Now));
+        }
+
+        [Theory]
+        [InlineData(null, false)]
+        [InlineData("", false)]
+        [InlineData("   ", false)]
+        [InlineData("ab", false)]
+        [InlineData("abc", true)]
+        [InlineData(" abc ", true)]
+        [InlineData("a\tb", false)]
+        public void RejectionReason_Boundaries(string? reason, bool expected)
+        {
+            Assert.Equal(expected, Order.IsValidRejectionReason(reason));
+        }
+
+        [Fact]
+        public void RejectionReason_TheUpperBoundaryIsTwoHundredFiftySixTrimmedCharacters()
+        {
+            Assert.True(Order.IsValidRejectionReason(new string('a', 256)));
+            Assert.False(Order.IsValidRejectionReason(new string('a', 257)));
+        }
+
         private static Order CreateOrder(
             int orderNumber = 1,
             OrderServiceType serviceType = OrderServiceType.DineIn,

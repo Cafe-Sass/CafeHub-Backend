@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Orders
 {
@@ -12,9 +13,12 @@ namespace CafeHub.Application.Orders
         public const string NotFoundCode = "Orders.NotFound";
         public const string StatusInvalidCode = "Orders.StatusInvalid";
         public const string BranchRequiredCode = "Orders.BranchRequired";
+        public const string StatusConflictCode = "Orders.StatusConflict";
+        public const string ResponseWindowElapsedCode = "Orders.ResponseWindowElapsed";
 
         public const string ItemsExtension = "items";
         public const string TotalExtension = "currentTotal";
+        public const string CurrentStatusExtension = "currentStatus";
 
         public static OrderSubmissionError PriceChanged(
             IReadOnlyList<OrderPriceChange> changes, decimal currentTotal) =>
@@ -40,6 +44,14 @@ namespace CafeHub.Application.Orders
 
         public static Error BranchRequired() =>
             Error.Validation(BranchRequiredCode, "The branch id is required.");
+
+        public static OrderDecisionError StatusConflict(OrderStatus currentStatus) =>
+            OrderDecisionError.StatusConflict(currentStatus);
+
+        public static Error ResponseWindowElapsed() =>
+            Error.Conflict(
+                ResponseWindowElapsedCode,
+                "The response window has elapsed. The order can no longer be decided.");
     }
 
     public sealed record OrderPriceChange(
