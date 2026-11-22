@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Behaviors;
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Orders;
 using CafeHub.Application.Pagination;
 using FluentValidation;
 using MediatR;
@@ -16,6 +17,7 @@ namespace CafeHub.Application
         public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration? configuration = null)
         {
             services.AddSingleton(PaginationOptionsBinder.Bind(configuration));
+            services.AddSingleton(OrdersOptionsBinder.Bind(configuration));
 
             var applicationAssembly = typeof(DependencyInjection).Assembly;
 

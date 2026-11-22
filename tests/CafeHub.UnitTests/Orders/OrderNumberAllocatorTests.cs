@@ -18,9 +18,9 @@ namespace CafeHub.UnitTests.Orders
         {
             var allocator = CreateAllocator();
 
-            Assert.Equal(1, await allocator.AllocateAsync(BranchId, default));
-            Assert.Equal(2, await allocator.AllocateAsync(BranchId, default));
-            Assert.Equal(3, await allocator.AllocateAsync(BranchId, default));
+            Assert.Equal(1, (await allocator.AllocateAsync(BranchId, default)).Number);
+            Assert.Equal(2, (await allocator.AllocateAsync(BranchId, default)).Number);
+            Assert.Equal(3, (await allocator.AllocateAsync(BranchId, default)).Number);
         }
 
         [Fact]
@@ -32,7 +32,7 @@ namespace CafeHub.UnitTests.Orders
 
             businessDate.Value = Today.AddDays(1);
 
-            Assert.Equal(1, await allocator.AllocateAsync(BranchId, default));
+            Assert.Equal(1, (await allocator.AllocateAsync(BranchId, default)).Number);
         }
 
         [Fact]
@@ -41,8 +41,8 @@ namespace CafeHub.UnitTests.Orders
             var allocator = CreateAllocator();
             await allocator.AllocateAsync(BranchId, default);
 
-            Assert.Equal(1, await allocator.AllocateAsync(OtherBranchId, default));
-            Assert.Equal(2, await allocator.AllocateAsync(BranchId, default));
+            Assert.Equal(1, (await allocator.AllocateAsync(OtherBranchId, default)).Number);
+            Assert.Equal(2, (await allocator.AllocateAsync(BranchId, default)).Number);
         }
 
         [Fact]
@@ -51,9 +51,10 @@ namespace CafeHub.UnitTests.Orders
             var otherDay = Today.AddDays(-3);
             businessDate.Value = otherDay;
 
-            await CreateAllocator().AllocateAsync(BranchId, default);
+            var allocation = await CreateAllocator().AllocateAsync(BranchId, default);
 
             Assert.Equal(otherDay, Assert.Single(store.Requests).BusinessDate);
+            Assert.Equal(otherDay, allocation.BusinessDate);
         }
 
         [Fact]
