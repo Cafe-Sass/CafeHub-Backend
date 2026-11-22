@@ -4,6 +4,8 @@ namespace CafeHub.Application.Tables
 {
     public static class GuestQrErrors
     {
-        public static Error NotFound() => Error.NotFound("GuestQr.NotFound", "The table QR was not found.");
+        public const string NotFoundCode = "GuestQr.NotFound";
+
+        public static Error NotFound() => Error.NotFound(NotFoundCode, "The table QR was not found.");
     }
 }

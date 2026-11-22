@@ -1,4 +1,9 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Menu.DTOs;
+using CafeHub.Application.Menu.Queries;
+using CafeHub.Application.Pagination;
+using CafeHub.Application.Tables;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
 using CafeHub.WebApi.Errors;
@@ -33,6 +38,34 @@ namespace CafeHub.WebApi.Controllers
 
             await GuestQrProblem.WriteNotFoundAsync(HttpContext, correlationIdAccessor, cancellationToken);
             return new EmptyResult();
+        }
+
+        [HttpGet("{code}/menu")]
+        [AllowAnonymous]
+        [TableQrEndpoint(IsGuest = true)]
+        [ProducesResponseType<OffsetPage<GuestMenuItemResponse>>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, "application/problem+json")]
+        public async Task<ActionResult<OffsetPage<GuestMenuItemResponse>>> Menu(
+            [FromRoute] string slug,
+            [FromRoute] string? code,
+            [FromQuery] GetGuestMenuQuery request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(request with { Code = code }, cancellationToken);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            if (result.Error!.Code == GuestQrErrors.NotFoundCode)
+            {
+                await GuestQrProblem.WriteNotFoundAsync(HttpContext, correlationIdAccessor, cancellationToken);
+                return new EmptyResult();
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
     }
 }
