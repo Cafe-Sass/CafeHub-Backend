@@ -6,6 +6,8 @@ namespace CafeHub.Domain.Tenants
         public const int MinimumGuestDeviceIdLength = 16;
         public const int MaximumGuestDeviceIdLength = 64;
         public const int MaximumIdempotencyKeyLength = 128;
+        public const int MinimumRejectionReasonLength = 3;
+        public const int MaximumRejectionReasonLength = 256;
         public const int MaximumItemCount = 50;
         public const int PublicReferenceLength = 22;
         public const int RequestHashLength = 64;
@@ -195,6 +197,9 @@ namespace CafeHub.Domain.Tenants
         public void Accept(Guid responderId, DateTimeOffset now) =>
             ApplyDecision(responderId, OrderStatus.Accepted, null, now);
 
+        public void Reject(Guid responderId, string reason, DateTimeOffset now) =>
+            ApplyDecision(responderId, OrderStatus.Rejected, ValidateRejectionReason(reason), now);
+
         private void ApplyDecision(Guid responderId, OrderStatus status, string? rejectionReason, DateTimeOffset now)
         {
             if (responderId == Guid.Empty)
@@ -214,6 +219,27 @@ namespace CafeHub.Domain.Tenants
             RejectionReason = rejectionReason;
             UpdatedAt = now;
             UpdatedBy = responderId;
+        }
+
+        public static bool IsValidRejectionReason(string? reason)
+        {
+            var trimmed = reason?.Trim();
+            return !string.IsNullOrEmpty(trimmed)
+                && trimmed.Length >= MinimumRejectionReasonLength
+                && trimmed.Length <= MaximumRejectionReasonLength
+                && !trimmed.Any(char.IsControl);
+        }
+
+        private static string ValidateRejectionReason(string reason)
+        {
+            if (!IsValidRejectionReason(reason))
+            {
+                throw new ArgumentException(
+                    "The rejection reason must be 3 to 256 characters after trimming, with no control characters.",
+                    nameof(reason));
+            }
+
+            return reason.Trim();
         }
 
         public static bool IsValidGuestDisplayName(string? name)

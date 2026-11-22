@@ -73,7 +73,7 @@ namespace CafeHub.Application.Orders.Commands
                 Changes = TenantAuditChanges.Update(
                 [
                     new TenantAuditChanges.FieldChange(
-                        "status",
+                        nameof(Order.Status),
                         OrderStatus.Pending.ToString(),
                         order.Status.ToString()),
                 ]),

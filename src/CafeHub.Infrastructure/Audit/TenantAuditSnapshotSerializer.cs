@@ -13,6 +13,7 @@ namespace CafeHub.Infrastructure.Audit
         private const string BranchesTarget = "branches";
         private const string TenantUsersTarget = "tenant_users";
         private const string ProductsTarget = "products";
+        private const string OrdersTarget = "orders";
 
 
         private static readonly IReadOnlyDictionary<string, HashSet<string>> AllowLists =
@@ -69,6 +70,11 @@ namespace CafeHub.Infrastructure.Audit
                     "count",
                     "fromNumber",
                     "toNumber",
+                },
+                [OrdersTarget] = new(StringComparer.Ordinal)
+                {
+                    "Status",
+                    "RejectionReason",
                 },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
