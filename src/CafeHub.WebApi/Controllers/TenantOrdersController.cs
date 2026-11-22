@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders.Commands;
+using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Orders.Queries;
 using CafeHub.Application.Pagination;
@@ -80,6 +81,22 @@ namespace CafeHub.WebApi.Controllers
             CancellationToken cancellationToken)
         {
             var result = await sender.Send(new RejectOrderCommand(orderId, request.Reason), cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("missed-summary")]
+        [TenantAuthorize(TenantPermissions.MissesView)]
+        public async Task<ActionResult<OffsetPage<MissedResponseSummaryEntry>>> MissedSummary(
+            [FromQuery] GetMissedResponsesSummaryQuery query,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(query, cancellationToken);
 
             if (result.IsSuccess)
             {
