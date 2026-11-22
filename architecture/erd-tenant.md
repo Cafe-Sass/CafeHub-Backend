@@ -2,9 +2,9 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 21 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), and the cafe currency used by menu prices.
+The Tenant model contains 25 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, and the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`).
 
-Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; later entities and migrations consume this ERD through their own stories.
+Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories.
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
 
@@ -150,6 +150,44 @@ erDiagram
         timestamptz revoked_at
         text revoked_reason
     }
+    orders {
+        uuid id PK
+        uuid branch_id FK
+        uuid table_id FK
+        integer order_number
+        date business_date
+        text service_type
+        text status
+        text source
+        text guest_display_name
+        text public_reference UK
+        numeric total_amount
+        timestamptz submitted_at
+        timestamptz response_deadline
+    }
+    order_items {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        uuid station_id FK
+        text product_name
+        text size_name
+        numeric unit_price
+        integer quantity
+        numeric line_total
+    }
+    order_item_addons {
+        uuid id PK
+        uuid order_item_id FK
+        uuid product_addon_id FK
+        text addon_name
+        numeric price
+    }
+    order_number_counters {
+        uuid branch_id PK, FK
+        date business_date PK
+        integer last_number
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
@@ -173,6 +211,16 @@ erDiagram
     branches ||--o{ branch_tables : "tables"
     tenant_users ||--o{ tenant_user_stations : "station assignments"
     stations ||--o{ tenant_user_stations : "assigned staff"
+    branches ||--o{ orders : "orders"
+    branch_tables ||--o{ orders : "orders"
+    tenant_users |o--o{ orders : "captain or responder"
+    orders ||--o{ order_items : "items"
+    products |o--o{ order_items : "snapshot source"
+    product_sizes |o--o{ order_items : "snapshot source"
+    stations |o--o{ order_items : "routing snapshot"
+    order_items ||--o{ order_item_addons : "add-ons"
+    product_addons |o--o{ order_item_addons : "snapshot source"
+    branches ||--o{ order_number_counters : "counters"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -445,12 +493,74 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 - `revoked_at timestamptz NULL`; `revoked_reason text NULL` (CHECK length 1..64 when present) — `ck_refresh_tokens_revoked_reason_labels` limits values to the Master design's proposed closed list `('logout', 'reuse_detected', 'admin_revoked')`. **Proposed, pending owner confirmation**: `ck_refresh_tokens_revocation_pair CHECK ((revoked_at IS NULL AND revoked_reason IS NULL) OR (revoked_at IS NOT NULL AND revoked_reason IS NOT NULL))`, matching the Master design; rejected alternative: a one-directional check that allows a reason without a revocation time.
 - State is derived from `rotated_at`, `revoked_at`, and `expires_at`; no status column is stored. Rows are retained as security history and are not physically deleted by ordinary workflows (PRD section 9, rule 23); cleanup of expired families is later work.
 
+### orders
+
+Purpose: one guest or captain submission from a table QR (FR-ORD-001 through FR-ORD-010) with its branch, table, cafe-local business date, per-branch order number, service type, status, server-computed total, opaque public reference, and the decision fields the later handling story fills. Rows are never physically deleted; the status column carries the lifecycle.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_orders`.
+- `branch_id uuid NOT NULL` — `fk_orders_branch_id` to `branches.id` (ON DELETE RESTRICT). The branch is the first column of both `uq_orders_branch_business_date_number` and `ix_orders_branch_id_status_submitted_at`, so the foreign key is covered by those indexes.
+- `table_id uuid NOT NULL` — `fk_orders_table_id` to `branch_tables.id` (ON DELETE RESTRICT); `ix_orders_table_id`. A Takeaway order still starts from a table QR, so the table is never null and never comes from the request body.
+- `order_number integer NOT NULL` — `ck_orders_order_number CHECK (order_number >= 1)`. One number per branch per business date, shared by every item of the order (Proposed, pending owner confirmation: it resets each cafe-local day; rejected alternatives: one global sequence shared by all dates, and an hourly reset). `IOrderNumberAllocator` assigns it before insert.
+- `business_date date NOT NULL` — the cafe-local calendar date derived from `cafe_settings.timezone` and `TimeProvider` at submission; it is part of the numbering key, never a client value.
+- `service_type text NOT NULL` — `ck_orders_service_type` over `('DineIn', 'Takeaway')`.
+- `status text NOT NULL DEFAULT 'Pending'` — `ck_orders_status` over `('Pending', 'Accepted', 'Rejected', 'Expired')`.
+- `source text NOT NULL` — `ck_orders_source` over `('Guest', 'Captain')`; the same use case serves both, and only the Captain flow sets `placed_by_user_id`.
+- `guest_display_name text NOT NULL` — `ck_orders_guest_display_name_length CHECK (char_length(guest_display_name) BETWEEN 1 AND 64)`; trimmed, no control characters, and the only personal data a guest supplies (FR-IAM-004; guest data minimization TBD-10).
+- `guest_device_id text NULL` — `ck_orders_guest_device_id_format CHECK (guest_device_id IS NULL OR (char_length(guest_device_id) BETWEEN 16 AND 64 AND guest_device_id ~ '^[A-Za-z0-9_-]+$'))`; an untrusted client identifier that no authorization decision reads and that is never logged.
+- `placed_by_user_id uuid NULL` — `fk_orders_placed_by_user_id` to `tenant_users.id` (ON DELETE RESTRICT); `ix_orders_placed_by_user_id`. NULL for a guest submission.
+- `public_reference text NOT NULL` — `ck_orders_public_reference_format CHECK (char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$')`; 16 random bytes encoded base64url, and `uq_orders_public_reference` keeps it unique. It is the only identifier a guest receives back.
+- `idempotency_key text NOT NULL` — `ck_orders_idempotency_key_length CHECK (char_length(idempotency_key) BETWEEN 1 AND 128)`; `uq_orders_branch_idempotency_key` on `(branch_id, idempotency_key)` makes a replay return the stored order.
+- `request_hash text NULL` — `ck_orders_request_hash_format CHECK (request_hash IS NULL OR request_hash ~ '^[0-9a-f]{64}$')`; the lowercase hex SHA-256 of the normalized submission, so a repeat under the same idempotency key with a different payload is refused instead of returning the wrong order (CFMD-406). Present from this migration so the idempotency story needs no second schema change.
+- `total_amount numeric(12,2) NOT NULL` — `ck_orders_total_amount_range CHECK (total_amount >= 0)`; always recomputed on the server from current sizes and add-ons.
+- `submitted_at timestamptz NOT NULL`, `response_deadline timestamptz NOT NULL` — `ck_orders_response_deadline CHECK (response_deadline > submitted_at)`. The deadline is the submission time plus the `Orders:ResponseWindowSeconds` window (Proposed default 300, pending owner confirmation).
+- `responded_by_user_id uuid NULL`, `responded_at timestamptz NULL`, `rejection_reason text NULL` — the decision fields of the later handling story. `ix_orders_responded_by_user_id` covers the foreign key to `tenant_users.id` (ON DELETE RESTRICT). `ck_orders_decision_pair CHECK ((responded_at IS NULL AND responded_by_user_id IS NULL) OR (responded_at IS NOT NULL AND responded_by_user_id IS NOT NULL))` keeps the pair consistent, and `ck_orders_rejection_reason CHECK (rejection_reason IS NULL OR (status = 'Rejected' AND char_length(rejection_reason) BETWEEN 1 AND 256))` limits a reason to a rejected order.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_orders_created_by` / `fk_orders_updated_by` with ON DELETE RESTRICT and its own index.
+- `xmin` row version — the aggregate concurrency token.
+- Unique keys: `uq_orders_branch_business_date_number` on `(branch_id, business_date, order_number)`, `uq_orders_public_reference`, `uq_orders_branch_idempotency_key` on `(branch_id, idempotency_key)`. Lookup index: `ix_orders_branch_id_status_submitted_at` on `(branch_id, status, submitted_at)` for the staff queue.
+
+### order_items
+
+Purpose: the immutable priced snapshot of one submitted line, so later catalog edits never rewrite history and the kitchen keeps the exact name, size, price, quantity, and routing it received. Rows are never updated after submission.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_order_items`.
+- `order_id uuid NOT NULL` — `fk_order_items_order_id` to `orders.id` (ON DELETE RESTRICT); `ix_order_items_order_id`.
+- `line_number integer NOT NULL` — `ck_order_items_line_number CHECK (line_number >= 1)`; `uq_order_items_order_id_line_number` on `(order_id, line_number)` keeps the submitted order stable when the guest and the kitchen read it.
+- `product_id uuid NULL`, `product_size_id uuid NULL` — nullable reporting references to `products.id` and `product_sizes.id` (`fk_order_items_product_id`, `fk_order_items_product_size_id`, both ON DELETE RESTRICT, each indexed). Catalogs deactivate rather than delete, so these references never block a deactivation, and a snapshot survives even if a reference is cleared.
+- `station_id uuid NULL` — the preparation station captured at submission (`fk_order_items_station_id`, ON DELETE RESTRICT); `ix_order_items_station_id`. NULL when the product had no routing when the order was placed.
+- `product_name text NOT NULL` (CHECK 1..96, `ck_order_items_product_name_length`), `size_name text NOT NULL` (CHECK 1..32, `ck_order_items_size_name_length`) — the snapshot labels.
+- `unit_price numeric(12,2) NOT NULL` — `ck_order_items_unit_price_range CHECK (unit_price >= 0)`; the size price at submission.
+- `quantity integer NOT NULL` — `ck_order_items_quantity_range CHECK (quantity BETWEEN 1 AND 50)`.
+- `line_total numeric(12,2) NOT NULL` — `ck_order_items_line_total_range CHECK (line_total >= 0)`; `quantity * unit_price` plus that line's add-on prices, computed on the server.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each indexed with ON DELETE RESTRICT.
+
+### order_item_addons
+
+Purpose: the immutable snapshot of one add-on chosen for an order line.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_order_item_addons`.
+- `order_item_id uuid NOT NULL` — `fk_order_item_addons_order_item_id` to `order_items.id` (ON DELETE RESTRICT); `ix_order_item_addons_order_item_id`.
+- `product_addon_id uuid NULL` — nullable reporting reference to `product_addons.id` (`fk_order_item_addons_product_addon_id`, ON DELETE RESTRICT, indexed); it never blocks an add-on deactivation.
+- `addon_name text NOT NULL` — the snapshot label (CHECK 1..48, `ck_order_item_addons_name_length`).
+- `price numeric(12,2) NOT NULL` — `ck_order_item_addons_price_range CHECK (price >= 0)`; the add-on price at submission.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each indexed with ON DELETE RESTRICT.
+
+### order_number_counters
+
+Purpose: the per-branch, per-business-date counter that hands out order numbers (Proposed). It exists so numbering is atomic without scanning `orders`, and it is the only mutable row the submission path locks.
+
+- `branch_id uuid NOT NULL` — `fk_order_number_counters_branch_id` to `branches.id` (ON DELETE RESTRICT).
+- `business_date date NOT NULL` — the cafe-local date; together with the branch it forms `pk_order_number_counters`.
+- `last_number integer NOT NULL` — `ck_order_number_counters_last_number CHECK (last_number >= 1)`; the highest number already handed out for that branch and date.
+- `updated_at timestamptz NOT NULL` — the moment of the last increment.
+- No `created_at`, `created_by`, or `updated_by`: the counter is derived infrastructure state, not an audited business row.
+- Allocation is one statement inside the order transaction: `INSERT INTO order_number_counters (branch_id, business_date, last_number, updated_at) VALUES (..., 1, ...) ON CONFLICT (branch_id, business_date) DO UPDATE SET last_number = order_number_counters.last_number + 1, updated_at = EXCLUDED.updated_at RETURNING last_number`. The conflicting insert holds the row lock until the transaction commits, so concurrent submissions serialize and committed orders never share a number.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
-- Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
+- Ordering beyond the schema — order status read for guests, staff accept/reject handling, captain (assisted) ordering endpoints, and expiry of unanswered orders (FR-ORD-001 through FR-ORD-010) remain later work; the `orders`, `order_items`, `order_item_addons`, and `order_number_counters` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).

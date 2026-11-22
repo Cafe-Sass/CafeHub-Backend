@@ -43,6 +43,10 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",
+            "orders",
+            "order_items",
+            "order_item_addons",
+            "order_number_counters",
         ];
 
         [Fact]
