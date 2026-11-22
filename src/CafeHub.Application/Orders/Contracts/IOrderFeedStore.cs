@@ -10,5 +10,11 @@ namespace CafeHub.Application.Orders.Contracts
     public interface IOrderFeedStore
     {
         Task<OrderFeedPage> ListFeedAsync(OrderFeedListRequest request, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Finds one order with its items. A null branch id (the owner path) searches every branch; a staff
+        /// caller always passes their own branch, so a foreign order is indistinguishable from a missing one.
+        /// </summary>
+        Task<OrderFeedEntry?> FindByIdAsync(Guid? branchId, Guid orderId, CancellationToken cancellationToken);
     }
 }
