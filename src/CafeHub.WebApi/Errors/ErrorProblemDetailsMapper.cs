@@ -88,7 +88,7 @@ namespace CafeHub.WebApi.Errors
             problemDetails.Extensions["code"] = error.Code;
             problemDetails.Extensions["traceId"] = traceIdentifier;
             AddCorrelationId(problemDetails.Extensions, correlationId);
-            AddDetails(problemDetails.Extensions, error.Details);
+            AddDetails(problemDetails.Extensions, error);
 
             return problemDetails;
         }
@@ -107,15 +107,19 @@ namespace CafeHub.WebApi.Errors
             problemDetails.Extensions["code"] = error.Code;
             problemDetails.Extensions["traceId"] = traceIdentifier;
             AddCorrelationId(problemDetails.Extensions, correlationId);
-            AddDetails(problemDetails.Extensions, error.Details);
+            AddDetails(problemDetails.Extensions, error);
 
             return problemDetails;
         }
 
-        private static void AddDetails(
-            IDictionary<string, object?> extensions, IReadOnlyDictionary<string, object?> details)
+        private static void AddDetails(IDictionary<string, object?> extensions, Error error)
         {
-            foreach (var detail in details)
+            if (error is not IErrorDetails detailed)
+            {
+                return;
+            }
+
+            foreach (var detail in detailed.Details)
             {
                 extensions[detail.Key] = detail.Value;
             }

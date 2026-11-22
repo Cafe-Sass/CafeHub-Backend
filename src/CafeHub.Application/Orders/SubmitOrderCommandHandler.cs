@@ -1,7 +1,7 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
-using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Idempotency;
+using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
 using CafeHub.Domain.Tenants;

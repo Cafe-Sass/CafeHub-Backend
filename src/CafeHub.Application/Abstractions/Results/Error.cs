@@ -25,9 +25,6 @@ namespace CafeHub.Application.Abstractions.Results
 
         public ErrorType Type { get; }
 
-        public IReadOnlyDictionary<string, object?> Details { get; init; } =
-            new Dictionary<string, object?>();
-
         public static Error Failure(string code, string message)
         {
             return new Error(code, message, ErrorType.Failure);

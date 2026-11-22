@@ -12,25 +12,12 @@ namespace CafeHub.Application.Orders
         public const string ItemsExtension = "items";
         public const string TotalExtension = "currentTotal";
 
-        public static Error PriceChanged(
+        public static OrderSubmissionError PriceChanged(
             IReadOnlyList<OrderPriceChange> changes, decimal currentTotal) =>
-            Error.Conflict(PriceChangedCode, "The menu changed since it was read. Reload the menu and try again.") with
-            {
-                Details = new Dictionary<string, object?>
-                {
-                    [ItemsExtension] = changes,
-                    [TotalExtension] = currentTotal,
-                },
-            };
+            OrderSubmissionError.PriceChanged(changes, currentTotal);
 
-        public static Error ProductUnavailable(IReadOnlyList<OrderUnavailableItem> items) =>
-            Error.Conflict(ProductUnavailableCode, "One or more products are not available.") with
-            {
-                Details = new Dictionary<string, object?>
-                {
-                    [ItemsExtension] = items,
-                },
-            };
+        public static OrderSubmissionError ProductUnavailable(IReadOnlyList<OrderUnavailableItem> items) =>
+            OrderSubmissionError.ProductUnavailable(items);
 
         public static Error OrderNumberConflict() =>
             Error.Conflict(OrderNumberConflictCode, "The order could not be numbered. Try again.");
