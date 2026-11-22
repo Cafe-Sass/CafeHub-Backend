@@ -11,6 +11,7 @@ namespace CafeHub.Application.Orders.DTOs
         string GuestDisplayName,
         DateTimeOffset SubmittedAt,
         DateTimeOffset ResponseDeadline,
+        DateTimeOffset UpdatedAt,
         decimal TotalAmount,
         IReadOnlyList<OrderFeedItemLine> Items)
     {
@@ -23,6 +24,7 @@ namespace CafeHub.Application.Orders.DTOs
             entry.GuestDisplayName,
             entry.SubmittedAt,
             entry.ResponseDeadline,
+            entry.UpdatedAt,
             entry.TotalAmount,
             entry.Items
                 .Select(item => new OrderFeedItemLine(

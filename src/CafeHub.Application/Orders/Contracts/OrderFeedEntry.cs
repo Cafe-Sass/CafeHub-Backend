@@ -9,6 +9,7 @@ namespace CafeHub.Application.Orders.Contracts
         string GuestDisplayName,
         DateTimeOffset SubmittedAt,
         DateTimeOffset ResponseDeadline,
+        DateTimeOffset UpdatedAt,
         decimal TotalAmount,
         IReadOnlyList<OrderFeedEntryItem> Items);
 }

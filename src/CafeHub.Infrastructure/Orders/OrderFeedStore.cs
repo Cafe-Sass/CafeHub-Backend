@@ -74,6 +74,7 @@ namespace CafeHub.Infrastructure.Orders
                 order.GuestDisplayName,
                 order.SubmittedAt,
                 order.ResponseDeadline,
+                order.UpdatedAt,
                 order.TotalAmount,
                 order.Items
                     .OrderBy(item => item.LineNumber)
