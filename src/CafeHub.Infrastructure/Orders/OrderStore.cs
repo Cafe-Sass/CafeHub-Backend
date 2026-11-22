@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Idempotency;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Domain.Tenants;
@@ -13,6 +14,10 @@ namespace CafeHub.Infrastructure.Orders
     {
         private const string PublicReferenceIndex = "uq_orders_public_reference";
         private const string OrderNumberIndex = "uq_orders_branch_business_date_number";
+        private const string IdempotencyIndex = "uq_orders_branch_idempotency_key";
+        private const string SavepointSql = "SAVEPOINT order_insert";
+        private const string ReleaseSavepointSql = "RELEASE SAVEPOINT order_insert";
+        private const string RollbackSavepointSql = "ROLLBACK TO SAVEPOINT order_insert";
 
         public async Task<OrderCatalog> LoadCatalogAsync(
             Guid branchId,
@@ -75,6 +80,12 @@ namespace CafeHub.Infrastructure.Orders
         {
             ArgumentNullException.ThrowIfNull(order);
 
+            var usesSavepoint = context.Database.CurrentTransaction is not null;
+            if (usesSavepoint)
+            {
+                await context.Database.ExecuteSqlRawAsync(SavepointSql, cancellationToken);
+            }
+
             context.Orders.Add(order);
             try
             {
@@ -86,6 +97,16 @@ namespace CafeHub.Infrastructure.Orders
             } violation)
             {
                 context.Entry(order).State = EntityState.Detached;
+                if (usesSavepoint)
+                {
+                    await context.Database.ExecuteSqlRawAsync(RollbackSavepointSql, cancellationToken);
+                }
+
+                if (violation.ConstraintName == IdempotencyIndex)
+                {
+                    return await ResolveIdempotencyAsync(order, cancellationToken);
+                }
+
                 if (violation.ConstraintName == PublicReferenceIndex)
                 {
                     return Result.Failure<SubmitOrderResult>(OrdersErrors.ReferenceConflict());
@@ -99,12 +120,59 @@ namespace CafeHub.Infrastructure.Orders
                 throw;
             }
 
-            return Result.Success(new SubmitOrderResult(
-                order.OrderNumber,
-                order.PublicReference,
-                order.Status.ToString(),
-                order.TotalAmount,
-                order.ResponseDeadline));
+            if (usesSavepoint)
+            {
+                await context.Database.ExecuteSqlRawAsync(ReleaseSavepointSql, cancellationToken);
+            }
+
+            return Result.Success(ToResult(order));
         }
+
+        public async Task<StoredOrder?> FindByIdempotencyKeyAsync(
+            Guid branchId, string idempotencyKey, CancellationToken cancellationToken)
+        {
+            var row = await context.Orders.AsNoTracking()
+                .Where(order => order.BranchId == branchId && order.IdempotencyKey == idempotencyKey)
+                .Select(order => new
+                {
+                    order.RequestHash,
+                    order.OrderNumber,
+                    order.PublicReference,
+                    order.Status,
+                    order.TotalAmount,
+                    order.ResponseDeadline,
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return row is null
+                ? null
+                : new StoredOrder(
+                    row.RequestHash,
+                    new SubmitOrderResult(
+                        row.OrderNumber,
+                        row.PublicReference,
+                        row.Status.ToString(),
+                        row.TotalAmount,
+                        row.ResponseDeadline));
+        }
+
+        private async Task<Result<SubmitOrderResult>> ResolveIdempotencyAsync(
+            Order order, CancellationToken cancellationToken)
+        {
+            var existing = await FindByIdempotencyKeyAsync(
+                order.BranchId, order.IdempotencyKey, cancellationToken);
+            if (existing is null)
+            {
+                return Result.Failure<SubmitOrderResult>(IdempotencyErrors.KeyReused());
+            }
+
+            return string.Equals(existing.RequestHash, order.RequestHash, StringComparison.Ordinal)
+                ? Result.Success(existing.Result)
+                : Result.Failure<SubmitOrderResult>(IdempotencyErrors.KeyReused());
+        }
+
+        private static SubmitOrderResult ToResult(Order order) =>
+            new(order.OrderNumber, order.PublicReference, order.Status.ToString(),
+                order.TotalAmount, order.ResponseDeadline);
     }
 }

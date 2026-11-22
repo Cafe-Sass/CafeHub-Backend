@@ -16,5 +16,8 @@ namespace CafeHub.Application.Orders.Contracts
             CancellationToken cancellationToken);
 
         Task<Result<SubmitOrderResult>> AddAsync(Order order, CancellationToken cancellationToken);
+
+        Task<StoredOrder?> FindByIdempotencyKeyAsync(
+            Guid branchId, string idempotencyKey, CancellationToken cancellationToken);
     }
 }

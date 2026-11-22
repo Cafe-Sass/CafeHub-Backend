@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Orders.Contracts;
+using CafeHub.Application.Idempotency;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
 using CafeHub.Domain.Tenants;
@@ -31,6 +32,18 @@ namespace CafeHub.Application.Orders
             }
 
             var qr = context.Value;
+            var requestHash = OrderRequestHash.Compute(
+                qr.TableId, command.ServiceType, command.Source, command.GuestDisplayName, command.Lines);
+
+            var replay = await store.FindByIdempotencyKeyAsync(
+                qr.BranchId, command.IdempotencyKey!, cancellationToken);
+            if (replay is not null)
+            {
+                return string.Equals(replay.RequestHash, requestHash, StringComparison.Ordinal)
+                    ? Result.Success(replay.Result)
+                    : Result.Failure<SubmitOrderResult>(IdempotencyErrors.KeyReused());
+            }
+
             var catalog = await store.LoadCatalogAsync(
                 qr.BranchId,
                 command.Lines.Select(line => line.ProductId).Distinct().ToArray(),
@@ -47,7 +60,7 @@ namespace CafeHub.Application.Orders
 
             for (var attempt = 0; attempt < MaximumReferenceAttempts; attempt++)
             {
-                var order = CreateOrder(command, qr, allocation, priced.Value, placedByUserId, now);
+                var order = CreateOrder(command, qr, allocation, priced.Value, placedByUserId, now, requestHash);
                 var added = await store.AddAsync(order, cancellationToken);
                 if (added.IsSuccess)
                 {
@@ -69,7 +82,8 @@ namespace CafeHub.Application.Orders
             OrderNumberAllocation allocation,
             PricedOrder priced,
             Guid? placedByUserId,
-            DateTimeOffset now)
+            DateTimeOffset now,
+            string requestHash)
         {
             var items = priced.Lines
                 .Select(line => OrderItem.Create(
@@ -108,7 +122,7 @@ namespace CafeHub.Application.Orders
                 placedByUserId,
                 referenceGenerator.Generate(),
                 command.IdempotencyKey!,
-                null,
+                requestHash,
                 now,
                 now.AddSeconds(options.ResponseWindowSeconds),
                 items,
