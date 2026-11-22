@@ -34,7 +34,9 @@ namespace CafeHub.WebApi.Tenancy
                 return;
             }
 
-            if (IsGuestQr(context) && !BranchTable.IsValidQrCode(context.Request.RouteValues["code"] as string))
+            if (IsGuestQr(context)
+                && context.Request.RouteValues.TryGetValue("code", out var routeCode)
+                && !BranchTable.IsValidQrCode(routeCode as string))
             {
                 await GuestQrProblem.WriteNotFoundAsync(context, correlationIdAccessor, context.RequestAborted);
                 return;
