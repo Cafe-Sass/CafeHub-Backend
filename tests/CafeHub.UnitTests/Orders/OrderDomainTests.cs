@@ -206,6 +206,36 @@ namespace CafeHub.UnitTests.Orders
             Assert.Throws<InvalidOperationException>(() => order.Reject(Actor, "out of oat milk", Now));
         }
 
+        [Fact]
+        public void Expire_AtTheDeadlineExpiresTheOrder()
+        {
+            var order = CreateOrder();
+
+            order.Expire(Now.AddMinutes(5));
+
+            Assert.Equal(OrderStatus.Expired, order.Status);
+            Assert.Equal(Now.AddMinutes(5), order.UpdatedAt);
+            Assert.Null(order.UpdatedBy);
+            Assert.Null(order.RespondedByUserId);
+        }
+
+        [Fact]
+        public void Expire_OneSecondBeforeTheDeadlineIsRefused()
+        {
+            var order = CreateOrder();
+
+            Assert.Throws<InvalidOperationException>(() => order.Expire(Now.AddMinutes(5).AddSeconds(-1)));
+        }
+
+        [Fact]
+        public void Expire_OnlyAPendingOrderCanBeExpired()
+        {
+            var order = CreateOrder();
+            order.Accept(Actor, Now);
+
+            Assert.Throws<InvalidOperationException>(() => order.Expire(Now));
+        }
+
         [Theory]
         [InlineData(null, false)]
         [InlineData("", false)]
