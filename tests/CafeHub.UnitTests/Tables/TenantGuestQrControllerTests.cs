@@ -4,6 +4,9 @@ using System.Reflection;
 using System.Text.Json;
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Menu.DTOs;
+using CafeHub.Application.Menu.Queries;
+using CafeHub.Application.Pagination;
 using CafeHub.Application.Tables;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
@@ -51,6 +54,70 @@ namespace CafeHub.UnitTests.Tables
 
             Assert.Same(context, Assert.IsType<OkObjectResult>(result.Result).Value);
             Assert.Equal(Code, Assert.IsType<ResolveGuestQrQuery>(sender.LastRequest).Code);
+        }
+
+        [Fact]
+        public async Task Menu_IsExplicitlyAnonymousAndSendsTheRouteCode()
+        {
+            var action = typeof(TenantGuestQrController).GetMethod(nameof(TenantGuestQrController.Menu))!;
+            Assert.NotNull(action.GetCustomAttribute<AllowAnonymousAttribute>());
+            Assert.Equal("{code}/menu", action.GetCustomAttribute<HttpGetAttribute>()?.Template);
+            var page = OffsetPage<GuestMenuItemResponse>.Create([], 1, 20, null);
+            var sender = new RecordingSender { Response = Result.Success(page) };
+            var controller = new TenantGuestQrController(sender, new FixedCorrelationIdAccessor(null));
+
+            var result = await controller.Menu("test-cafe", Code, new GetGuestMenuQuery { Search = "latte" }, default);
+
+            Assert.Same(page, Assert.IsType<OkObjectResult>(result.Result).Value);
+            var sent = Assert.IsType<GetGuestMenuQuery>(sender.LastRequest);
+            Assert.Equal(Code, sent.Code);
+            Assert.Equal("latte", sent.Search);
+        }
+
+        [Fact]
+        public async Task Menu_InvalidCodeReturnsTheSameNotFoundBodyAsTheResolveEndpoint()
+        {
+            var context = CreateContext();
+            var controller = new TenantGuestQrController(
+                new RecordingSender
+                {
+                    Response = Result.Failure<OffsetPage<GuestMenuItemResponse>>(GuestQrErrors.NotFound()),
+                },
+                new FixedCorrelationIdAccessor("correlation-menu-test"))
+            {
+                ControllerContext = new ControllerContext { HttpContext = context },
+            };
+
+            var result = await controller.Menu("test-cafe", Code, new GetGuestMenuQuery(), default);
+
+            Assert.IsType<EmptyResult>(result.Result);
+            Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+            Assert.Equal("application/problem+json", context.Response.ContentType);
+            var body = ReadBody(context);
+            Assert.DoesNotContain(Code, body);
+            using var problem = JsonDocument.Parse(body);
+            Assert.Equal("GuestQr.NotFound", problem.RootElement.GetProperty("code").GetString());
+        }
+
+        [Fact]
+        public async Task Menu_InvalidFilterReturnsAValidationProblem()
+        {
+            var context = CreateContext();
+            var controller = new TenantGuestQrController(
+                new RecordingSender
+                {
+                    Response = Result.Failure<OffsetPage<GuestMenuItemResponse>>(
+                        PaginationErrors.SortFieldIsNotAllowed("bestselling")),
+                },
+                new FixedCorrelationIdAccessor("correlation-menu-test"))
+            {
+                ControllerContext = new ControllerContext { HttpContext = context },
+            };
+
+            var result = await controller.Menu("test-cafe", Code, new GetGuestMenuQuery { Sort = "bestselling" }, default);
+
+            var problem = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         }
 
         [Theory]
@@ -129,6 +196,26 @@ namespace CafeHub.UnitTests.Tables
                 Assert.Equal(1, resolver.CallCount);
                 Assert.Equal(1, sender.CallCount);
             }
+        }
+
+        [Fact]
+        public async Task MenuPath_RoutesToTheMenuActionAndSharesTheGuestNotFoundContract()
+        {
+            var resolver = new StubTenantResolver(TenantLifecycleStatus.Active);
+            var sender = new RecordingSender
+            {
+                Response = Result.Failure<OffsetPage<GuestMenuItemResponse>>(GuestQrErrors.NotFound()),
+            };
+            await using var app = CreateApp(resolver, sender, permitLimit: 10);
+            var pipeline = ((IApplicationBuilder)app).Build();
+
+            var response = await SendAsync(app, pipeline, $"/t/test-cafe/api/v1/guest/qr/{Code}/menu");
+
+            Assert.Equal(StatusCodes.Status404NotFound, response.Response.StatusCode);
+            Assert.Equal(1, sender.CallCount);
+            Assert.IsType<GetGuestMenuQuery>(sender.LastRequest);
+            Assert.Equal("no-store", response.Response.Headers.CacheControl.ToString());
+            Assert.DoesNotContain(Code, ReadBody(response));
         }
 
         [Theory]
