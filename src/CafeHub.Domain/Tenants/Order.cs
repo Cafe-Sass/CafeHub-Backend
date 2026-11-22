@@ -192,6 +192,30 @@ namespace CafeHub.Domain.Tenants
             return order;
         }
 
+        public void Accept(Guid responderId, DateTimeOffset now) =>
+            ApplyDecision(responderId, OrderStatus.Accepted, null, now);
+
+        private void ApplyDecision(Guid responderId, OrderStatus status, string? rejectionReason, DateTimeOffset now)
+        {
+            if (responderId == Guid.Empty)
+            {
+                throw new ArgumentException("The responder id is required.", nameof(responderId));
+            }
+
+            if (Status is not OrderStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    $"Only pending orders can be decided. The current status is {Status}.");
+            }
+
+            Status = status;
+            RespondedByUserId = responderId;
+            RespondedAt = now;
+            RejectionReason = rejectionReason;
+            UpdatedAt = now;
+            UpdatedBy = responderId;
+        }
+
         public static bool IsValidGuestDisplayName(string? name)
         {
             var trimmed = name?.Trim();
