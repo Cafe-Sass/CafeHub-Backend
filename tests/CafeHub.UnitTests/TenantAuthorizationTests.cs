@@ -215,8 +215,13 @@ namespace CafeHub.UnitTests
                 {
                     if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestQrController))
                     {
-                        Assert.Equal(nameof(TenantGuestQrController.Resolve), action.MethodInfo.Name);
-                        Assert.Equal("t/{slug}/api/v1/guest/qr/{**code}", action.AttributeRouteInfo?.Template);
+                        Assert.Contains(action.MethodInfo.Name,
+                            new[] { nameof(TenantGuestQrController.Resolve), nameof(TenantGuestQrController.Menu) });
+                        Assert.Contains(action.AttributeRouteInfo?.Template, new[]
+                        {
+                            "t/{slug}/api/v1/guest/qr/{**code}",
+                            "t/{slug}/api/v1/guest/qr/{code}/menu",
+                        });
                     }
                     else
                     {
