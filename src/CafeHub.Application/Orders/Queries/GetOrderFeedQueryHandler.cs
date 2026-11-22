@@ -43,7 +43,8 @@ namespace CafeHub.Application.Orders.Queries
             if (!string.IsNullOrWhiteSpace(query.Status))
             {
                 if (!Enum.TryParse<OrderStatus>(query.Status, ignoreCase: true, out var parsed)
-                    || !Enum.IsDefined(parsed))
+                    || !Enum.IsDefined(parsed)
+                    || !parsed.ToString().Equals(query.Status, StringComparison.OrdinalIgnoreCase))
                 {
                     return Result.Failure<OffsetPage<OrderFeedItem>>(OrdersErrors.StatusInvalid());
                 }

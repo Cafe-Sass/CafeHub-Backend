@@ -153,13 +153,15 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(expected, store.LastListRequest!.Status);
         }
 
-        [Fact]
-        public async Task Feed_AnUnknownStatusIsRefused()
+        [Theory]
+        [InlineData("Delivering")]
+        [InlineData("1")]
+        public async Task Feed_AnUnknownStatusIsRefused(string status)
         {
             var store = new FakeOrderFeedStore(_ => new OrderFeedPage([], null));
             var handler = CreateFeedHandler(store, StaffUser(BranchId), new FakeStationScope(null));
 
-            var result = await handler.Handle(new GetOrderFeedQuery { Status = "Delivering" }, default);
+            var result = await handler.Handle(new GetOrderFeedQuery { Status = status }, default);
 
             Assert.False(result.IsSuccess);
             Assert.Equal(OrdersErrors.StatusInvalidCode, result.Error!.Code);
@@ -324,7 +326,7 @@ namespace CafeHub.UnitTests.Orders
 
             public IReadOnlyCollection<string> Roles => [];
 
-            public Guid? BranchId => accountAccess?.BranchId;
+            public Guid? BranchId => AccountAccess?.BranchId;
 
             public TenantAccountAccess? AccountAccess { get; } = accountAccess;
         }
