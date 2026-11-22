@@ -84,6 +84,8 @@ namespace CafeHub.Infrastructure.Audit
                     "BranchId",
                     "AssignmentId",
                     "StationId",
+                    "IsAvailable",
+                    "ReasonCode",
                 },
             };
 
