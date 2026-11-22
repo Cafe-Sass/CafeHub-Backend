@@ -26,6 +26,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<CafeSettings> CafeSettings => Set<CafeSettings>();
         public DbSet<TenantAuditRecord> TenantAuditRecords => Set<TenantAuditRecord>();
         public DbSet<TenantRefreshToken> TenantRefreshTokens => Set<TenantRefreshToken>();
+        public DbSet<Order> Orders => Set<Order>();
+        public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+        public DbSet<OrderItemAddon> OrderItemAddons => Set<OrderItemAddon>();
+        public DbSet<OrderNumberCounter> OrderNumberCounters => Set<OrderNumberCounter>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

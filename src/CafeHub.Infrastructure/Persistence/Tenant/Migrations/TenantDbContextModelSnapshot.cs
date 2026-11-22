@@ -398,6 +398,377 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("GuestDeviceId")
+                        .HasColumnType("text")
+                        .HasColumnName("guest_device_id");
+
+                    b.Property<string>("GuestDisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("guest_display_name");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<int>("OrderNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_number");
+
+                    b.Property<Guid?>("PlacedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("placed_by_user_id");
+
+                    b.Property<string>("PublicReference")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("public_reference");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("text")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<string>("RequestHash")
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("responded_at");
+
+                    b.Property<Guid?>("RespondedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("responded_by_user_id");
+
+                    b.Property<DateTimeOffset>("ResponseDeadline")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("response_deadline");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("service_type");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_orders");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_orders_created_by");
+
+                    b.HasIndex("PlacedByUserId")
+                        .HasDatabaseName("ix_orders_placed_by_user_id");
+
+                    b.HasIndex("PublicReference")
+                        .IsUnique()
+                        .HasDatabaseName("uq_orders_public_reference");
+
+                    b.HasIndex("RespondedByUserId")
+                        .HasDatabaseName("ix_orders_responded_by_user_id");
+
+                    b.HasIndex("TableId")
+                        .HasDatabaseName("ix_orders_table_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_orders_updated_by");
+
+                    b.HasIndex("BranchId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_orders_branch_idempotency_key");
+
+                    b.HasIndex("BranchId", "BusinessDate", "OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_orders_branch_business_date_number");
+
+                    b.HasIndex("BranchId", "Status", "SubmittedAt")
+                        .HasDatabaseName("ix_orders_branch_id_status_submitted_at");
+
+                    b.ToTable("orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_orders_decision_pair", "(responded_at IS NULL AND responded_by_user_id IS NULL AND rejection_reason IS NULL) OR (responded_at IS NOT NULL AND responded_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_orders_guest_device_id_format", "guest_device_id IS NULL OR (char_length(guest_device_id) BETWEEN 16 AND 64 AND guest_device_id ~ '^[A-Za-z0-9_-]+$')");
+
+                            t.HasCheckConstraint("ck_orders_guest_display_name_length", "char_length(guest_display_name) BETWEEN 1 AND 64");
+
+                            t.HasCheckConstraint("ck_orders_idempotency_key_length", "char_length(idempotency_key) BETWEEN 1 AND 128");
+
+                            t.HasCheckConstraint("ck_orders_order_number", "order_number >= 1");
+
+                            t.HasCheckConstraint("ck_orders_public_reference_format", "char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$'");
+
+                            t.HasCheckConstraint("ck_orders_rejection_reason", "rejection_reason IS NULL OR (status = 'Rejected' AND char_length(rejection_reason) BETWEEN 1 AND 256)");
+
+                            t.HasCheckConstraint("ck_orders_request_hash_format", "request_hash IS NULL OR request_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_orders_response_deadline", "response_deadline > submitted_at");
+
+                            t.HasCheckConstraint("ck_orders_service_type", "service_type IN ('DineIn', 'Takeaway')");
+
+                            t.HasCheckConstraint("ck_orders_source", "source IN ('Guest', 'Captain')");
+
+                            t.HasCheckConstraint("ck_orders_status", "status IN ('Pending', 'Accepted', 'Rejected', 'Expired')");
+
+                            t.HasCheckConstraint("ck_orders_total_amount_range", "total_amount >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("line_total");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("product_name");
+
+                    b.Property<Guid?>("ProductSizeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_size_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("SizeName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("size_name");
+
+                    b.Property<Guid?>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_items");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_order_items_created_by");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_order_items_order_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_order_items_product_id");
+
+                    b.HasIndex("ProductSizeId")
+                        .HasDatabaseName("ix_order_items_product_size_id");
+
+                    b.HasIndex("StationId")
+                        .HasDatabaseName("ix_order_items_station_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_order_items_updated_by");
+
+                    b.HasIndex("OrderId", "LineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_order_items_order_id_line_number");
+
+                    b.ToTable("order_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_items_line_number", "line_number >= 1");
+
+                            t.HasCheckConstraint("ck_order_items_line_total_range", "line_total >= 0 AND line_total <= 99999999.99");
+
+                            t.HasCheckConstraint("ck_order_items_product_name_length", "char_length(product_name) BETWEEN 1 AND 96");
+
+                            t.HasCheckConstraint("ck_order_items_quantity_range", "quantity BETWEEN 1 AND 50");
+
+                            t.HasCheckConstraint("ck_order_items_size_name_length", "char_length(size_name) BETWEEN 1 AND 32");
+
+                            t.HasCheckConstraint("ck_order_items_unit_price_range", "unit_price >= 0 AND unit_price <= 99999999.99");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItemAddon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AddonName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("addon_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_item_id");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("price");
+
+                    b.Property<Guid?>("ProductAddonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_addon_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_item_addons");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_order_item_addons_created_by");
+
+                    b.HasIndex("OrderItemId")
+                        .HasDatabaseName("ix_order_item_addons_order_item_id");
+
+                    b.HasIndex("ProductAddonId")
+                        .HasDatabaseName("ix_order_item_addons_product_addon_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_order_item_addons_updated_by");
+
+                    b.ToTable("order_item_addons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_item_addons_name_length", "char_length(addon_name) BETWEEN 1 AND 48");
+
+                            t.HasCheckConstraint("ck_order_item_addons_price_range", "price >= 0 AND price <= 99999999.99");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderNumberCounter", b =>
+                {
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.Property<int>("LastNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_number");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("BranchId", "BusinessDate")
+                        .HasName("pk_order_number_counters");
+
+                    b.ToTable("order_number_counters", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_number_counters_last_number", "last_number >= 1");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1476,6 +1847,125 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("PlacedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_placed_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("RespondedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_responded_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.BranchTable", null)
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_table_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItem", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Order", null)
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_order_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_product_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.ProductSize", null)
+                        .WithMany()
+                        .HasForeignKey("ProductSizeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_product_size_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_station_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItemAddon", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_item_addons_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.OrderItem", null)
+                        .WithMany("Addons")
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_item_addons_order_item_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.ProductAddon", null)
+                        .WithMany()
+                        .HasForeignKey("ProductAddonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_item_addons_product_addon_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_item_addons_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderNumberCounter", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_number_counters_branch_id");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.MenuCategory", null)
@@ -1752,6 +2242,16 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_stations_tenant_user_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItem", b =>
+                {
+                    b.Navigation("Addons");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
