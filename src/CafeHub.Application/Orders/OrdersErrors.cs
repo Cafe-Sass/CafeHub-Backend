@@ -7,6 +7,7 @@ namespace CafeHub.Application.Orders
         public const string PriceChangedCode = "Orders.PriceChanged";
         public const string ProductUnavailableCode = "Orders.ProductUnavailable";
         public const string OrderNumberConflictCode = "Orders.NumberConflict";
+        public const string ServiceTypeInvalidCode = "Orders.ServiceTypeInvalid";
         public const string ReferenceConflictCode = "Orders.ReferenceConflict";
 
         public const string ItemsExtension = "items";
@@ -18,6 +19,9 @@ namespace CafeHub.Application.Orders
 
         public static OrderSubmissionError ProductUnavailable(IReadOnlyList<OrderUnavailableItem> items) =>
             OrderSubmissionError.ProductUnavailable(items);
+
+        public static Error InvalidServiceType() =>
+            Error.Validation(ServiceTypeInvalidCode, "The service type must be DineIn or Takeaway.");
 
         public static Error OrderNumberConflict() =>
             Error.Conflict(OrderNumberConflictCode, "The order could not be numbered. Try again.");
