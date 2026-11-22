@@ -1,15 +1,18 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Pagination;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Domain.Tenants;
+using MediatR;
 
 namespace CafeHub.Application.Orders.Queries
 {
     public sealed class GetOrderFeedQueryHandler(
+        ISender sender,
         IOrderFeedStore feedStore,
         ICurrentTenantUser currentUser,
         IStationScope stationScope,
@@ -38,6 +41,8 @@ namespace CafeHub.Application.Orders.Queries
             {
                 return Result.Failure<OffsetPage<OrderFeedItem>>(OrdersErrors.NotFound());
             }
+
+            await sender.Send(new ExpireStaleOrdersCommand(branchId, null), cancellationToken);
 
             OrderStatus? status = null;
             if (!string.IsNullOrWhiteSpace(query.Status))

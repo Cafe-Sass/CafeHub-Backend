@@ -1,13 +1,16 @@
 using System.Text.Json;
+using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders;
+using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Orders.Queries;
 using CafeHub.Application.Pagination;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Domain.Tenants;
+using MediatR;
 
 namespace CafeHub.UnitTests.Orders
 {
@@ -262,11 +265,80 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(1, result.Value!.OrderNumber);
         }
 
+        [Fact]
+        public async Task Feed_TheStaffBranchIsExpiredBeforeTheListIsBuilt()
+        {
+            var store = new FakeOrderFeedStore(_ => new OrderFeedPage([], null));
+            var sender = new FakeSender();
+            var handler = CreateFeedHandler(sender, store, StaffUser(BranchId), new FakeStationScope(null));
+
+            var result = await handler.Handle(new GetOrderFeedQuery(), default);
+
+            Assert.True(result.IsSuccess);
+            var expire = Assert.IsType<ExpireStaleOrdersCommand>(Assert.Single(sender.Sent));
+            Assert.Equal(BranchId, expire.BranchId);
+            Assert.Null(expire.OrderId);
+        }
+
+        [Fact]
+        public async Task Feed_TheOwnerExpiresThePassedBranch()
+        {
+            var store = new FakeOrderFeedStore(_ => new OrderFeedPage([], null));
+            var sender = new FakeSender();
+            var handler = CreateFeedHandler(sender, store, OwnerUser(), new FakeStationScope(null));
+
+            var result = await handler.Handle(new GetOrderFeedQuery { BranchId = BranchId }, default);
+
+            Assert.True(result.IsSuccess);
+            var expire = Assert.IsType<ExpireStaleOrdersCommand>(Assert.Single(sender.Sent));
+            Assert.Equal(BranchId, expire.BranchId);
+        }
+
         private static GetOrderFeedQueryHandler CreateFeedHandler(
             FakeOrderFeedStore store,
             FakeTenantUser user,
             FakeStationScope stations) =>
-            new(store, user, stations, new PaginationOptions { DefaultPageSize = 20, MaxPageSize = 100 });
+            new(new FakeSender(), store, user, stations, new PaginationOptions { DefaultPageSize = 20, MaxPageSize = 100 });
+
+        private static GetOrderFeedQueryHandler CreateFeedHandler(
+            FakeSender sender,
+            FakeOrderFeedStore store,
+            FakeTenantUser user,
+            FakeStationScope stations) =>
+            new(sender, store, user, stations, new PaginationOptions { DefaultPageSize = 20, MaxPageSize = 100 });
+
+        private sealed class FakeSender : ISender
+        {
+            public List<object> Sent { get; } = [];
+
+            public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+            {
+                Sent.Add(request);
+                var response = request is ExpireStaleOrdersCommand
+                    ? (TResponse)(object)Result.Success<IReadOnlyList<Guid>>(Array.Empty<Guid>())
+                    : default;
+                return Task.FromResult(response!);
+            }
+
+            public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+                where TRequest : IRequest
+            {
+                Sent.Add(request);
+                return Task.CompletedTask;
+            }
+
+            public Task<object?> Send(object request, CancellationToken cancellationToken = default)
+            {
+                Sent.Add(request);
+                return Task.FromResult<object?>(null);
+            }
+
+            public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException("The feed handler must not create streams.");
+
+            public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException("The feed handler must not create streams.");
+        }
 
         private static GetOrderQueryHandler CreateGetHandler(
             FakeOrderFeedStore store,

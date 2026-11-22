@@ -86,5 +86,28 @@ namespace CafeHub.UnitTests.Orders
             Assert.True(TenantPermissions.IsStaffGrant(TenantPermissions.OrdersDecide));
             Assert.False(TenantPermissions.IsOwnerOnly(TenantPermissions.OrdersDecide));
         }
+
+        [Fact]
+        public void MissedSummary_IsAnAuthorizedGetActionOnTheOrdersRoute()
+        {
+            var action = typeof(TenantOrdersController).GetMethod(nameof(TenantOrdersController.MissedSummary))!;
+
+            Assert.NotNull(action.GetCustomAttribute<HttpGetAttribute>());
+            Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
+            var authorize = Assert.IsType<TenantAuthorizeAttribute>(action.GetCustomAttribute<TenantAuthorizeAttribute>());
+            Assert.Equal(TenantPermissions.MissesView, authorize.Policy);
+            Assert.Equal(
+                "missed-summary",
+                action.GetCustomAttribute<HttpGetAttribute>()!.Template);
+        }
+
+        [Fact]
+        public void TheOrdersMissesViewPermissionIsGrantableToStaff()
+        {
+            Assert.Equal("orders.misses.view", TenantPermissions.MissesView);
+            Assert.Contains(TenantPermissions.MissesView, TenantPermissions.All);
+            Assert.True(TenantPermissions.IsStaffGrant(TenantPermissions.MissesView));
+            Assert.False(TenantPermissions.IsOwnerOnly(TenantPermissions.MissesView));
+        }
     }
 }

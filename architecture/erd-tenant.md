@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 25 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, and the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`).
+The Tenant model contains 27 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), and the missed-response record (`order_response_misses`, `order_response_miss_holders`).
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories.
 
@@ -188,6 +188,16 @@ erDiagram
         date business_date PK
         integer last_number
     }
+    order_response_misses {
+        uuid id PK
+        uuid order_id FK, UK
+        uuid branch_id FK
+        timestamptz expired_at
+    }
+    order_response_miss_holders {
+        uuid order_response_miss_id PK, FK
+        uuid user_id PK, FK
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
@@ -221,6 +231,10 @@ erDiagram
     order_items ||--o{ order_item_addons : "add-ons"
     product_addons |o--o{ order_item_addons : "snapshot source"
     branches ||--o{ order_number_counters : "counters"
+    orders |o--o| order_response_misses : "missed response"
+    branches ||--o{ order_response_misses : "missed responses"
+    order_response_misses ||--o{ order_response_miss_holders : "holders"
+    tenant_users ||--o{ order_response_miss_holders : "holder"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -555,12 +569,30 @@ Purpose: the per-branch, per-business-date counter that hands out order numbers 
 - No `created_at`, `created_by`, or `updated_by`: the counter is derived infrastructure state, not an audited business row.
 - Allocation is one statement inside the order transaction: `INSERT INTO order_number_counters (branch_id, business_date, last_number, updated_at) VALUES (..., 1, ...) ON CONFLICT (branch_id, business_date) DO UPDATE SET last_number = order_number_counters.last_number + 1, updated_at = EXCLUDED.updated_at RETURNING last_number`. The conflicting insert holds the row lock until the transaction commits, so concurrent submissions serialize and committed orders never share a number.
 
+### order_response_misses
+
+Purpose: the missed-response record written once when a pending order crosses its response deadline without a decision (CFMD-411, FR-ORD-008) — the branch and the expiry moment, so unanswered orders stay attributable per branch. Payroll, penalties, and deductions are out of scope. A miss is immutable after insertion; the unique key on `order_id` makes a repeat expiry harmless.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_order_response_misses`.
+- `order_id uuid NOT NULL` — `uq_order_response_misses_order_id` keeps exactly one miss per order and covers `fk_order_response_misses_order_id` to `orders.id` (ON DELETE RESTRICT).
+- `branch_id uuid NOT NULL` — `fk_order_response_misses_branch_id` to `branches.id` (ON DELETE RESTRICT); the first column of `ix_order_response_misses_branch_expired_at`.
+- `expired_at timestamptz NOT NULL` — the moment the lazy expiry first recorded the miss; the second column of `ix_order_response_misses_branch_expired_at`, which serves the missed-response summaries.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_order_response_misses_created_by` / `fk_order_response_misses_updated_by` with ON DELETE RESTRICT and its own index. The expiry command writes rows without an acting user, so both actor columns stay NULL.
+
+### order_response_miss_holders
+
+Purpose: the snapshot of the branch's active staff who held `orders.decide` at the moment a miss was first recorded (CFMD-411) — the attribution record behind the missed-response summaries. Off-shift staff are included because no attendance data exists yet (Proposed, pending owner confirmation; attendance integration is later work).
+
+- `order_response_miss_id uuid NOT NULL` — `fk_order_response_miss_holders_miss_id` to `order_response_misses.id` (ON DELETE RESTRICT); the first column of `pk_order_response_miss_holders`.
+- `user_id uuid NOT NULL` — `fk_order_response_miss_holders_user_id` to `tenant_users.id` (ON DELETE RESTRICT); the second column of the composite primary key, with `ix_order_response_miss_holders_user_id` covering the per-staff counts.
+- `created_at timestamptz NOT NULL` — the moment the snapshot row was written; the join-table audit exception (no `updated_at`, `created_by`, or `updated_by`), matching the other pure join tables.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
-- Ordering beyond the schema — order status read for guests, staff accept/reject handling, captain (assisted) ordering endpoints, and expiry of unanswered orders (FR-ORD-001 through FR-ORD-010) remain later work; the `orders`, `order_items`, `order_item_addons`, and `order_number_counters` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
+- Ordering beyond the schema — order status read for guests and captain (assisted) ordering endpoints remain later work; staff accept/reject handling and expiry of unanswered orders (FR-ORD-001 through FR-ORD-010) shipped with their own stories, and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, and `order_response_miss_holders` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).

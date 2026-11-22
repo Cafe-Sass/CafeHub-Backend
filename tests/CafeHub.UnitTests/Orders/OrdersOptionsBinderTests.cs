@@ -22,6 +22,8 @@ namespace CafeHub.UnitTests.Orders
         }
 
         [Theory]
+        [InlineData("0")]
+        [InlineData("-5")]
         [InlineData("29")]
         [InlineData("3601")]
         [InlineData("not-a-number")]

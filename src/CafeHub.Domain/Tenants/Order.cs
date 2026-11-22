@@ -200,6 +200,24 @@ namespace CafeHub.Domain.Tenants
         public void Reject(Guid responderId, string reason, DateTimeOffset now) =>
             ApplyDecision(responderId, OrderStatus.Rejected, ValidateRejectionReason(reason), now);
 
+        public void Expire(DateTimeOffset now)
+        {
+            if (Status is not OrderStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    $"Only pending orders can expire. The current status is {Status}.");
+            }
+
+            if (now < ResponseDeadline)
+            {
+                throw new InvalidOperationException("The response deadline has not elapsed yet.");
+            }
+
+            Status = OrderStatus.Expired;
+            UpdatedAt = now;
+            UpdatedBy = null;
+        }
+
         private void ApplyDecision(Guid responderId, OrderStatus status, string? rejectionReason, DateTimeOffset now)
         {
             if (responderId == Guid.Empty)

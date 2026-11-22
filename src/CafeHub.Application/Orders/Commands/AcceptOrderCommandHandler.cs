@@ -6,10 +6,12 @@ using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Domain.Tenants;
+using MediatR;
 
 namespace CafeHub.Application.Orders.Commands
 {
     public sealed class AcceptOrderCommandHandler(
+        ISender sender,
         IOrderDecisionStore decisionStore,
         ICurrentTenantUser currentUser,
         IStationScope stationScope,
@@ -24,6 +26,8 @@ namespace CafeHub.Application.Orders.Commands
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(command);
+
+            await sender.Send(new ExpireStaleOrdersCommand(null, command.OrderId), cancellationToken);
 
             var scope = TenantBranchScope.Resolve(currentUser.AccountAccess);
             if (scope.IsFailure)
@@ -51,10 +55,6 @@ namespace CafeHub.Application.Orders.Commands
             }
 
             var now = timeProvider.GetUtcNow();
-            if (now >= order.ResponseDeadline)
-            {
-                return Result.Failure<OrderDecisionResult>(OrdersErrors.ResponseWindowElapsed());
-            }
 
             order.Accept(currentUser.UserId!.Value, now);
 

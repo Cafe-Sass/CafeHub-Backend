@@ -14,7 +14,7 @@ namespace CafeHub.Application.Orders
         public const string StatusInvalidCode = "Orders.StatusInvalid";
         public const string BranchRequiredCode = "Orders.BranchRequired";
         public const string StatusConflictCode = "Orders.StatusConflict";
-        public const string ResponseWindowElapsedCode = "Orders.ResponseWindowElapsed";
+        public const string DateRangeInvalidCode = "Orders.DateRangeInvalid";
 
         public const string ItemsExtension = "items";
         public const string TotalExtension = "currentTotal";
@@ -48,10 +48,8 @@ namespace CafeHub.Application.Orders
         public static OrderDecisionError StatusConflict(OrderStatus currentStatus) =>
             OrderDecisionError.StatusConflict(currentStatus);
 
-        public static Error ResponseWindowElapsed() =>
-            Error.Conflict(
-                ResponseWindowElapsedCode,
-                "The response window has elapsed. The order can no longer be decided.");
+        public static Error DateRangeInvalid() =>
+            Error.Validation(DateRangeInvalidCode, "The summary date range must end on or after its start.");
     }
 
     public sealed record OrderPriceChange(

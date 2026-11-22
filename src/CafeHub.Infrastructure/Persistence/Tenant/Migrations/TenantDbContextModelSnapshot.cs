@@ -769,6 +769,82 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderResponseMiss", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset>("ExpiredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expired_at");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_response_misses");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_order_response_misses_created_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_order_response_misses_order_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_order_response_misses_updated_by");
+
+                    b.HasIndex("BranchId", "ExpiredAt")
+                        .HasDatabaseName("ix_order_response_misses_branch_expired_at");
+
+                    b.ToTable("order_response_misses", (string)null);
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderResponseMissHolder", b =>
+                {
+                    b.Property<Guid>("OrderResponseMissId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_response_miss_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("OrderResponseMissId", "UserId")
+                        .HasName("pk_order_response_miss_holders");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_order_response_miss_holders_user_id");
+
+                    b.ToTable("order_response_miss_holders", (string)null);
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1966,6 +2042,52 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasConstraintName("fk_order_number_counters_branch_id");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderResponseMiss", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_response_misses_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_response_misses_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_response_misses_order_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_response_misses_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderResponseMissHolder", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.OrderResponseMiss", null)
+                        .WithMany("Holders")
+                        .HasForeignKey("OrderResponseMissId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_response_miss_holders_miss_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_response_miss_holders_user_id");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.MenuCategory", null)
@@ -2252,6 +2374,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
             modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItem", b =>
                 {
                     b.Navigation("Addons");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.OrderResponseMiss", b =>
+                {
+                    b.Navigation("Holders");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
