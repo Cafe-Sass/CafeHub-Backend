@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Identity;
@@ -7,6 +8,7 @@ using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Domain.Tenants;
+using MediatR;
 
 namespace CafeHub.UnitTests.Orders
 {
@@ -117,29 +119,40 @@ namespace CafeHub.UnitTests.Orders
         }
 
         [Fact]
-        public async Task Accept_AnOrderPastItsResponseDeadlineIsRefused()
+        public async Task Accept_AStaleOrderIsExpiredFirstAndTheDecisionIsRefusedAsConflict()
         {
             var order = PendingOrder(Now.AddSeconds(-30));
+            var sender = ExpireOnSend(order, Now);
             var store = new FakeOrderDecisionStore(order);
-            var handler = CreateAcceptHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now);
+            var handler = CreateAcceptHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now, sender: sender);
 
             var result = await handler.Handle(new AcceptOrderCommand(order.Id), default);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(OrdersErrors.ResponseWindowElapsedCode, result.Error!.Code);
+            Assert.Equal(OrdersErrors.StatusConflictCode, result.Error!.Code);
+            var details = Assert.IsAssignableFrom<IErrorDetails>(result.Error);
+            Assert.Equal("Expired", details.Details[OrdersErrors.CurrentStatusExtension]);
+            Assert.Equal(OrderStatus.Expired, order.Status);
+            var expire = Assert.IsType<ExpireStaleOrdersCommand>(Assert.Single(sender.Sent));
+            Assert.Null(expire.BranchId);
+            Assert.Equal(order.Id, expire.OrderId);
         }
 
         [Fact]
         public async Task Accept_TheResponseDeadlineBoundaryIsInclusive()
         {
             var order = PendingOrder(Now);
+            var sender = ExpireOnSend(order, Now);
             var store = new FakeOrderDecisionStore(order);
-            var handler = CreateAcceptHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now);
+            var handler = CreateAcceptHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now, sender: sender);
 
             var result = await handler.Handle(new AcceptOrderCommand(order.Id), default);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(OrdersErrors.ResponseWindowElapsedCode, result.Error!.Code);
+            Assert.Equal(OrdersErrors.StatusConflictCode, result.Error!.Code);
+            var details = Assert.IsAssignableFrom<IErrorDetails>(result.Error);
+            Assert.Equal("Expired", details.Details[OrdersErrors.CurrentStatusExtension]);
+            Assert.Equal(OrderStatus.Expired, order.Status);
         }
 
         [Fact]
@@ -205,16 +218,23 @@ namespace CafeHub.UnitTests.Orders
         }
 
         [Fact]
-        public async Task Reject_AnOrderPastItsResponseDeadlineIsRefused()
+        public async Task Reject_AStaleOrderIsExpiredFirstAndTheDecisionIsRefusedAsConflict()
         {
             var order = PendingOrder(Now.AddSeconds(-30));
+            var sender = ExpireOnSend(order, Now);
             var store = new FakeOrderDecisionStore(order);
-            var handler = CreateRejectHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now);
+            var handler = CreateRejectHandler(store, StaffUser(BranchId), new RecordingAuditWriter(), Now, sender: sender);
 
             var result = await handler.Handle(new RejectOrderCommand(order.Id, "Out of oat milk"), default);
 
             Assert.False(result.IsSuccess);
-            Assert.Equal(OrdersErrors.ResponseWindowElapsedCode, result.Error!.Code);
+            Assert.Equal(OrdersErrors.StatusConflictCode, result.Error!.Code);
+            var details = Assert.IsAssignableFrom<IErrorDetails>(result.Error);
+            Assert.Equal("Expired", details.Details[OrdersErrors.CurrentStatusExtension]);
+            Assert.Equal(OrderStatus.Expired, order.Status);
+            var expire = Assert.IsType<ExpireStaleOrdersCommand>(Assert.Single(sender.Sent));
+            Assert.Null(expire.BranchId);
+            Assert.Equal(order.Id, expire.OrderId);
         }
 
         [Theory]
@@ -317,16 +337,32 @@ namespace CafeHub.UnitTests.Orders
             FakeTenantUser user,
             RecordingAuditWriter audit,
             DateTimeOffset now,
-            FakeStationScope? stations = null) =>
-            new(store, user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+            FakeStationScope? stations = null,
+            FakeSender? sender = null) =>
+            new(sender ?? new FakeSender(), store, user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
 
         private static RejectOrderCommandHandler CreateRejectHandler(
             FakeOrderDecisionStore store,
             FakeTenantUser user,
             RecordingAuditWriter audit,
             DateTimeOffset now,
-            FakeStationScope? stations = null) =>
-            new(store, user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+            FakeStationScope? stations = null,
+            FakeSender? sender = null) =>
+            new(sender ?? new FakeSender(), store, user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+
+        private static FakeSender ExpireOnSend(Order order, DateTimeOffset now) =>
+            new(request =>
+            {
+                if (request is ExpireStaleOrdersCommand expire
+                    && expire.OrderId == order.Id
+                    && order.Status == OrderStatus.Pending
+                    && order.ResponseDeadline <= now)
+                {
+                    order.Expire(now);
+                }
+
+                return null;
+            });
 
         private static FakeTenantUser StaffUser(Guid branchId) =>
             new(UserId, new TenantAccountAccess(true, null, true) { BranchId = branchId });
@@ -418,6 +454,45 @@ namespace CafeHub.UnitTests.Orders
         private sealed class FixedClock(DateTimeOffset now) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => now;
+        }
+
+        private sealed class FakeSender(Func<object, object?>? onSend = null) : ISender
+        {
+            public List<object> Sent { get; } = [];
+
+            public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+            {
+                Sent.Add(request);
+                var result = onSend?.Invoke(request);
+                if (result is not null)
+                {
+                    return Task.FromResult((TResponse)result);
+                }
+
+                var response = request is ExpireStaleOrdersCommand
+                    ? (TResponse)(object)Result.Success<IReadOnlyList<Guid>>(Array.Empty<Guid>())
+                    : default;
+                return Task.FromResult(response!);
+            }
+
+            public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+                where TRequest : IRequest
+            {
+                Sent.Add(request);
+                return Task.CompletedTask;
+            }
+
+            public Task<object?> Send(object request, CancellationToken cancellationToken = default)
+            {
+                Sent.Add(request);
+                return Task.FromResult(onSend?.Invoke(request));
+            }
+
+            public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException("The handler must not create streams.");
+
+            public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException("The handler must not create streams.");
         }
 
         private sealed class RecordingAuditWriter : ITenantAuditWriter
