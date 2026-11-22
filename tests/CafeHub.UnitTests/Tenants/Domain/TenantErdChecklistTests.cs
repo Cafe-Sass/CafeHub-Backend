@@ -32,6 +32,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "order_items",
             "order_item_addons",
             "order_number_counters",
+            "order_response_misses",
+            "order_response_miss_holders",
         ];
 
         [Fact]
@@ -77,6 +79,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "order_items" => nameof(OrderItem),
                     "order_item_addons" => nameof(OrderItemAddon),
                     "order_number_counters" => nameof(OrderNumberCounter),
+                    "order_response_misses" => nameof(OrderResponseMiss),
+                    "order_response_miss_holders" => nameof(OrderResponseMissHolder),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
