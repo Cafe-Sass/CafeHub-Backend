@@ -14,7 +14,7 @@ namespace CafeHub.Infrastructure.Provisioning
     /// </summary>
     internal sealed class NpgsqlTenantMigrationApplicator : ITenantMigrationApplicator
     {
-        private const string RoutineTargetMigrationId = "20261117233117_ExpandTask47ProductRemediation";
+        private const string RoutineTargetMigrationId = "20261122200337_AddOrderResponseMisses";
         private readonly TenantSchemaInitializerOptions _options;
 
         public NpgsqlTenantMigrationApplicator(TenantSchemaInitializerOptions options)
