@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 20 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), and the cafe currency used by menu prices.
+The Tenant model contains 21 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), and the cafe currency used by menu prices.
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; later entities and migrations consume this ERD through their own stories.
 
@@ -104,6 +104,12 @@ erDiagram
         uuid product_id FK
         text tag
     }
+    branch_product_availability {
+        uuid branch_id PK, FK
+        uuid product_id PK, FK
+        boolean is_available
+        text reason_code
+    }
     branch_tables {
         uuid id PK
         uuid branch_id FK
@@ -162,6 +168,8 @@ erDiagram
     products ||--o{ product_sizes : "sizes"
     products ||--o{ product_addons : "add-ons"
     products ||--o{ product_tags : "tags"
+    branches ||--o{ branch_product_availability : "availability"
+    products ||--o{ branch_product_availability : "availability"
     branches ||--o{ branch_tables : "tables"
     tenant_users ||--o{ tenant_user_stations : "station assignments"
     stations ||--o{ tenant_user_stations : "assigned staff"
@@ -386,6 +394,18 @@ Purpose: normalized filter tags for one product, at most 10 per product (applica
 - Tag replacement uses stable IDs, preserves retained rows and logically deactivates omitted rows. The expansion adds nullable IDs without assigning identities to existing records.
 - **Proposed, pending owner confirmation**: ASCII letters are used for the allowed character set because the tag is matched exactly and exposed as a simple filter; rejected alternative: Unicode letters, which widen normalization and matching rules without an approved need.
 
+### branch_product_availability
+
+Purpose: per-branch availability of one product for the guest menu (FR-MENU-002). A missing row means the product is available in that branch, so a row exists only for a product made unavailable in a branch, and it is kept when the product is marked available again. Rows are never physically deleted; the change history lives in `tenant_audit_records`.
+
+- `branch_id uuid NOT NULL` — `fk_branch_product_availability_branch_id` foreign key to `branches.id` (ON DELETE RESTRICT); the branch must be Active when availability is set.
+- `product_id uuid NOT NULL` — `fk_branch_product_availability_product_id` foreign key to `products.id` (ON DELETE RESTRICT); only Active products can have availability set. `ix_branch_product_availability_product_id` supports the per-product lookup and the foreign key.
+- `is_available boolean NOT NULL` — the effective availability in the branch; a restored product keeps its row with `true` so the row itself is the record that this product was once unavailable here.
+- `reason_code text NOT NULL` — `ck_branch_product_availability_reason_code` over `('manual', 'out_of_stock', 'expired')`. `manual` is the only value the management API accepts in this story; `out_of_stock` and `expired` are reserved for the future inventory link so that it needs no migration.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`. Each actor FK uses ON DELETE RESTRICT and its own index.
+- `pk_branch_product_availability` — composite primary key on `(branch_id, product_id)`, the unique key on branch and product that the idempotent upsert uses as its final guard.
+- No separate `xmin`: every write is a single-row upsert, not a multi-row aggregate update.
+
 ### cafe_settings
 
 Purpose: the cafe's profile and branding configuration (FR-CAF-001), the timezone used for explicit daily/hourly interpretations (PRD section 13 peak-hours precondition), and the currency unit for cafe-menu prices. A singleton row: created once by provisioning (see the seeding section above) with no acting user.
@@ -429,7 +449,7 @@ Purpose: long-lived refresh-token sessions for tenant owners and staff (FR-IAM-0
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
-- Per-branch product availability, product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog schema is defined above.
+- Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
 - Ordering — guest QR ordering, assisted ordering, submissions and their state (FR-ORD-001 through FR-ORD-010). Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
