@@ -35,7 +35,7 @@ namespace CafeHub.Application.Orders
                 qr.BranchId,
                 command.Lines.Select(line => line.ProductId).Distinct().ToArray(),
                 cancellationToken);
-            var priced = OrderPricing.Evaluate(command.Lines, catalog);
+            var priced = OrderPricing.Evaluate(command.Lines, catalog, command.ExpectedTotal);
             if (priced.IsFailure)
             {
                 return Result.Failure<SubmitOrderResult>(priced.Error!);

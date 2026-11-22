@@ -5,13 +5,15 @@ namespace CafeHub.Application.Orders
 {
     public static class OrderPricing
     {
-        public static Result<PricedOrder> Evaluate(IReadOnlyList<SubmitOrderLine> lines, OrderCatalog catalog)
+        public static Result<PricedOrder> Evaluate(
+            IReadOnlyList<SubmitOrderLine> lines, OrderCatalog catalog, decimal? expectedTotal)
         {
             ArgumentNullException.ThrowIfNull(lines);
             ArgumentNullException.ThrowIfNull(catalog);
 
             var pricedLines = new List<PricedOrderLine>(lines.Count);
             var unavailable = new List<OrderUnavailableItem>();
+            var priceChanges = new List<OrderPriceChange>();
 
             for (var index = 0; index < lines.Count; index++)
             {
@@ -65,6 +67,20 @@ namespace CafeHub.Application.Orders
                     line.Quantity,
                     addons,
                     lineTotal));
+
+                if (HasChanged(size.Price, addons, line))
+                {
+                    priceChanges.Add(new OrderPriceChange(
+                        lineNumber,
+                        product.Id,
+                        size.Id,
+                        size.Price,
+                        addons
+                            .Select(addon => new OrderAddonPrice(
+                                addon.ProductAddonId, addon.Name, addon.Price))
+                            .ToArray(),
+                        lineTotal));
+                }
             }
 
             if (unavailable.Count > 0)
@@ -72,7 +88,37 @@ namespace CafeHub.Application.Orders
                 return Result.Failure<PricedOrder>(OrdersErrors.ProductUnavailable(unavailable));
             }
 
-            return Result.Success(new PricedOrder(pricedLines, pricedLines.Sum(line => line.LineTotal)));
+            var total = pricedLines.Sum(line => line.LineTotal);
+            if (priceChanges.Count > 0)
+            {
+                return Result.Failure<PricedOrder>(OrdersErrors.PriceChanged(priceChanges, total));
+            }
+
+            if (expectedTotal is not null && expectedTotal != total)
+            {
+                return Result.Failure<PricedOrder>(OrdersErrors.PriceChanged([], total));
+            }
+
+            return Result.Success(new PricedOrder(pricedLines, total));
+        }
+
+        private static bool HasChanged(
+            decimal unitPrice, IReadOnlyList<PricedOrderAddon> addons, SubmitOrderLine line)
+        {
+            if (unitPrice != line.ExpectedUnitPrice)
+            {
+                return true;
+            }
+
+            for (var index = 0; index < addons.Count; index++)
+            {
+                if (addons[index].Price != line.ExpectedAddonPrices[index])
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
