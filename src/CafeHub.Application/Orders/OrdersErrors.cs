@@ -9,6 +9,9 @@ namespace CafeHub.Application.Orders
         public const string OrderNumberConflictCode = "Orders.NumberConflict";
         public const string ServiceTypeInvalidCode = "Orders.ServiceTypeInvalid";
         public const string ReferenceConflictCode = "Orders.ReferenceConflict";
+        public const string NotFoundCode = "Orders.NotFound";
+        public const string StatusInvalidCode = "Orders.StatusInvalid";
+        public const string BranchRequiredCode = "Orders.BranchRequired";
 
         public const string ItemsExtension = "items";
         public const string TotalExtension = "currentTotal";
@@ -28,6 +31,15 @@ namespace CafeHub.Application.Orders
 
         public static Error ReferenceConflict() =>
             Error.Conflict(ReferenceConflictCode, "The order reference could not be assigned. Try again.");
+
+        public static Error NotFound() =>
+            Error.NotFound(NotFoundCode, "The order was not found.");
+
+        public static Error StatusInvalid() =>
+            Error.Validation(StatusInvalidCode, "The status filter must be Pending, Accepted, Rejected, or Expired.");
+
+        public static Error BranchRequired() =>
+            Error.Validation(BranchRequiredCode, "The branch id is required.");
     }
 
     public sealed record OrderPriceChange(
