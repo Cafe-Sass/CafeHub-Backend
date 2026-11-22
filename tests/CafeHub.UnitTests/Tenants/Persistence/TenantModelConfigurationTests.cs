@@ -39,6 +39,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "product_station_assignments",
             "product_routing_readiness",
             "product_tags",
+            "branch_product_availability",
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",
