@@ -6,7 +6,7 @@ namespace CafeHub.Application.Orders
         IOrderNumberCounterStore counterStore, ICafeBusinessDateProvider businessDateProvider)
         : IOrderNumberAllocator
     {
-        public async Task<int> AllocateAsync(Guid branchId, CancellationToken cancellationToken)
+        public async Task<OrderNumberAllocation> AllocateAsync(Guid branchId, CancellationToken cancellationToken)
         {
             if (branchId == Guid.Empty)
             {
@@ -14,7 +14,8 @@ namespace CafeHub.Application.Orders
             }
 
             var businessDate = await businessDateProvider.GetBusinessDateAsync(cancellationToken);
-            return await counterStore.IncrementAsync(branchId, businessDate, cancellationToken);
+            var number = await counterStore.IncrementAsync(branchId, businessDate, cancellationToken);
+            return new OrderNumberAllocation(number, businessDate);
         }
     }
 }
