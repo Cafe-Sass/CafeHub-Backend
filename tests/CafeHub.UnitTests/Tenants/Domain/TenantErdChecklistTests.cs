@@ -28,6 +28,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "cafe_settings",
             "tenant_audit_records",
             "refresh_tokens",
+            "orders",
+            "order_items",
+            "order_item_addons",
+            "order_number_counters",
         ];
 
         [Fact]
@@ -69,6 +73,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "cafe_settings" => nameof(CafeSettings),
                     "tenant_audit_records" => nameof(TenantAuditRecord),
                     "refresh_tokens" => nameof(TenantRefreshToken),
+                    "orders" => nameof(Order),
+                    "order_items" => nameof(OrderItem),
+                    "order_item_addons" => nameof(OrderItemAddon),
+                    "order_number_counters" => nameof(OrderNumberCounter),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
