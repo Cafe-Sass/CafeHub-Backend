@@ -20,6 +20,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<ProductSize> ProductSizes => Set<ProductSize>();
         public DbSet<ProductAddon> ProductAddons => Set<ProductAddon>();
         public DbSet<ProductTag> ProductTags => Set<ProductTag>();
+        public DbSet<BranchProductAvailability> BranchProductAvailability => Set<BranchProductAvailability>();
         public DbSet<BranchTable> BranchTables => Set<BranchTable>();
         public DbSet<TenantUserStation> TenantUserStations => Set<TenantUserStation>();
         public DbSet<CafeSettings> CafeSettings => Set<CafeSettings>();

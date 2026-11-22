@@ -260,6 +260,35 @@ namespace CafeHub.Infrastructure.Audit
         }
 
 
+        public static TenantAuditChanges BranchProductAvailabilityCreate(BranchProductAvailability row)
+        {
+            ArgumentNullException.ThrowIfNull(row);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchProductAvailability.BranchId), null, row.BranchId.ToString()),
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchProductAvailability.IsAvailable), null, row.IsAvailable.ToString()),
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchProductAvailability.ReasonCode), null, row.ReasonCode),
+            });
+        }
+
+        public static TenantAuditChanges BranchProductAvailabilityUpdate(
+            bool previousAvailable, string previousReason, BranchProductAvailability row)
+        {
+            ArgumentNullException.ThrowIfNull(row);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchProductAvailability.IsAvailable),
+                    previousAvailable.ToString(),
+                    row.IsAvailable.ToString()),
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchProductAvailability.ReasonCode), previousReason, row.ReasonCode),
+            });
+        }
+
         public static TenantAuditChanges ProductLifecycleStatus(Product product, ProductStatus oldStatus)
         {
             ArgumentNullException.ThrowIfNull(product);
