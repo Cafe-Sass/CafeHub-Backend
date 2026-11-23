@@ -32,7 +32,15 @@ namespace CafeHub.Infrastructure.Orders
                             item.SizeName,
                             item.Quantity,
                             item.Addons.OrderBy(addon => addon.Id).Select(addon => addon.AddonName).ToList()))
-                        .ToList()))
+                        .ToList())
+                {
+                    BillReference = order.BillId == null
+                        ? null
+                        : context.Bills
+                            .Where(bill => bill.Id == order.BillId)
+                            .Select(bill => bill.PublicReference)
+                            .FirstOrDefault(),
+                })
                 .SingleOrDefaultAsync(cancellationToken);
     }
 }
