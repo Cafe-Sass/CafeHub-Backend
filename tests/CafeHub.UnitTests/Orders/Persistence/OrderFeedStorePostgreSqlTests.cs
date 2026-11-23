@@ -39,10 +39,10 @@ namespace CafeHub.UnitTests.Orders.Persistence
             context.AddRange(branch, otherBranch, table, bar, kitchen, first, second);
             await context.SaveChangesAsync();
 
-            var store = new OrderFeedStore(context);
+            var store = new OrderFeedStore(context, TimeProvider.System);
 
             var feed = await store.ListFeedAsync(
-                new OrderFeedListRequest(1, 10, true, branch.Id, null, null, null),
+                new OrderFeedListRequest(1, 10, true, branch.Id, null, null, null, false),
                 default);
 
             Assert.Equal(2, feed.TotalCount);
@@ -62,7 +62,7 @@ namespace CafeHub.UnitTests.Orders.Persistence
             Assert.Null(firstEntryItems[1].StationName);
 
             var scoped = await store.ListFeedAsync(
-                new OrderFeedListRequest(1, 10, false, branch.Id, OrderStatus.Pending, null, [bar.Id]),
+                new OrderFeedListRequest(1, 10, false, branch.Id, OrderStatus.Pending, null, [bar.Id], false),
                 default);
 
             var scopedEntry = Assert.Single(scoped.FetchedItems);

@@ -301,6 +301,34 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges GuestMuteCreate(GuestMute mute)
+        {
+            ArgumentNullException.ThrowIfNull(mute);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(GuestMute.Reason), null, mute.Reason),
+                new TenantAuditChanges.FieldChange(
+                    nameof(GuestMute.ExpiresAt), null, mute.ExpiresAt.ToString("O", CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(nameof(GuestMute.BranchId), null, mute.BranchId.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges GuestMuteLift(GuestMute mute)
+        {
+            ArgumentNullException.ThrowIfNull(mute);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(GuestMute.Reason), mute.Reason, mute.Reason),
+                new TenantAuditChanges.FieldChange(
+                    nameof(GuestMute.ExpiresAt),
+                    mute.ExpiresAt.ToString("O", CultureInfo.InvariantCulture),
+                    mute.ExpiresAt.ToString("O", CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(nameof(GuestMute.BranchId), mute.BranchId.ToString(), mute.BranchId.ToString()),
+                new TenantAuditChanges.FieldChange(
+                    nameof(GuestMute.LiftedAt), null, mute.LiftedAt?.ToString("O", CultureInfo.InvariantCulture)),
+            });
+        }
+
         private static string? FormatNumber(int? value) => value?.ToString(CultureInfo.InvariantCulture);
 
         private static string FormatNumber(decimal value) => value.ToString(CultureInfo.InvariantCulture);

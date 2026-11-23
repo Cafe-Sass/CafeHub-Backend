@@ -328,6 +328,86 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.GuestMute", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("LiftedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("lifted_at");
+
+                    b.Property<Guid?>("LiftedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lifted_by_user_id");
+
+                    b.Property<Guid>("MutedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("muted_by_user_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_guest_mutes");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_guest_mutes_created_by");
+
+                    b.HasIndex("LiftedByUserId")
+                        .HasDatabaseName("ix_guest_mutes_lifted_by_user_id");
+
+                    b.HasIndex("MutedByUserId")
+                        .HasDatabaseName("ix_guest_mutes_muted_by_user_id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_guest_mutes_order_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_guest_mutes_updated_by");
+
+                    b.HasIndex("BranchId", "DeviceId")
+                        .HasDatabaseName("ix_guest_mutes_branch_device");
+
+                    b.ToTable("guest_mutes", (string)null);
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.MenuCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1898,6 +1978,48 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_cafe_settings_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.GuestMute", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_guest_mutes_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_guest_mutes_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("LiftedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_guest_mutes_lifted_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("MutedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_guest_mutes_muted_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_guest_mutes_order_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_guest_mutes_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.MenuCategory", b =>

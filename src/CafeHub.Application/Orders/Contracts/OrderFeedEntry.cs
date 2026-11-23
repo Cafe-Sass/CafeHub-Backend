@@ -11,5 +11,8 @@ namespace CafeHub.Application.Orders.Contracts
         DateTimeOffset ResponseDeadline,
         DateTimeOffset UpdatedAt,
         decimal TotalAmount,
-        IReadOnlyList<OrderFeedEntryItem> Items);
+        IReadOnlyList<OrderFeedEntryItem> Items)
+    {
+        public bool SuggestMute { get; init; }
+    }
 }

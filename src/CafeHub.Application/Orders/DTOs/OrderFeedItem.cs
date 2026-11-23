@@ -15,6 +15,8 @@ namespace CafeHub.Application.Orders.DTOs
         decimal TotalAmount,
         IReadOnlyList<OrderFeedItemLine> Items)
     {
+        public bool SuggestMute { get; init; }
+
         public static OrderFeedItem From(OrderFeedEntry entry) => new(
             entry.Id,
             entry.OrderNumber,
@@ -33,6 +35,9 @@ namespace CafeHub.Application.Orders.DTOs
                     item.Quantity,
                     item.StationName,
                     item.AddonNames))
-                .ToArray());
+                .ToArray())
+        {
+            SuggestMute = entry.SuggestMute,
+        };
     }
 }

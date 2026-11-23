@@ -77,6 +77,13 @@ namespace CafeHub.Infrastructure.Audit
                     "RejectionReason",
                     "OrderNumber",
                 },
+                ["guest_mutes"] = new(StringComparer.Ordinal)
+                {
+                    "Reason",
+                    "ExpiresAt",
+                    "LiftedAt",
+                    "BranchId",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",
