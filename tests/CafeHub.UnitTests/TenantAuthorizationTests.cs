@@ -225,8 +225,13 @@ namespace CafeHub.UnitTests
                     }
                     else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestOrdersController))
                     {
-                        Assert.Equal(nameof(TenantGuestOrdersController.Submit), action.MethodInfo.Name);
-                        Assert.Equal("t/{slug}/api/v1/guest/orders", action.AttributeRouteInfo?.Template);
+                        var guestOrderTemplates = new Dictionary<string, string>
+                        {
+                            [nameof(TenantGuestOrdersController.Submit)] = "t/{slug}/api/v1/guest/orders",
+                            [nameof(TenantGuestOrdersController.Status)] = "t/{slug}/api/v1/guest/orders/{publicReference}",
+                        };
+                        Assert.True(guestOrderTemplates.TryGetValue(action.MethodInfo.Name, out var template));
+                        Assert.Equal(template, action.AttributeRouteInfo?.Template);
                     }
                     else
                     {

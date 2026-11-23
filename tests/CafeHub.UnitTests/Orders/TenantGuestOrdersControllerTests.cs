@@ -5,11 +5,15 @@ using System.Text.Json;
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Orders;
+using CafeHub.Application.Orders.Contracts;
+using CafeHub.Application.Orders.DTOs;
+using CafeHub.Application.Orders.Queries;
 using CafeHub.Application.Tables;
 using CafeHub.Application.Tenancy;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Tenancy;
 using CafeHub.WebApi;
+using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Controllers;
 using CafeHub.WebApi.Errors;
 using CafeHub.WebApi.RateLimiting;
@@ -28,6 +32,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace CafeHub.UnitTests.Orders
 {
@@ -38,6 +43,17 @@ namespace CafeHub.UnitTests.Orders
         private static readonly Guid SizeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         private static readonly SubmitOrderResult OrderResult = new(
             7, "OrderPublicReference22", "Pending", 42.50m, DateTimeOffset.Parse("2026-11-22T10:05:00Z"));
+        private static readonly GuestOrderStatus StatusResult = GuestOrderStatus.From(new GuestOrderEntry(
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            7,
+            4,
+            "DineIn",
+            "Rejected",
+            "Out of croissants",
+            DateTimeOffset.Parse("2026-11-22T10:00:00Z"),
+            DateTimeOffset.Parse("2026-11-22T10:05:00Z"),
+            42.50m,
+            [new GuestOrderEntryItem("Latte", "Regular", 2, ["Milk"])]));
 
         [Fact]
         public void Submit_IsAnAnonymousGuestPostActionOnTheOrdersRoute()
@@ -203,6 +219,87 @@ namespace CafeHub.UnitTests.Orders
         }
 
         [Fact]
+        public void Status_IsAnAnonymousGuestGetActionOnTheOrderRoute()
+        {
+            var action = typeof(TenantGuestOrdersController).GetMethod(nameof(TenantGuestOrdersController.Status))!;
+
+            Assert.NotNull(action.GetCustomAttribute<HttpGetAttribute>());
+            Assert.Null(action.GetCustomAttribute<HttpPostAttribute>());
+            Assert.NotNull(action.GetCustomAttribute<AllowAnonymousAttribute>());
+            Assert.Null(action.GetCustomAttribute<TenantAuthorizeAttribute>());
+            Assert.True(action.GetCustomAttribute<TableQrEndpointAttribute>()!.IsGuest);
+            Assert.Equal("{publicReference}", action.GetCustomAttribute<HttpGetAttribute>()!.Template);
+            Assert.Equal("publicReference", action.GetParameters().Single(parameter => parameter.Name == "publicReference").Name);
+            Assert.Equal(
+                "t/{slug}/api/v1/guest/orders",
+                typeof(TenantGuestOrdersController).GetCustomAttribute<RouteAttribute>()!.Template);
+        }
+
+        [Fact]
+        public async Task Status_MapsTheRouteReferenceAndReturnsTheGuestProjection()
+        {
+            var sender = new RecordingSender { Response = Result.Success(StatusResult) };
+            var controller = new TenantGuestOrdersController(sender, new FixedCorrelationIdAccessor(null))
+            {
+                ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+            };
+
+            var result = await controller.Status(Code, default);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Same(StatusResult, ok.Value);
+            var query = Assert.IsType<GetGuestOrderStatusQuery>(sender.LastRequest);
+            Assert.Equal(Code, query.PublicReference);
+        }
+
+        [Fact]
+        public async Task Status_AnUnknownReferenceWritesTheUniformGuestNotFoundWithoutRepeatingIt()
+        {
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+            var controller = new TenantGuestOrdersController(
+                new RecordingSender { Response = Result.Failure<GuestOrderStatus>(OrdersErrors.NotFound()) },
+                new FixedCorrelationIdAccessor("correlation-order-test"))
+            {
+                ControllerContext = new ControllerContext { HttpContext = context },
+            };
+
+            var result = await controller.Status(Code, default);
+
+            Assert.IsType<EmptyResult>(result.Result);
+            Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+            Assert.Equal("application/problem+json", context.Response.ContentType);
+            var body = ReadBody(context);
+            Assert.DoesNotContain(Code, body);
+            using var problem = JsonDocument.Parse(body);
+            Assert.Equal(GuestQrErrors.NotFoundCode, problem.RootElement.GetProperty("code").GetString());
+        }
+
+        [Fact]
+        public async Task StatusRoute_IsAnonymousRateLimitedAndNeverLogsTheReference()
+        {
+            var resolver = new StubTenantResolver(TenantLifecycleStatus.Active);
+            var sender = new RecordingSender { Response = Result.Success(StatusResult) };
+            var loggerProvider = new RecordingLoggerProvider();
+            await using var app = CreateApp(resolver, sender, loggerProvider);
+            var pipeline = ((IApplicationBuilder)app).Build();
+            loggerProvider.CreateLogger("GuestStatusProbe").LogInformation("guest status probe");
+
+            var context = await SendAsync(
+                app,
+                pipeline,
+                string.Empty,
+                HttpMethods.Get,
+                $"/t/test-cafe/api/v1/guest/orders/{Code}");
+
+            Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+            Assert.Equal("no-store", context.Response.Headers.CacheControl.ToString());
+            Assert.Equal(Code, Assert.IsType<GetGuestOrderStatusQuery>(sender.LastRequest).PublicReference);
+            Assert.Contains(loggerProvider.Messages, message => message.Contains("guest status probe", StringComparison.Ordinal));
+            Assert.DoesNotContain(loggerProvider.Messages, message => message.Contains(Code, StringComparison.Ordinal));
+        }
+
+        [Fact]
         public async Task PostRoute_IsGloballyRateLimitedAndReachesTheGuestUseCaseWithoutAuthentication()
         {
             var resolver = new StubTenantResolver(TenantLifecycleStatus.Active);
@@ -284,7 +381,8 @@ namespace CafeHub.UnitTests.Orders
                 42.50m,
                 [new SubmitGuestOrderLineRequest(ProductId, SizeId, [], 2, 15.00m, [])]);
 
-        private static WebApplication CreateApp(StubTenantResolver resolver, RecordingSender sender)
+        private static WebApplication CreateApp(
+            StubTenantResolver resolver, RecordingSender sender, ILoggerProvider? loggerProvider = null)
         {
             var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions
             {
@@ -296,6 +394,11 @@ namespace CafeHub.UnitTests.Orders
                 [GlobalRateLimitConfigurationKeys.WindowSecondsPath] = "60",
             });
             builder.Services.AddLogging();
+            if (loggerProvider is not null)
+            {
+                builder.Logging.AddProvider(loggerProvider);
+            }
+
             builder.Services.AddMetrics();
             builder.Services.AddSingleton<IServer, NoNetworkServer>();
             builder.Services.AddControllers().AddApplicationPart(typeof(TenantGuestOrdersController).Assembly);
@@ -318,14 +421,18 @@ namespace CafeHub.UnitTests.Orders
         }
 
         private static async Task<DefaultHttpContext> SendAsync(
-            WebApplication app, RequestDelegate pipeline, string body)
+            WebApplication app,
+            RequestDelegate pipeline,
+            string body,
+            string method = "POST",
+            string path = "/t/test-cafe/api/v1/guest/orders")
         {
             using var scope = app.Services.CreateScope();
             var context = new DefaultHttpContext { TraceIdentifier = "trace-order-test", RequestServices = scope.ServiceProvider };
             context.Connection.RemoteIpAddress = IPAddress.Loopback;
-            context.Request.Method = HttpMethods.Post;
+            context.Request.Method = method;
             context.Request.Scheme = "https";
-            context.Request.Path = "/t/test-cafe/api/v1/guest/orders";
+            context.Request.Path = path;
             context.Request.ContentType = "application/json";
             context.Request.Headers["Idempotency-Key"] = "guest-order-key-1";
             context.Request.Headers["X-Guest-Device"] = "Abcdefghijklmnop1234";
@@ -347,6 +454,33 @@ namespace CafeHub.UnitTests.Orders
             context.Response.Body.Position = 0;
             using var reader = new StreamReader(context.Response.Body, leaveOpen: true);
             return reader.ReadToEnd();
+        }
+
+        private sealed class RecordingLoggerProvider : ILoggerProvider
+        {
+            public List<string> Messages { get; } = [];
+
+            public ILogger CreateLogger(string categoryName) => new RecordingLogger(Messages);
+
+            public void Dispose()
+            {
+            }
+        }
+
+        private sealed class RecordingLogger(List<string> messages) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter) =>
+                messages.Add(formatter(state, exception));
         }
 
         private sealed class StubTenantResolver(TenantLifecycleStatus? state) : ITenantResolver
