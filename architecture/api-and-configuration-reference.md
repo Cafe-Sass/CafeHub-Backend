@@ -177,6 +177,8 @@ Tenant policies read current grants from the tenant database. The grant query ve
 | `Transport:ForwardedHeaders` | `KnownNetworks` | Known networks | `[]` | No |
 | `Transport:ForwardedHeaders` | `ForwardLimit` | Forward limit | `1` | No |
 | `Orders` | `ResponseWindowSeconds` | Seconds a guest order stays open for staff decision (30 to 3600) | `300` | No |
+| `Media` | `RootPath` | Absolute directory that holds uploaded files. Required. Must be outside the application content root and outside any `wwwroot` folder; startup validates it. | (unset) | No |
+| `Media` | `MaxBytes` | Maximum accepted upload size in bytes (1024 to 20971520) | `5242880` | No |
 | `Pagination` | `DefaultPageSize` | Default page size | `20` | No |
 | `Pagination` | `MaxPageSize` | Maximum page size | `100` | No |
 | `PlatformSeed` | `SuperAdminEmail` | Super admin seed email | (unset) | Yes |
@@ -185,6 +187,10 @@ Tenant policies read current grants from the tenant database. The grant query ve
 | `Payments:Mock` | `Outcome` | Mock payment outcome | `Succeed` | No |
 | `Payments:Mock` | `AllowOutsideDevelopment` | Allow mock outside Development | `false` | No |
 
+### Media storage
+
+Uploaded files are stored on the server disk under `Media:RootPath` with opaque keys of the form `platform/<id>` or `tenants/<tenantId>/<id>`; the client file name is never used on disk and never trusted. Files are not served as static files and no endpoint returns them yet; later tasks serve them only through authorized endpoints. The root path must be outside the repository and outside any web-served folder, must be included in backups (backup retention and restore cadence remain open under PRD TBD-19), and the disk space is shared with the application. Startup fails when the setting is missing, relative, inside the content root, or inside a `wwwroot` folder, and when `Media:MaxBytes` is outside its allowed range.
+
 ### Secrets
 
 Secret keys (shown by name only; values are placeholders, never committed): `ConnectionStrings:Master`, `ConnectionStrings:TenantDesignTime`, `Jwt:SigningKey`, `PlatformSeed:SuperAdminEmail`, `PlatformSeed:SuperAdminPassword`. Set these via User Secrets locally (`dotnet user-secrets`) and environment variables in deployed environments.
@@ -192,7 +198,7 @@ Secret keys (shown by name only; values are placeholders, never committed): `Con
 ### How each row was verified
 
 - Endpoint table: grep of `src/CafeHub.WebApi/Controllers/*.cs` for `[Route]`, `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[TenantAuthorize]`, `[Authorize]`, `[AllowAnonymous]`; route templates and policy names read directly from each action and controller. Health endpoints are mapped in `src/CafeHub.WebApi/Program.cs` via `MapHealthChecks` and verified by unit tests in `tests/CafeHub.UnitTests`.
-- Configuration table: `src/CafeHub.WebApi/appsettings.template.json` (all keys and defaults) cross-checked against options binder classes in `src/CafeHub.Infrastructure` and `src/CafeHub.Application` (e.g. `JwtOptionsBinder`, `PaginationOptionsBinder`, `PaginationConfigurationKeys`, `GlobalRateLimitOptionsBinder`, `AuthRateLimitOptionsBinder`, `CorsOptionsBinder`, `RequestLimitsOptionsBinder`, `TransportSecurityOptionsBinder`, `PlatformSeedOptionsBinder`, `PaymentOptionsBinder`, `NotificationOptionsBinder`).
+- Configuration table: `src/CafeHub.WebApi/appsettings.template.json` (all keys and defaults) cross-checked against options binder classes in `src/CafeHub.Infrastructure` and `src/CafeHub.Application` (e.g. `JwtOptionsBinder`, `PaginationOptionsBinder`, `PaginationConfigurationKeys`, `GlobalRateLimitOptionsBinder`, `AuthRateLimitOptionsBinder`, `CorsOptionsBinder`, `RequestLimitsOptionsBinder`, `TransportSecurityOptionsBinder`, `PlatformSeedOptionsBinder`, `PaymentOptionsBinder`, `NotificationOptionsBinder`, `MediaOptionsBinder`).
 
 ## Task 47 branch assignment and catalog changes
 
