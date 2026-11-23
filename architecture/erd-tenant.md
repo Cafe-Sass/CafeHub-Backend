@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 27 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), and the missed-response record (`order_response_misses`, `order_response_miss_holders`).
+The Tenant model contains 28 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), and the guest device mutes (`guest_mutes`).
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories.
 
@@ -198,6 +198,17 @@ erDiagram
         uuid order_response_miss_id PK, FK
         uuid user_id PK, FK
     }
+    guest_mutes {
+        uuid id PK
+        uuid branch_id FK
+        uuid order_id FK
+        text device_id
+        uuid muted_by_user_id FK
+        text reason
+        timestamptz expires_at
+        timestamptz lifted_at
+        uuid lifted_by_user_id FK
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
@@ -235,6 +246,10 @@ erDiagram
     branches ||--o{ order_response_misses : "missed responses"
     order_response_misses ||--o{ order_response_miss_holders : "holders"
     tenant_users ||--o{ order_response_miss_holders : "holder"
+    branches ||--o{ guest_mutes : "device mutes"
+    orders ||--o{ guest_mutes : "mute source order"
+    tenant_users ||--o{ guest_mutes : "muted by"
+    tenant_users |o--o{ guest_mutes : "lifted by"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -587,12 +602,26 @@ Purpose: the snapshot of the branch's active staff who held `orders.decide` at t
 - `user_id uuid NOT NULL` — `fk_order_response_miss_holders_user_id` to `tenant_users.id` (ON DELETE RESTRICT); the second column of the composite primary key, with `ix_order_response_miss_holders_user_id` covering the per-staff counts.
 - `created_at timestamptz NOT NULL` — the moment the snapshot row was written; the join-table audit exception (no `updated_at`, `created_by`, or `updated_by`), matching the other pure join tables.
 
+### guest_mutes
+
+Purpose: the accountable record of a guest device muted by staff (FR-ORD-010, PRD section 8.7). A mute never deletes or rejects orders; it only hides the device's orders from the default staff feed until it is lifted or expires, and the register shows who muted and who lifted each device (CFMD-415, CFMD-416). The device identifier is never returned to staff outside the audit register and never audited.
+
+- `id uuid NOT NULL` — app-generated UUIDv7, `pk_guest_mutes`.
+- `branch_id uuid NOT NULL` — `fk_guest_mutes_branch_id` references `branches.id` (ON DELETE RESTRICT); a mute is branch-scoped, so a mute in one branch never hides another branch's orders. `ix_guest_mutes_branch_device` on `(branch_id, device_id)` supports the active-mute lookup the feed performs.
+- `order_id uuid NOT NULL` — `fk_guest_mutes_order_id` references `orders.id` (ON DELETE RESTRICT); the order the mute was raised from, which is how staff select a device without typing the raw identifier, and the reference the register shows. **Proposed, pending owner confirmation**: the rejected alternative is storing only the device id, which leaves the register without a human-readable reference because device ids are never returned by the feed.
+- `device_id text NOT NULL` (CHECK length 16..64 and `^[A-Za-z0-9_-]+$`, `ck_guest_mutes_device_id_format`) — the stored guest device id of the source order, read from `orders.guest_device_id`; it is never accepted from a staff payload, never audited, and is returned only to `guests.mute.audit` holders.
+- `muted_by_user_id uuid NOT NULL` — `fk_guest_mutes_muted_by_user_id` references `tenant_users.id` (ON DELETE RESTRICT); `ix_guest_mutes_muted_by_user_id` supports the per-acting-staff counts of the mute summary.
+- `reason text NOT NULL` (CHECK length 3..256 after trimming, `ck_guest_mutes_reason_length`) — the mandatory justification recorded for the mute.
+- `expires_at timestamptz NOT NULL` — the mute's expiry; the default is 24 hours after creation and the maximum is 7 days (**Proposed, pending owner confirmation**). A mute without `lifted_at` is active while `expires_at` is in the future.
+- `lifted_at timestamptz NULL` and `lifted_by_user_id uuid NULL FK tenant_users.id` (`fk_guest_mutes_lifted_by_user_id`, ON DELETE RESTRICT) — the early-lift record; both are NULL while the mute is not lifted. An expired mute is inactive without being lifted, and no index enforces one active mute per device because the active window is time-dependent: the write path returns the existing active mute instead of creating a second one.
+- `created_at timestamptz NOT NULL` — the mute time; `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id` with `ix_guest_mutes_created_by` and `ix_guest_mutes_updated_by`.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
-- Ordering beyond the schema — order status read for guests and captain (assisted) ordering endpoints remain later work; staff accept/reject handling and expiry of unanswered orders (FR-ORD-001 through FR-ORD-010) shipped with their own stories, and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, and `order_response_miss_holders` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10).
+- Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
 - Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
