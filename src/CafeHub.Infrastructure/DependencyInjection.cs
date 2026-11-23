@@ -146,6 +146,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IOrderNumberAllocator, OrderNumberAllocator>();
             services.AddScoped<IOrderStore, OrderStore>();
             services.AddScoped<IOrderFeedStore, OrderFeedStore>();
+            services.AddScoped<IGuestOrderStore, GuestOrderStore>();
             services.AddScoped<IOrderDecisionStore, OrderDecisionStore>();
             services.AddScoped<IOrderExpiryStore, OrderExpiryStore>();
             services.AddScoped<IMissedResponseStore, MissedResponseStore>();
