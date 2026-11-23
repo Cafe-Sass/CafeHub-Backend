@@ -56,7 +56,8 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(
                 new[]
                 {
-                    "branch_id", "created_by", "placed_by_user_id", "responded_by_user_id", "table_id", "updated_by",
+                    "bill_id", "branch_id", "created_by", "placed_by_user_id", "responded_by_user_id", "table_id",
+                    "updated_by",
                 },
                 foreignKeys.Select(foreignKey => foreignKey.Properties.Single().GetColumnName()).OrderBy(name => name).ToArray());
 

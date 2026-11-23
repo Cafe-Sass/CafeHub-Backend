@@ -50,6 +50,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "order_response_misses",
             "order_response_miss_holders",
             "guest_mutes",
+            "bills",
         ];
 
         [Fact]
