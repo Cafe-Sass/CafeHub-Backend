@@ -32,6 +32,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<OrderNumberCounter> OrderNumberCounters => Set<OrderNumberCounter>();
         public DbSet<OrderResponseMiss> OrderResponseMisses => Set<OrderResponseMiss>();
         public DbSet<OrderResponseMissHolder> OrderResponseMissHolders => Set<OrderResponseMissHolder>();
+        public DbSet<GuestMute> GuestMutes => Set<GuestMute>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
