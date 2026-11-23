@@ -159,6 +159,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IOrderPublicReferenceGenerator, OrderPublicReferenceGenerator>();
             services.AddScoped<IBillStore, BillStore>();
             services.AddScoped<IBillPublicReferenceGenerator, BillPublicReferenceGenerator>();
+            services.AddScoped<IPaymentStore, PaymentStore>();
             services.AddScoped<IOrderNumberCounterStore, OrderNumberCounterStore>();
             services.AddScoped<ICafeBusinessDateProvider, CafeBusinessDateProvider>();
             services.AddScoped<IStationScope, StationScope>();

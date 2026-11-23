@@ -36,6 +36,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "order_response_miss_holders",
             "guest_mutes",
             "bills",
+            "payments",
         ];
 
         [Fact]
@@ -85,6 +86,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "order_response_miss_holders" => nameof(OrderResponseMissHolder),
                     "guest_mutes" => nameof(GuestMute),
                     "bills" => nameof(Bill),
+                    "payments" => nameof(Payment),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

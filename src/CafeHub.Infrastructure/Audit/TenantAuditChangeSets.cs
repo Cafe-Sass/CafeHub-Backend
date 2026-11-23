@@ -329,6 +329,19 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges PaymentConfirmCash(Payment payment)
+        {
+            ArgumentNullException.ThrowIfNull(payment);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(Payment.Method), null, payment.Method.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Payment.Status), null, payment.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Payment.Amount), null, FormatNumber(payment.Amount)),
+                new TenantAuditChanges.FieldChange(nameof(Payment.BillId), null, payment.BillId.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Payment.OrderId), null, payment.OrderId?.ToString()),
+            });
+        }
+
         public static TenantAuditChanges BillOpen(Bill bill)
         {
             ArgumentNullException.ThrowIfNull(bill);
