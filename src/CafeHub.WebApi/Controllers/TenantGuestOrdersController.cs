@@ -1,6 +1,8 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Orders;
+using CafeHub.Application.Orders.DTOs;
+using CafeHub.Application.Orders.Queries;
 using CafeHub.Application.Tables;
 using CafeHub.Domain.Tenants;
 using CafeHub.WebApi.Errors;
@@ -80,6 +82,31 @@ namespace CafeHub.WebApi.Controllers
                 result.Value.TotalAmount,
                 result.Value.ResponseDeadline);
             return Created($"/t/{slug}/api/v1/guest/orders/{result.Value.PublicReference}", response);
+        }
+
+        [HttpGet("{publicReference}")]
+        [AllowAnonymous]
+        [TableQrEndpoint(IsGuest = true)]
+        [ProducesResponseType<GuestOrderStatus>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, "application/problem+json")]
+        public async Task<ActionResult<GuestOrderStatus>> Status(
+            [FromRoute] string publicReference,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetGuestOrderStatusQuery(publicReference), cancellationToken);
+            if (result.IsFailure && result.Error!.Code == OrdersErrors.NotFoundCode)
+            {
+                await GuestQrProblem.WriteNotFoundAsync(HttpContext, correlationIdAccessor, cancellationToken);
+                return new EmptyResult();
+            }
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
     }
 }
