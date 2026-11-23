@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Idempotency;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Contracts;
@@ -25,6 +26,7 @@ namespace CafeHub.UnitTests.Orders
         private readonly FakeOrderStore store = new() { Catalog = Catalog() };
         private readonly FakeAllocator allocator = new(7);
         private readonly FakeReferenceGenerator references = new();
+        private readonly FakeAuditWriter audit = new();
 
         [Fact]
         public async Task ASuccessfulSubmissionReturnsTheNumberedStoredOrder()
@@ -211,8 +213,48 @@ namespace CafeHub.UnitTests.Orders
                 Assert.Single(store.Added).RequestHash);
         }
 
+        [Fact]
+        public async Task ACaptainOrderIsAcceptedImmediatelyWithTheCaptainAsResponder()
+        {
+            var staffId = Guid.NewGuid();
+
+            var result = await CreateHandler().Handle(
+                Valid() with { Source = OrderSource.Captain, ActingStaffUserId = staffId }, default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(OrderStatus.Accepted.ToString(), result.Value.Status);
+            var order = Assert.Single(store.Added);
+            Assert.Equal(staffId, order.RespondedByUserId);
+            Assert.Equal(Now, order.RespondedAt);
+            Assert.Throws<InvalidOperationException>(() => order.Expire(Now.AddDays(1)));
+        }
+
+        [Fact]
+        public async Task ACaptainOrderIsAuditedWithOnlyTheOrderNumber()
+        {
+            var staffId = Guid.NewGuid();
+
+            await CreateHandler().Handle(
+                Valid() with { Source = OrderSource.Captain, ActingStaffUserId = staffId }, default);
+
+            var entry = Assert.Single(audit.Entries);
+            Assert.Equal("orders.assisted_created.succeeded", entry.Action);
+            Assert.Equal(staffId, entry.ActorUserId);
+            var change = Assert.Single(entry.Changes!.Fields);
+            Assert.Equal(nameof(Order.OrderNumber), change.Name);
+            Assert.Equal("7", change.After);
+        }
+
+        [Fact]
+        public async Task AGuestOrderWritesNoAuditEntry()
+        {
+            await CreateHandler().Handle(Valid(), default);
+
+            Assert.Empty(audit.Entries);
+        }
+
         private SubmitOrderCommandHandler CreateHandler() =>
-            new(sender, store, allocator, references, new OrdersOptions(), new FixedClock());
+            new(sender, store, allocator, references, new OrdersOptions(), new FixedClock(), audit);
 
         private static SubmitOrderCommand Valid() => new()
         {
@@ -255,6 +297,17 @@ namespace CafeHub.UnitTests.Orders
             {
                 Calls++;
                 return Task.FromResult(new OrderNumberAllocation(number, new DateOnly(2026, 11, 22)));
+            }
+        }
+
+        private sealed class FakeAuditWriter : ITenantAuditWriter
+        {
+            public List<TenantAuditEntry> Entries { get; } = [];
+
+            public Task<Result> WriteAsync(TenantAuditEntry entry, CancellationToken cancellationToken)
+            {
+                Entries.Add(entry);
+                return Task.FromResult(Result.Success());
             }
         }
 

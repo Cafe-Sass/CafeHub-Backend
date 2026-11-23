@@ -1,5 +1,7 @@
+using System.Globalization;
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Audit;
 using CafeHub.Application.Idempotency;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Tables.DTOs;
@@ -15,10 +17,13 @@ namespace CafeHub.Application.Orders
         IOrderNumberAllocator allocator,
         IOrderPublicReferenceGenerator referenceGenerator,
         OrdersOptions options,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITenantAuditWriter auditWriter)
         : ICommandHandler<SubmitOrderCommand, SubmitOrderResult>
     {
         private const int MaximumReferenceAttempts = 2;
+        private const string TargetType = "orders";
+        private const string AssistedCreatedAction = "orders.assisted_created.succeeded";
 
         public async Task<Result<SubmitOrderResult>> Handle(
             SubmitOrderCommand command, CancellationToken cancellationToken)
@@ -64,6 +69,31 @@ namespace CafeHub.Application.Orders
                 var added = await store.AddAsync(order, cancellationToken);
                 if (added.IsSuccess)
                 {
+                    if (placedByUserId is not null)
+                    {
+                        var auditResult = await auditWriter.WriteAsync(
+                            new TenantAuditEntry
+                            {
+                                Action = AssistedCreatedAction,
+                                TargetType = TargetType,
+                                TargetId = order.Id,
+                                ActorUserId = placedByUserId,
+                                Changes = TenantAuditChanges.Create(
+                                [
+                                    new TenantAuditChanges.FieldChange(
+                                        nameof(Order.OrderNumber),
+                                        null,
+                                        order.OrderNumber.ToString(CultureInfo.InvariantCulture),
+                                        BeforePresent: false),
+                                ]),
+                            },
+                            cancellationToken);
+                        if (auditResult.IsFailure)
+                        {
+                            return Result.Failure<SubmitOrderResult>(auditResult.Error!);
+                        }
+                    }
+
                     return added;
                 }
 
@@ -109,7 +139,7 @@ namespace CafeHub.Application.Orders
                     placedByUserId))
                 .ToArray();
 
-            return Order.Create(
+            var order = Order.Create(
                 Guid.CreateVersion7(),
                 qr.BranchId,
                 qr.TableId,
@@ -127,6 +157,13 @@ namespace CafeHub.Application.Orders
                 now.AddSeconds(options.ResponseWindowSeconds),
                 items,
                 placedByUserId);
+
+            if (placedByUserId is { } captainId)
+            {
+                order.Accept(captainId, now);
+            }
+
+            return order;
         }
     }
 }

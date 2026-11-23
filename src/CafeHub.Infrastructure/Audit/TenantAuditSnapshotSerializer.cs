@@ -75,6 +75,7 @@ namespace CafeHub.Infrastructure.Audit
                 {
                     "Status",
                     "RejectionReason",
+                    "OrderNumber",
                 },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {

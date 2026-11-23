@@ -97,6 +97,32 @@ namespace CafeHub.UnitTests
         }
 
         [Fact]
+        public async Task WriteAsync_KeepsTheOrderNumberInOrderSnapshots()
+        {
+            var (writer, context) = CreateWriter();
+            using (context)
+            {
+                var result = await writer.WriteAsync(new TenantAuditEntry
+                {
+                    Action = "orders.assisted_created.succeeded",
+                    TargetType = "orders",
+                    TargetId = Guid.NewGuid(),
+                    Changes = TenantAuditChanges.Create(
+                    [
+                        new TenantAuditChanges.FieldChange(
+                            "OrderNumber", null, "7", BeforePresent: false),
+                    ]),
+                }, CancellationToken.None);
+
+                Assert.True(result.IsSuccess);
+                var record = Assert.Single(context.ChangeTracker.Entries<TenantAuditRecord>()).Entity;
+                Assert.Null(record.BeforeState);
+                using var after = JsonDocument.Parse(record.AfterState!);
+                Assert.Equal("7", after.RootElement.GetProperty("OrderNumber").GetString());
+            }
+        }
+
+        [Fact]
         public void TenantAuditEntry_ContainsOnlyAuditMetadataAndNoSecretBearingMembers()
         {
             var properties = typeof(TenantAuditEntry).GetProperties().Select(property => property.Name).Order().ToArray();
