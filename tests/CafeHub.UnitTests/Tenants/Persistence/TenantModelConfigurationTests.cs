@@ -49,6 +49,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "order_number_counters",
             "order_response_misses",
             "order_response_miss_holders",
+            "guest_mutes",
         ];
 
         [Fact]
