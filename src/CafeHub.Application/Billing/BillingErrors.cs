@@ -5,12 +5,16 @@ namespace CafeHub.Application.Billing
     public static class BillingErrors
     {
         public const string NotFoundCode = "Billing.NotFound";
+        public const string BranchRequiredCode = "Billing.BranchRequired";
         public const string BillClosedCode = "Billing.BillClosed";
         public const string OrderNotOnBillCode = "Billing.OrderNotOnBill";
         public const string AmountAboveRemainingCode = "Billing.AmountAboveRemaining";
 
         public static Error NotFound() =>
             Error.NotFound(NotFoundCode, "The bill was not found.");
+
+        public static Error BranchRequired() =>
+            Error.Validation(BranchRequiredCode, "The branch id is required.");
 
         public static Error BillClosed() =>
             Error.Conflict(BillClosedCode, "The bill is already closed.");
