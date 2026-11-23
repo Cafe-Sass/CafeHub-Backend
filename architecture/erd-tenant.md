@@ -2,9 +2,9 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 28 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), and the guest device mutes (`guest_mutes`).
+The Tenant model contains 30 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), and the money record of its payments (`payments`).
 
-Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories.
+Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427).
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
 
@@ -253,6 +253,9 @@ erDiagram
     branches ||--o{ bills : "bills"
     branch_tables ||--o{ bills : "table bill"
     bills |o--o{ orders : "orders"
+    bills ||--o{ payments : "payments"
+    orders |o--o{ payments : "named settlement"
+    tenant_users |o--o{ payments : "confirmed by"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -634,13 +637,29 @@ Purpose: the per-table settlement bill (FR-PAY-001 through FR-PAY-005, Story CFM
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_bills_created_by` / `fk_bills_updated_by` with ON DELETE RESTRICT and its own index.
 - `xmin` row version — the aggregate concurrency token.
 
+### payments
+
+Purpose: the money record of one confirmed or pending payment against a bill (FR-PAY-001 through FR-PAY-005, Story CFMD-425, CFMD-427). A payment never writes to the order status and an order decision never marks money as paid: payment state is independent of order state. Paid and remaining amounts are computed from `Confirmed` payments only, and Cash, Online, and Hybrid settlement types are derived from the payment methods present and never stored.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_payments`.
+- `bill_id uuid NOT NULL` — `fk_payments_bill_id` to `bills.id` (ON DELETE RESTRICT). The foreign key is covered by `uq_payments_bill_idempotency_key`, whose first column is `bill_id`.
+- `order_id uuid NULL` — `fk_payments_order_id` to `orders.id` (ON DELETE RESTRICT); `ix_payments_order_id`. A payment may settle one named order of the same bill; NULL applies it to the bill as a whole. A payment linked to an order of another bill is refused by the application.
+- `method text NOT NULL` — `ck_payments_method` over `('Cash', 'Online')`.
+- `status text NOT NULL` — `ck_payments_status` over `('Confirmed', 'PendingReview', 'Rejected')`. Cash payments are created as `Confirmed` because the authorized staff confirmation is the act (CFMD-427); the online payment story reuses the same closed set.
+- `amount numeric(12,2) NOT NULL` — `ck_payments_amount_range CHECK (amount > 0)`; an amount above the remaining amount of the bill or of the linked order is refused by the application.
+- `confirmed_by_user_id uuid NULL` — `fk_payments_confirmed_by_user_id` to `tenant_users.id` (ON DELETE RESTRICT); `ix_payments_confirmed_by_user_id`.
+- `confirmed_at timestamptz NULL` — the confirmation moment recorded by the server through `TimeProvider`; `ck_payments_confirmation_pair CHECK ((status = 'Confirmed') = (confirmed_at IS NOT NULL AND confirmed_by_user_id IS NOT NULL))` keeps the pair consistent with the status.
+- `idempotency_key text NOT NULL` — `ck_payments_idempotency_key_length CHECK (char_length(idempotency_key) BETWEEN 1 AND 128)`; `uq_payments_bill_idempotency_key` on `(bill_id, idempotency_key)` makes a repeat with the same key return the stored payment and never count twice.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_payments_created_by` / `fk_payments_updated_by` with ON DELETE RESTRICT and its own index.
+- Payment rows are never physically deleted; settlement history is immutable financial history.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
-- Payments and receipts — cash confirmation, online payments, and digital receipts; the `bills` schema is defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
+- Online payments and receipts — the online provider flows, digital receipts, and refunds; the `payments` schema and the cash confirmation are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
 - Printing — local print jobs and connector targets (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD without a TBD number).
