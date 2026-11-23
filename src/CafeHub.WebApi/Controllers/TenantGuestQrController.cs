@@ -1,5 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Billing.DTOs;
+using CafeHub.Application.Billing.Queries;
 using CafeHub.Application.Menu.DTOs;
 using CafeHub.Application.Menu.Queries;
 using CafeHub.Application.Pagination;
@@ -66,6 +68,27 @@ namespace CafeHub.WebApi.Controllers
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("{code}/payment-options")]
+        [AllowAnonymous]
+        [TableQrEndpoint(IsGuest = true)]
+        [ProducesResponseType<GuestPaymentOptionsResponse>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, "application/problem+json")]
+        public async Task<ActionResult<GuestPaymentOptionsResponse>> PaymentOptions(
+            [FromRoute] string slug,
+            [FromRoute] string? code,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetGuestPaymentOptionsQuery(code), cancellationToken);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            await GuestQrProblem.WriteNotFoundAsync(HttpContext, correlationIdAccessor, cancellationToken);
+            return new EmptyResult();
         }
     }
 }
