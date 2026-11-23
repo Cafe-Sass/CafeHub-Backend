@@ -652,7 +652,7 @@ Purpose: the per-table settlement bill (FR-PAY-001 through FR-PAY-005, Story CFM
 
 ### payments
 
-Purpose: the money record of one confirmed or pending payment against a bill (FR-PAY-001 through FR-PAY-005, Story CFMD-425, CFMD-427). A payment never writes to the order status and an order decision never marks money as paid: payment state is independent of order state. Paid and remaining amounts are computed from `Confirmed` payments only, and Cash, Online, and Hybrid settlement types are derived from the payment methods present and never stored.
+Purpose: the money record of one confirmed or pending payment against a bill (FR-PAY-001 through FR-PAY-005, Story CFMD-425, CFMD-427, CFMD-431). A payment never writes to the order status and an order decision never marks money as paid: payment state is independent of order state. Paid and remaining amounts are computed from `Confirmed` payments only, and Cash, Online, and Hybrid settlement types are derived from the payment methods present and never stored. An Online payment is a guest-submitted proof in `PendingReview` with its screenshot reference, claimed amount, and note; staff review (CFMD-432) confirms or rejects it and never changes the order status.
 
 - `id uuid NOT NULL` — app-generated UUIDv7; `pk_payments`.
 - `bill_id uuid NOT NULL` — `fk_payments_bill_id` to `bills.id` (ON DELETE RESTRICT). The foreign key is covered by `uq_payments_bill_idempotency_key`, whose first column is `bill_id`.
@@ -663,6 +663,10 @@ Purpose: the money record of one confirmed or pending payment against a bill (FR
 - `confirmed_by_user_id uuid NULL` — `fk_payments_confirmed_by_user_id` to `tenant_users.id` (ON DELETE RESTRICT); `ix_payments_confirmed_by_user_id`.
 - `confirmed_at timestamptz NULL` — the confirmation moment recorded by the server through `TimeProvider`; `ck_payments_confirmation_pair CHECK ((status = 'Confirmed') = (confirmed_at IS NOT NULL AND confirmed_by_user_id IS NOT NULL))` keeps the pair consistent with the status.
 - `idempotency_key text NOT NULL` — `ck_payments_idempotency_key_length CHECK (char_length(idempotency_key) BETWEEN 1 AND 128)`; `uq_payments_bill_idempotency_key` on `(bill_id, idempotency_key)` makes a repeat with the same key return the stored payment and never count twice.
+- `media_reference text NULL` — the neutral media storage key of the uploaded payment screenshot (Story CFMD-431): `ck_payments_media_reference_length CHECK (media_reference IS NULL OR length(media_reference) <= 512)`; only the reference lives here, never the binary, and the key is never audited or logged.
+- `claimed_amount numeric(12,2) NULL` — the amount the guest claimed with the proof (Story CFMD-431): `ck_payments_claimed_amount_range CHECK (claimed_amount IS NULL OR claimed_amount > 0)`; it is the pending payment's `amount` until staff confirm a different one (CFMD-432), so the guest's claim survives a partial confirmation.
+- `note text NULL` — the guest's optional free-text note of up to 140 characters (Story CFMD-431): `ck_payments_note_length CHECK (note IS NULL OR (length(note) >= 1 AND length(note) <= 140 AND note !~ '[[:cntrl:]]'))`; guest-typed text that must never include personal data and is never audited or logged.
+- `ck_payments_online_proof CHECK (method <> 'Online' OR (media_reference IS NOT NULL AND claimed_amount IS NOT NULL))` — an Online payment always carries its proof and claim (Proposed, pending owner confirmation; the rejected alternative is a separate proof table, which would duplicate the payment identity and idempotency key the workflow already needs).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_payments_created_by` / `fk_payments_updated_by` with ON DELETE RESTRICT and its own index.
 - Payment rows are never physically deleted; settlement history is immutable financial history.
 
