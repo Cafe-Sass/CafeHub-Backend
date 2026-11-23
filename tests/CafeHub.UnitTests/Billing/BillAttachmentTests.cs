@@ -276,6 +276,19 @@ namespace CafeHub.UnitTests.Billing
             public Bill? FindOpen(Guid tableId) =>
                 committed.FirstOrDefault(bill => bill.TableId == tableId && bill.Status == BillStatus.Open);
 
+            public Task<BillSettlement?> FindForCloseAsync(
+                Guid? branchId,
+                Guid billId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The accept flow must not read a bill for closing.");
+
+            public Task<Result> SaveCloseAsync(
+                Bill bill,
+                decimal remainingAmount,
+                Guid actorId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The accept flow must not close a bill.");
+
             public void Commit(Bill bill)
             {
                 pending.Remove(bill);

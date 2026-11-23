@@ -92,6 +92,14 @@ namespace CafeHub.Infrastructure.Audit
                     "BillId",
                     "OrderId",
                 },
+                ["bills"] = new(StringComparer.Ordinal)
+                {
+                    "Status",
+                    "PublicReference",
+                    "BranchId",
+                    "CloseReason",
+                    "RemainingAmount",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",

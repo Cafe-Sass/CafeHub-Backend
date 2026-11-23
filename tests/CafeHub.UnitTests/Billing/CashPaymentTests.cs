@@ -246,8 +246,8 @@ namespace CafeHub.UnitTests.Billing
             Assert.Equal(PaymentSettlement.Cash, Payment.ResolveSettlementType([pendingOnline]));
         }
 
-        private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store) =>
-            new(store, StaffUser(), new FixedClock(Now));
+        private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store, FakeBillStore? bills = null) =>
+            new(store, bills ?? new FakeBillStore(), StaffUser(), new FixedClock(Now));
 
         private static FakeTenantUser StaffUser() =>
             new(UserId, new TenantAccountAccess(true, null, true) { BranchId = BranchId });
@@ -311,6 +311,38 @@ namespace CafeHub.UnitTests.Billing
         private sealed class FixedClock(DateTimeOffset now) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => now;
+        }
+
+        private sealed class FakeBillStore : IBillStore
+        {
+            public List<Bill> Closed { get; } = [];
+
+            public List<decimal> ClosedRemaining { get; } = [];
+
+            public Task<Result<Bill>> ResolveOpenBillAsync(
+                Guid branchId,
+                Guid tableId,
+                DateTimeOffset now,
+                Guid? actorId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The payment flow must not open a bill.");
+
+            public Task<BillSettlement?> FindForCloseAsync(
+                Guid? branchId,
+                Guid billId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The payment flow must not read a bill for closing.");
+
+            public Task<Result> SaveCloseAsync(
+                Bill bill,
+                decimal remainingAmount,
+                Guid actorId,
+                CancellationToken cancellationToken)
+            {
+                Closed.Add(bill);
+                ClosedRemaining.Add(remainingAmount);
+                return Task.FromResult(Result.Success());
+            }
         }
 
         private sealed class FakePaymentStore : IPaymentStore
