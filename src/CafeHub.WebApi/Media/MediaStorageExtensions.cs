@@ -1,3 +1,4 @@
+using CafeHub.Application.Media;
 using CafeHub.Application.Media.Contracts;
 using CafeHub.Infrastructure.Media;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +32,9 @@ namespace CafeHub.WebApi.Media
             var options = MediaOptionsBinder.Bind(configuration, environment.ContentRootPath);
             services.AddSingleton(options);
             services.AddScoped<IMediaStorage, LocalDiskMediaStorage>();
+            services.AddScoped<IMediaUploadService>(provider => new MediaUploadService(
+                provider.GetRequiredService<IMediaStorage>(),
+                options.MaxBytes));
 
             return services;
         }
