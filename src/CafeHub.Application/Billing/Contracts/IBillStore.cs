@@ -16,5 +16,16 @@ namespace CafeHub.Application.Billing.Contracts
             DateTimeOffset now,
             Guid? actorId,
             CancellationToken cancellationToken);
+
+        Task<BillSettlement?> FindForCloseAsync(
+            Guid? branchId,
+            Guid billId,
+            CancellationToken cancellationToken);
+
+        Task<Result> SaveCloseAsync(
+            Bill bill,
+            decimal remainingAmount,
+            Guid actorId,
+            CancellationToken cancellationToken);
     }
 }

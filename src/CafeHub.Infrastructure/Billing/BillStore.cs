@@ -53,5 +53,54 @@ namespace CafeHub.Infrastructure.Billing
 
             return Result.Success(bill);
         }
+
+        public async Task<BillSettlement?> FindForCloseAsync(
+            Guid? branchId,
+            Guid billId,
+            CancellationToken cancellationToken)
+        {
+            var bills = context.Bills.Where(bill => bill.Id == billId);
+            if (branchId is { } branch)
+            {
+                bills = bills.Where(bill => bill.BranchId == branch);
+            }
+
+            var bill = await bills.SingleOrDefaultAsync(cancellationToken);
+            if (bill is null)
+            {
+                return null;
+            }
+
+            await context.LockBillAsync(bill.Id, cancellationToken);
+
+            var orders = await context.Orders.AsNoTracking()
+                .Where(order => order.BillId == billId && order.Status == OrderStatus.Accepted)
+                .OrderBy(order => order.OrderNumber)
+                .ToListAsync(cancellationToken);
+            var payments = await context.Payments.AsNoTracking()
+                .Where(payment => payment.BillId == billId)
+                .OrderBy(payment => payment.CreatedAt)
+                .ThenBy(payment => payment.Id)
+                .ToListAsync(cancellationToken);
+            return new BillSettlement(bill, orders, payments);
+        }
+
+        public async Task<Result> SaveCloseAsync(
+            Bill bill,
+            decimal remainingAmount,
+            Guid actorId,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(bill);
+
+            return await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = "bills.closed.succeeded",
+                TargetType = TargetType,
+                TargetId = bill.Id,
+                ActorUserId = actorId,
+                Changes = TenantAuditChangeSets.BillClose(bill, remainingAmount),
+            }, cancellationToken);
+        }
     }
 }

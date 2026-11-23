@@ -10,6 +10,7 @@ namespace CafeHub.Application.Billing.Commands
 {
     public sealed class ConfirmCashPaymentCommandHandler(
         IPaymentStore store,
+        IBillStore billStore,
         ICurrentTenantUser currentUser,
         TimeProvider timeProvider)
         : ICommandHandler<ConfirmCashPaymentCommand, ConfirmCashPaymentResult>
@@ -30,6 +31,11 @@ namespace CafeHub.Application.Billing.Commands
             if (settlement is null)
             {
                 return Result.Failure<ConfirmCashPaymentResult>(BillingErrors.NotFound());
+            }
+
+            if (currentUser.UserId is not { } actorId || actorId == Guid.Empty)
+            {
+                return Result.Failure<ConfirmCashPaymentResult>(AuthErrors.Forbidden());
             }
 
             var stored = settlement.Payments.FirstOrDefault(
@@ -69,10 +75,10 @@ namespace CafeHub.Application.Billing.Commands
                 settlement.Bill.Id,
                 command.OrderId,
                 command.Amount,
-                currentUser.UserId!.Value,
+                actorId,
                 command.IdempotencyKey!,
                 now,
-                currentUser.UserId);
+                actorId);
 
             var add = await store.AddAsync(payment, cancellationToken);
             if (add.IsFailure)
@@ -88,10 +94,32 @@ namespace CafeHub.Application.Billing.Commands
                     return Result.Failure<ConfirmCashPaymentResult>(BillingErrors.NotFound());
                 }
 
-                return Result.Success(BuildSettlementResult(fresh, add.Value));
+                var freshResult = BuildSettlementResult(fresh, add.Value);
+                var freshClose = await TryAutoCloseAsync(
+                    fresh.Bill,
+                    freshResult.BillRemainingAmount,
+                    fresh.Payments,
+                    actorId,
+                    now,
+                    cancellationToken);
+                return freshClose.IsFailure
+                    ? Result.Failure<ConfirmCashPaymentResult>(freshClose.Error!)
+                    : Result.Success(freshResult);
             }
 
             var paid = Payment.ResolvePaidAmount(settlement.Payments) + add.Value.Amount;
+            var closed = await TryAutoCloseAsync(
+                settlement.Bill,
+                billTotal - paid,
+                settlement.Payments,
+                actorId,
+                now,
+                cancellationToken);
+            if (closed.IsFailure)
+            {
+                return Result.Failure<ConfirmCashPaymentResult>(closed.Error!);
+            }
+
             return Result.Success(new ConfirmCashPaymentResult(
                 add.Value.Id,
                 add.Value.Amount,
@@ -101,6 +129,25 @@ namespace CafeHub.Application.Billing.Commands
                 paid,
                 billTotal - paid,
                 add.Value.ConfirmedAt!.Value));
+        }
+
+        private async Task<Result> TryAutoCloseAsync(
+            Bill bill,
+            decimal remainingAmount,
+            IReadOnlyList<Payment> payments,
+            Guid actorId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            if (remainingAmount != 0m
+                || bill.Status is not BillStatus.Open
+                || payments.Any(payment => payment.Status == PaymentStatus.PendingReview))
+            {
+                return Result.Success();
+            }
+
+            bill.Close(null, actorId, now);
+            return await billStore.SaveCloseAsync(bill, remainingAmount, actorId, cancellationToken);
         }
 
         private static ConfirmCashPaymentResult BuildSettlementResult(BillSettlement settlement, Payment payment)

@@ -19,7 +19,7 @@ namespace CafeHub.Infrastructure.Billing
             Guid billId,
             CancellationToken cancellationToken)
         {
-            var bills = context.Bills.AsNoTracking().Where(bill => bill.Id == billId);
+            var bills = context.Bills.Where(bill => bill.Id == billId);
             if (branchId is { } branch)
             {
                 bills = bills.Where(bill => bill.BranchId == branch);

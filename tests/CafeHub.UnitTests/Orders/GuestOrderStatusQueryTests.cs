@@ -161,7 +161,27 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(Reference, store.LastReference);
         }
 
-        private static GuestOrderEntry Entry(OrderStatus status) => new(
+        [Fact]
+        public async Task Status_CarriesTheBillReferenceOnlyOnceTheOrderIsAttached()
+        {
+            var attachedStore = new FakeGuestOrderStore(Entry(OrderStatus.Accepted, billReference: Reference));
+            var attached = await new GetGuestOrderStatusQueryHandler(new FakeSender(attachedStore), attachedStore)
+                .Handle(new GetGuestOrderStatusQuery(Reference), default);
+
+            Assert.True(attached.IsSuccess);
+            Assert.Equal(Reference, attached.Value!.BillReference);
+            Assert.Equal("Accepted", attached.Value.Status);
+            Assert.Equal(42.50m, attached.Value.TotalAmount);
+
+            var unattachedStore = new FakeGuestOrderStore(Entry(OrderStatus.Accepted));
+            var unattached = await new GetGuestOrderStatusQueryHandler(new FakeSender(unattachedStore), unattachedStore)
+                .Handle(new GetGuestOrderStatusQuery(Reference), default);
+
+            Assert.True(unattached.IsSuccess);
+            Assert.Null(unattached.Value!.BillReference);
+        }
+
+        private static GuestOrderEntry Entry(OrderStatus status, string? billReference = null) => new(
             OrderId,
             7,
             4,
@@ -171,7 +191,10 @@ namespace CafeHub.UnitTests.Orders
             SubmittedAt,
             Deadline,
             42.50m,
-            [new GuestOrderEntryItem("Latte", "Regular", 2, ["Milk"])]);
+            [new GuestOrderEntryItem("Latte", "Regular", 2, ["Milk"])])
+        {
+            BillReference = billReference,
+        };
 
         private sealed class FakeGuestOrderStore(GuestOrderEntry? entry) : IGuestOrderStore
         {

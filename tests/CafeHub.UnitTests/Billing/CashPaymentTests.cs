@@ -246,8 +246,77 @@ namespace CafeHub.UnitTests.Billing
             Assert.Equal(PaymentSettlement.Cash, Payment.ResolveSettlementType([pendingOnline]));
         }
 
-        private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store) =>
-            new(store, StaffUser(), new FixedClock(Now));
+        [Fact]
+        public async Task Confirm_ThePaymentThatClearsTheRemainingAmountClosesTheBill()
+        {
+            var store = new FakePaymentStore();
+            var order = AcceptedOrder("Latte", 10.00m);
+            store.SeedOpenBillWithAcceptedOrders(order);
+            var bills = new FakeBillStore();
+            var handler = CreateHandler(store, bills);
+
+            var result = await handler.Handle(new ConfirmCashPaymentCommand
+            {
+                BillId = store.BillId,
+                Amount = 10.00m,
+                IdempotencyKey = "cash-key-0001",
+            }, default);
+
+            Assert.True(result.IsSuccess, result.Error?.Code);
+            Assert.Equal(0m, result.Value!.BillRemainingAmount);
+            var closed = Assert.Single(bills.Closed);
+            Assert.Equal(BillStatus.Closed, closed.Status);
+            Assert.Equal(UserId, closed.ClosedByUserId);
+            Assert.Null(closed.CloseReason);
+            Assert.Equal(0m, Assert.Single(bills.ClosedRemaining));
+        }
+
+        [Fact]
+        public async Task Confirm_APendingPaymentKeepsTheBillOpen()
+        {
+            var store = new FakePaymentStore();
+            store.SeedOpenBillWithAcceptedOrders(AcceptedOrder("Latte", 10.00m));
+            store.SeedConfirmedPayment(store.BillId, 6.00m, IdempotencyKey: "cash-key-0001");
+            store.SeedPendingPayment(store.BillId, 4.00m, IdempotencyKey: "online-key-0001");
+            var bills = new FakeBillStore();
+            var handler = CreateHandler(store, bills);
+
+            var result = await handler.Handle(new ConfirmCashPaymentCommand
+            {
+                BillId = store.BillId,
+                Amount = 4.00m,
+                IdempotencyKey = "cash-key-0002",
+            }, default);
+
+            Assert.True(result.IsSuccess, result.Error?.Code);
+            Assert.Equal(0m, result.Value!.BillRemainingAmount);
+            Assert.Empty(bills.Closed);
+        }
+
+        [Fact]
+        public async Task Confirm_AClosedBillRefusesCash()
+        {
+            var store = new FakePaymentStore();
+            var order = AcceptedOrder("Latte", 10.00m);
+            store.SeedOpenBillWithAcceptedOrders(order);
+            var settlement = await store.FindSettlementAsync(null, store.BillId, default);
+            settlement!.Bill.Close("Staff shift ended", UserId, Now);
+            var handler = CreateHandler(store);
+
+            var result = await handler.Handle(new ConfirmCashPaymentCommand
+            {
+                BillId = store.BillId,
+                Amount = 10.00m,
+                IdempotencyKey = "cash-key-0001",
+            }, default);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(BillingErrors.BillClosedCode, result.Error!.Code);
+            Assert.Empty(store.Payments(store.BillId));
+        }
+
+        private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store, FakeBillStore? bills = null) =>
+            new(store, bills ?? new FakeBillStore(), StaffUser(), new FixedClock(Now));
 
         private static FakeTenantUser StaffUser() =>
             new(UserId, new TenantAccountAccess(true, null, true) { BranchId = BranchId });
@@ -313,6 +382,38 @@ namespace CafeHub.UnitTests.Billing
             public override DateTimeOffset GetUtcNow() => now;
         }
 
+        private sealed class FakeBillStore : IBillStore
+        {
+            public List<Bill> Closed { get; } = [];
+
+            public List<decimal> ClosedRemaining { get; } = [];
+
+            public Task<Result<Bill>> ResolveOpenBillAsync(
+                Guid branchId,
+                Guid tableId,
+                DateTimeOffset now,
+                Guid? actorId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The payment flow must not open a bill.");
+
+            public Task<BillSettlement?> FindForCloseAsync(
+                Guid? branchId,
+                Guid billId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The payment flow must not read a bill for closing.");
+
+            public Task<Result> SaveCloseAsync(
+                Bill bill,
+                decimal remainingAmount,
+                Guid actorId,
+                CancellationToken cancellationToken)
+            {
+                Closed.Add(bill);
+                ClosedRemaining.Add(remainingAmount);
+                return Task.FromResult(Result.Success());
+            }
+        }
+
         private sealed class FakePaymentStore : IPaymentStore
         {
             private readonly Dictionary<Guid, Bill> bills = [];
@@ -353,6 +454,20 @@ namespace CafeHub.UnitTests.Billing
             {
                 var payment = Payment.ConfirmCash(
                     Guid.CreateVersion7(), billId, null, amount, UserId, IdempotencyKey, Now, UserId);
+                if (!payments.TryGetValue(billId, out var billPayments))
+                {
+                    billPayments = [];
+                    payments[billId] = billPayments;
+                }
+
+                billPayments.Add(payment);
+            }
+
+            public void SeedPendingPayment(Guid billId, decimal amount, string IdempotencyKey)
+            {
+                var payment = Payment.ConfirmCash(
+                    Guid.CreateVersion7(), billId, null, amount, UserId, IdempotencyKey, Now, UserId);
+                typeof(Payment).GetProperty(nameof(Payment.Status))!.SetValue(payment, PaymentStatus.PendingReview);
                 if (!payments.TryGetValue(billId, out var billPayments))
                 {
                     billPayments = [];

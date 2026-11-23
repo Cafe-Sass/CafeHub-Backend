@@ -353,6 +353,20 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges BillClose(Bill bill, decimal remainingAmount)
+        {
+            ArgumentNullException.ThrowIfNull(bill);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(Bill.Status),
+                    BillStatus.Open.ToString(),
+                    bill.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Bill.CloseReason), null, bill.CloseReason),
+                new TenantAuditChanges.FieldChange("RemainingAmount", null, FormatNumber(remainingAmount)),
+            });
+        }
+
         private static string? FormatNumber(int? value) => value?.ToString(CultureInfo.InvariantCulture);
 
         private static string FormatNumber(decimal value) => value.ToString(CultureInfo.InvariantCulture);

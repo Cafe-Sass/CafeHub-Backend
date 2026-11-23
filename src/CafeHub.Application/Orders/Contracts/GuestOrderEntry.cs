@@ -10,5 +10,8 @@ namespace CafeHub.Application.Orders.Contracts
         DateTimeOffset SubmittedAt,
         DateTimeOffset ResponseDeadline,
         decimal TotalAmount,
-        IReadOnlyList<GuestOrderEntryItem> Items);
+        IReadOnlyList<GuestOrderEntryItem> Items)
+    {
+        public string? BillReference { get; init; }
+    }
 }
