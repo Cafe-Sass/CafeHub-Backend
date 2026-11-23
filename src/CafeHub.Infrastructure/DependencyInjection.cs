@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Branches.Contracts;
 using CafeHub.Application.CafeProfile.Contracts;
 using CafeHub.Application.Guests.Contracts;
@@ -22,6 +23,7 @@ using CafeHub.Application.Upgrades;
 using CafeHub.Application.Upgrades.Contracts;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
+using CafeHub.Infrastructure.Billing;
 using CafeHub.Infrastructure.Branches;
 using CafeHub.Infrastructure.CafeProfile;
 using CafeHub.Infrastructure.Guests;
@@ -155,6 +157,8 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IMissedResponseStore, MissedResponseStore>();
             services.AddScoped<IGuestMuteStore, GuestMuteStore>();
             services.AddScoped<IOrderPublicReferenceGenerator, OrderPublicReferenceGenerator>();
+            services.AddScoped<IBillStore, BillStore>();
+            services.AddScoped<IBillPublicReferenceGenerator, BillPublicReferenceGenerator>();
             services.AddScoped<IOrderNumberCounterStore, OrderNumberCounterStore>();
             services.AddScoped<ICafeBusinessDateProvider, CafeBusinessDateProvider>();
             services.AddScoped<IStationScope, StationScope>();

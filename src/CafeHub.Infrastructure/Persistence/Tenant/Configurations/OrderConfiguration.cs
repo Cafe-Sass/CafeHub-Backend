@@ -57,6 +57,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(order => order.RespondedByUserId).HasColumnName("responded_by_user_id").HasColumnType("uuid");
             builder.Property(order => order.RespondedAt).HasColumnName("responded_at").HasColumnType("timestamptz");
             builder.Property(order => order.RejectionReason).HasColumnName("rejection_reason").HasColumnType("text");
+            builder.Property(order => order.BillId).HasColumnName("bill_id").HasColumnType("uuid");
             builder.Property(order => order.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz");
             builder.Property(order => order.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz");
             builder.Property(order => order.CreatedBy).HasColumnName("created_by").HasColumnType("uuid");
@@ -78,6 +79,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.HasIndex(order => order.RespondedByUserId).HasDatabaseName("ix_orders_responded_by_user_id");
             builder.HasIndex(order => order.CreatedBy).HasDatabaseName("ix_orders_created_by");
             builder.HasIndex(order => order.UpdatedBy).HasDatabaseName("ix_orders_updated_by");
+            builder.HasIndex(order => order.BillId).HasDatabaseName("ix_orders_bill_id");
 
             builder.HasOne<Branch>()
                 .WithMany()
@@ -108,6 +110,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .WithMany()
                 .HasForeignKey(order => order.UpdatedBy)
                 .HasConstraintName("fk_orders_updated_by")
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne<Bill>()
+                .WithMany()
+                .HasForeignKey(order => order.BillId)
+                .HasConstraintName("fk_orders_bill_id")
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasMany(order => order.Items)

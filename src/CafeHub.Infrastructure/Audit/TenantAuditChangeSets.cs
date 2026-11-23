@@ -329,6 +329,17 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges BillOpen(Bill bill)
+        {
+            ArgumentNullException.ThrowIfNull(bill);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(Bill.Status), null, bill.Status.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(Bill.PublicReference), null, bill.PublicReference),
+                new TenantAuditChanges.FieldChange(nameof(Bill.BranchId), null, bill.BranchId.ToString()),
+            });
+        }
+
         private static string? FormatNumber(int? value) => value?.ToString(CultureInfo.InvariantCulture);
 
         private static string FormatNumber(decimal value) => value.ToString(CultureInfo.InvariantCulture);

@@ -250,6 +250,9 @@ erDiagram
     orders ||--o{ guest_mutes : "mute source order"
     tenant_users ||--o{ guest_mutes : "muted by"
     tenant_users |o--o{ guest_mutes : "lifted by"
+    branches ||--o{ bills : "bills"
+    branch_tables ||--o{ bills : "table bill"
+    bills |o--o{ orders : "orders"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -543,6 +546,7 @@ Purpose: one guest or captain submission from a table QR (FR-ORD-001 through FR-
 - `total_amount numeric(12,2) NOT NULL` — `ck_orders_total_amount_range CHECK (total_amount >= 0)`; always recomputed on the server from current sizes and add-ons.
 - `submitted_at timestamptz NOT NULL`, `response_deadline timestamptz NOT NULL` — `ck_orders_response_deadline CHECK (response_deadline > submitted_at)`. The deadline is the submission time plus the `Orders:ResponseWindowSeconds` window (Proposed default 300, pending owner confirmation).
 - `responded_by_user_id uuid NULL`, `responded_at timestamptz NULL`, `rejection_reason text NULL` — the decision fields of the later handling story. `ix_orders_responded_by_user_id` covers the foreign key to `tenant_users.id` (ON DELETE RESTRICT). `ck_orders_decision_pair CHECK ((responded_at IS NULL AND responded_by_user_id IS NULL) OR (responded_at IS NOT NULL AND responded_by_user_id IS NOT NULL))` keeps the pair consistent, and `ck_orders_rejection_reason CHECK (rejection_reason IS NULL OR (status = 'Rejected' AND char_length(rejection_reason) BETWEEN 1 AND 256))` limits a reason to a rejected order.
+- `bill_id uuid NULL` — `fk_orders_bill_id` to `bills.id` (ON DELETE RESTRICT); `ix_orders_bill_id`. The accept use case sets it in the same transaction as the decision (CFMD-426); orders accepted before the bill amendment keep NULL, and development data is never backfilled.
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_orders_created_by` / `fk_orders_updated_by` with ON DELETE RESTRICT and its own index.
 - `xmin` row version — the aggregate concurrency token.
 - Unique keys: `uq_orders_branch_business_date_number` on `(branch_id, business_date, order_number)`, `uq_orders_public_reference`, `uq_orders_branch_idempotency_key` on `(branch_id, idempotency_key)`. Lookup index: `ix_orders_branch_id_status_submitted_at` on `(branch_id, status, submitted_at)` for the staff queue.
@@ -616,13 +620,27 @@ Purpose: the accountable record of a guest device muted by staff (FR-ORD-010, PR
 - `lifted_at timestamptz NULL` and `lifted_by_user_id uuid NULL FK tenant_users.id` (`fk_guest_mutes_lifted_by_user_id`, ON DELETE RESTRICT) — the early-lift record; both are NULL while the mute is not lifted. An expired mute is inactive without being lifted, and no index enforces one active mute per device because the active window is time-dependent: the write path returns the existing active mute instead of creating a second one.
 - `created_at timestamptz NOT NULL` — the mute time; `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id` with `ix_guest_mutes_created_by` and `ix_guest_mutes_updated_by`.
 
+### bills
+
+Purpose: the per-table settlement bill (FR-PAY-001 through FR-PAY-005, Story CFMD-425, CFMD-426). One open bill per table: every accepted order attaches to it, and the bill total is the sum of its accepted orders' totals, derived at read time and never stored. Payment state is independent of order state and belongs to the later payments story; this table carries only the bill lifecycle.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_bills`.
+- `branch_id uuid NOT NULL` — `fk_bills_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_bills_branch_id`.
+- `table_id uuid NOT NULL` — `fk_bills_table_id` to `branch_tables.id` (ON DELETE RESTRICT); `ix_bills_table_id`. `uq_bills_table_open`, the unique partial index on `table_id` where `status = 'Open'`, allows at most one open bill per table; a concurrent accept that loses the insert race re-reads the winning open bill and never surfaces the database error.
+- `status text NOT NULL` — `ck_bills_status` over `('Open', 'Closed')`.
+- `public_reference text NOT NULL` — `ck_bills_public_reference_format CHECK (char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$')`; 16 random bytes encoded base64url, unique through `uq_bills_public_reference`. It is the only bill identifier a guest ever receives (**Proposed, pending owner confirmation**; the rejected alternative is exposing the internal UUID).
+- `opened_at timestamptz NOT NULL` — the moment the first accepted order opened the bill.
+- `closed_at timestamptz NULL`, `closed_by_user_id uuid NULL` (`fk_bills_closed_by_user_id` to `tenant_users.id`, ON DELETE RESTRICT; `ix_bills_closed_by_user_id`), `close_reason text NULL` — the closing record, filled by the close use case of the later sub-task; all three are NULL while the bill is open. `ck_bills_close_pair` keeps them consistent, and `ck_bills_close_reason` limits a reason to a closed bill (3 to 256 characters after trimming).
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_bills_created_by` / `fk_bills_updated_by` with ON DELETE RESTRICT and its own index.
+- `xmin` row version — the aggregate concurrency token.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
-- Bills, payments, and receipts — settlement, cash confirmation, online payments, and digital receipts (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
+- Payments and receipts — cash confirmation, online payments, and digital receipts; the `bills` schema is defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
 - Printing — local print jobs and connector targets (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD without a TBD number).

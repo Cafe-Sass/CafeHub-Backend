@@ -58,6 +58,8 @@ namespace CafeHub.Domain.Tenants
 
         public string? RejectionReason { get; private set; }
 
+        public Guid? BillId { get; private set; }
+
         public DateTimeOffset CreatedAt { get; private set; }
 
         public DateTimeOffset UpdatedAt { get; private set; }
@@ -216,6 +218,16 @@ namespace CafeHub.Domain.Tenants
             Status = OrderStatus.Expired;
             UpdatedAt = now;
             UpdatedBy = null;
+        }
+
+        public void AttachToBill(Guid billId)
+        {
+            if (billId == Guid.Empty)
+            {
+                throw new ArgumentException("The bill id is required.", nameof(billId));
+            }
+
+            BillId = billId;
         }
 
         private void ApplyDecision(Guid responderId, OrderStatus status, string? rejectionReason, DateTimeOffset now)

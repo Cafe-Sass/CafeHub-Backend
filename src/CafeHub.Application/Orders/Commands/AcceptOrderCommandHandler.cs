@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
@@ -13,6 +14,7 @@ namespace CafeHub.Application.Orders.Commands
     public sealed class AcceptOrderCommandHandler(
         ISender sender,
         IOrderDecisionStore decisionStore,
+        IBillStore billStore,
         ICurrentTenantUser currentUser,
         IStationScope stationScope,
         TimeProvider timeProvider,
@@ -57,6 +59,19 @@ namespace CafeHub.Application.Orders.Commands
             var now = timeProvider.GetUtcNow();
 
             order.Accept(currentUser.UserId!.Value, now);
+
+            var bill = await billStore.ResolveOpenBillAsync(
+                order.BranchId,
+                order.TableId,
+                now,
+                currentUser.UserId,
+                cancellationToken);
+            if (bill.IsFailure)
+            {
+                return Result.Failure<OrderDecisionResult>(bill.Error!);
+            }
+
+            order.AttachToBill(bill.Value.Id);
 
             var save = await decisionStore.SaveDecisionAsync(order, cancellationToken);
             if (save.IsFailure)

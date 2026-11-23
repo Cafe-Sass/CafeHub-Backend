@@ -22,6 +22,104 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("CloseReason")
+                        .HasColumnType("text")
+                        .HasColumnName("close_reason");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("closed_at");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("opened_at");
+
+                    b.Property<string>("PublicReference")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("public_reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bills");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_bills_branch_id");
+
+                    b.HasIndex("ClosedByUserId")
+                        .HasDatabaseName("ix_bills_closed_by_user_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_bills_created_by");
+
+                    b.HasIndex("PublicReference")
+                        .IsUnique()
+                        .HasDatabaseName("uq_bills_public_reference");
+
+                    b.HasIndex("TableId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_bills_table_open")
+                        .HasFilter("status = 'Open'");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_bills_updated_by");
+
+                    b.ToTable("bills", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bills_close_pair", "(closed_at IS NULL AND closed_by_user_id IS NULL AND close_reason IS NULL) OR (closed_at IS NOT NULL AND closed_by_user_id IS NOT NULL AND close_reason IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_bills_close_reason", "close_reason IS NULL OR (status = 'Closed' AND char_length(close_reason) BETWEEN 3 AND 256)");
+
+                            t.HasCheckConstraint("ck_bills_public_reference_format", "char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$'");
+
+                            t.HasCheckConstraint("ck_bills_status", "status IN ('Open', 'Closed')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Branch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -484,6 +582,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("BillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bill_id");
+
                     b.Property<Guid>("BranchId")
                         .HasColumnType("uuid")
                         .HasColumnName("branch_id");
@@ -591,6 +693,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_orders");
+
+                    b.HasIndex("BillId")
+                        .HasDatabaseName("ix_orders_bill_id");
 
                     b.HasIndex("CreatedBy")
                         .HasDatabaseName("ix_orders_created_by");
@@ -1899,6 +2004,41 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("tenant_user_stations", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bills_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bills_closed_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bills_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.BranchTable", null)
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bills_table_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bills_updated_by");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Branch", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
@@ -2047,6 +2187,12 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>
                 {
+                    b.HasOne("CafeHub.Domain.Tenants.Bill", null)
+                        .WithMany()
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_bill_id");
+
                     b.HasOne("CafeHub.Domain.Tenants.Branch", null)
                         .WithMany()
                         .HasForeignKey("BranchId")
