@@ -1030,6 +1030,97 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("order_response_miss_holders", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bill_id");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payments");
+
+                    b.HasIndex("ConfirmedByUserId")
+                        .HasDatabaseName("ix_payments_confirmed_by_user_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_payments_created_by");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_payments_order_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_payments_updated_by");
+
+                    b.HasIndex("BillId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_payments_bill_idempotency_key");
+
+                    b.ToTable("payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount_range", "amount > 0");
+
+                            t.HasCheckConstraint("ck_payments_confirmation_pair", "(status = 'Confirmed') = (confirmed_at IS NOT NULL AND confirmed_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_payments_idempotency_key_length", "char_length(idempotency_key) BETWEEN 1 AND 128");
+
+                            t.HasCheckConstraint("ck_payments_method", "method IN ('Cash', 'Online')");
+
+                            t.HasCheckConstraint("ck_payments_status", "status IN ('Confirmed', 'PendingReview', 'Rejected')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2354,6 +2445,40 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_order_response_miss_holders_user_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Payment", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Bill", null)
+                        .WithMany()
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payments_bill_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_confirmed_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_order_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_payments_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
