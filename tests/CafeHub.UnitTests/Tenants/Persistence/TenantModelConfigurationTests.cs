@@ -41,6 +41,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "product_tags",
             "branch_product_availability",
             "cafe_settings",
+            "cafe_payment_settings",
             "tenant_audit_records",
             "refresh_tokens",
             "orders",
