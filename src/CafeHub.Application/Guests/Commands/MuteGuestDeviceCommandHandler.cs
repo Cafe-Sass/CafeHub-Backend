@@ -65,6 +65,7 @@ namespace CafeHub.Application.Guests.Commands
                 return Result.Failure<GuestMuteResult>(created.Error!);
             }
 
+            var mutedByName = await store.FindUserNameAsync(mute.MutedByUserId, cancellationToken);
             return Result.Success(new GuestMuteResult(
                 mute.Id,
                 mute.OrderId,
@@ -73,7 +74,10 @@ namespace CafeHub.Application.Guests.Commands
                 mute.CreatedAt,
                 mute.ExpiresAt,
                 null,
-                mute.MutedByUserId));
+                mute.MutedByUserId)
+            {
+                MutedByName = mutedByName,
+            });
         }
     }
 }

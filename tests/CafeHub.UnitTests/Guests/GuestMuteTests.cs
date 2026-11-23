@@ -509,6 +509,17 @@ namespace CafeHub.UnitTests.Guests
                 return Task.FromResult(Entry);
             }
 
+            public Task<GuestMuteListPage> ListAsync(
+                GuestMuteListRequest request, CancellationToken cancellationToken) =>
+                Task.FromResult(new GuestMuteListPage([], null));
+
+            public Task<IReadOnlyList<GuestMuteSummaryEntry>> ListSummaryAsync(
+                GuestMuteSummaryRequest request, CancellationToken cancellationToken) =>
+                Task.FromResult<IReadOnlyList<GuestMuteSummaryEntry>>([]);
+
+            public Task<string?> FindUserNameAsync(Guid userId, CancellationToken cancellationToken) =>
+                Task.FromResult<string?>("Sara");
+
             public Task<Result> CreateAsync(GuestMute mute, CancellationToken cancellationToken)
             {
                 Created.Add(mute);

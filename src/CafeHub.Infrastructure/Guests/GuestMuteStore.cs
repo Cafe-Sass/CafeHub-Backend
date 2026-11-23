@@ -60,6 +60,90 @@ namespace CafeHub.Infrastructure.Guests
             return await entries.SingleOrDefaultAsync(cancellationToken);
         }
 
+        public async Task<GuestMuteListPage> ListAsync(
+            GuestMuteListRequest request,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            var entries = Project(context.GuestMutes.AsNoTracking())
+                .Where(entry => entry.BranchId == request.BranchId);
+
+            if (request.MutedByUserId is { } mutedByUserId)
+            {
+                entries = entries.Where(entry => entry.MutedByUserId == mutedByUserId);
+            }
+
+            if (request.IsActive is { } isActive)
+            {
+                entries = isActive
+                    ? entries.Where(entry => entry.LiftedAt == null && entry.ExpiresAt > request.Now)
+                    : entries.Where(entry => entry.LiftedAt != null || entry.ExpiresAt <= request.Now);
+            }
+
+            int? totalCount = request.IncludeTotalCount
+                ? await entries.CountAsync(cancellationToken)
+                : null;
+
+            var rows = await entries
+                .OrderByDescending(entry => entry.CreatedAt)
+                .ThenBy(entry => entry.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            return new GuestMuteListPage(rows.Take(request.PageSize).ToList(), totalCount);
+        }
+
+        public async Task<IReadOnlyList<GuestMuteSummaryEntry>> ListSummaryAsync(
+            GuestMuteSummaryRequest request,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            var counts = context.GuestMutes
+                .AsNoTracking()
+                .Where(mute => mute.BranchId == request.BranchId
+                    && mute.CreatedAt >= request.From
+                    && mute.CreatedAt < request.ToExclusive)
+                .GroupBy(mute => mute.MutedByUserId)
+                .Select(group => new
+                {
+                    UserId = group.Key,
+                    MuteCount = group.Count(),
+                    LiftedEarlyCount = group.Count(mute => mute.LiftedAt != null),
+                });
+
+            return await counts
+                .Join(
+                    context.TenantUsers.AsNoTracking(),
+                    count => count.UserId,
+                    user => user.Id,
+                    (count, user) => new
+                    {
+                        count.UserId,
+                        user.FullName,
+                        count.MuteCount,
+                        count.LiftedEarlyCount,
+                    })
+                .OrderByDescending(row => row.MuteCount)
+                .ThenBy(row => row.FullName)
+                .ThenBy(row => row.UserId)
+                .Select(row => new GuestMuteSummaryEntry(
+                    row.UserId,
+                    row.FullName,
+                    row.MuteCount,
+                    row.LiftedEarlyCount))
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<string?> FindUserNameAsync(Guid userId, CancellationToken cancellationToken) =>
+            await context.TenantUsers
+                .AsNoTracking()
+                .Where(user => user.Id == userId)
+                .Select(user => user.FullName)
+                .SingleOrDefaultAsync(cancellationToken);
+
         public async Task<Result> CreateAsync(GuestMute mute, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(mute);
@@ -131,6 +215,19 @@ namespace CafeHub.Infrastructure.Guests
                 mute.CreatedAt,
                 mute.ExpiresAt,
                 mute.LiftedAt,
-                mute.LiftedByUserId));
+                mute.LiftedByUserId)
+            {
+                DeviceId = mute.DeviceId,
+                MutedByName = context.TenantUsers
+                    .Where(user => user.Id == mute.MutedByUserId)
+                    .Select(user => user.FullName)
+                    .FirstOrDefault() ?? string.Empty,
+                LiftedByName = mute.LiftedByUserId == null
+                    ? null
+                    : context.TenantUsers
+                        .Where(user => user.Id == mute.LiftedByUserId)
+                        .Select(user => user.FullName)
+                        .FirstOrDefault(),
+            });
     }
 }

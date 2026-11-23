@@ -10,5 +10,12 @@ namespace CafeHub.Application.Guests.Contracts
         DateTimeOffset CreatedAt,
         DateTimeOffset ExpiresAt,
         DateTimeOffset? LiftedAt,
-        Guid? LiftedByUserId);
+        Guid? LiftedByUserId)
+    {
+        public string? DeviceId { get; init; }
+
+        public string MutedByName { get; init; } = string.Empty;
+
+        public string? LiftedByName { get; init; }
+    }
 }
