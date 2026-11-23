@@ -12,6 +12,8 @@ namespace CafeHub.Application.Identity
         public const string OrdersDecide = "orders.decide";
         public const string OrdersCaptain = "orders.captain";
         public const string PaymentsCashConfirm = "payments.cash.confirm";
+        public const string PaymentsSettingsManage = "payments.settings.manage";
+        public const string PaymentsOnlineReview = "payments.online.review";
         public const string MissesView = "orders.misses.view";
         public const string StaffManage = "staff.manage";
         public const string RolesManage = "roles.manage";
@@ -24,7 +26,7 @@ namespace CafeHub.Application.Identity
         public const string BillsClose = "bills.close";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage });
+            new[] { BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage });
 
         public static bool IsOwnerOnly(string? code) => code is RolesManage or BranchesManage or CafeProfileManage;
 
