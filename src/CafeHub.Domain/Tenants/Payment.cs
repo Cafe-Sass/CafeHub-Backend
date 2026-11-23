@@ -3,6 +3,8 @@ namespace CafeHub.Domain.Tenants
     public sealed class Payment
     {
         public const int MaximumIdempotencyKeyLength = 128;
+        public const int MaximumNoteLength = 140;
+        public const int MaximumMediaReferenceLength = 512;
         public const decimal MaximumAmount = 9_999_999_999.99m;
 
         private Payment()
@@ -26,6 +28,12 @@ namespace CafeHub.Domain.Tenants
         public DateTimeOffset? ConfirmedAt { get; private set; }
 
         public string IdempotencyKey { get; private set; } = string.Empty;
+
+        public string? MediaReference { get; private set; }
+
+        public decimal? ClaimedAmount { get; private set; }
+
+        public string? Note { get; private set; }
 
         public DateTimeOffset CreatedAt { get; private set; }
 
@@ -90,6 +98,68 @@ namespace CafeHub.Domain.Tenants
             };
         }
 
+        public static Payment SubmitOnlineProof(
+            Guid id,
+            Guid billId,
+            decimal claimedAmount,
+            string mediaReference,
+            string? note,
+            string idempotencyKey,
+            DateTimeOffset now)
+        {
+            if (id == Guid.Empty)
+            {
+                throw new ArgumentException("The payment id is required.", nameof(id));
+            }
+
+            if (billId == Guid.Empty)
+            {
+                throw new ArgumentException("The bill id is required.", nameof(billId));
+            }
+
+            if (!IsValidAmount(claimedAmount))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(claimedAmount),
+                    "The claimed amount must be greater than zero, at most two decimal places, and within numeric(12,2).");
+            }
+
+            if (string.IsNullOrWhiteSpace(mediaReference)
+                || mediaReference.Length > MaximumMediaReferenceLength)
+            {
+                throw new ArgumentException(
+                    "The media reference is required and must not exceed 512 characters.",
+                    nameof(mediaReference));
+            }
+
+            if (!IsValidNote(note))
+            {
+                throw new ArgumentException(
+                    "The note must be 1 to 140 characters without control characters.",
+                    nameof(note));
+            }
+
+            return new Payment
+            {
+                Id = id,
+                BillId = billId,
+                OrderId = null,
+                Method = PaymentMethod.Online,
+                Status = PaymentStatus.PendingReview,
+                Amount = claimedAmount,
+                ConfirmedByUserId = null,
+                ConfirmedAt = null,
+                IdempotencyKey = ValidateIdempotencyKey(idempotencyKey),
+                MediaReference = mediaReference,
+                ClaimedAmount = claimedAmount,
+                Note = note,
+                CreatedAt = now,
+                UpdatedAt = now,
+                CreatedBy = null,
+                UpdatedBy = null,
+            };
+        }
+
         public static bool IsValidAmount(decimal amount) =>
             amount > 0 && amount <= MaximumAmount && decimal.Round(amount, 2) == amount;
 
@@ -97,6 +167,15 @@ namespace CafeHub.Domain.Tenants
         {
             var trimmed = key?.Trim();
             return !string.IsNullOrEmpty(trimmed) && trimmed.Length <= MaximumIdempotencyKeyLength;
+        }
+
+        public static bool IsValidNote(string? note)
+        {
+            var trimmed = note?.Trim();
+            return trimmed is null
+                || (trimmed.Length >= 1
+                    && trimmed.Length <= MaximumNoteLength
+                    && !trimmed.Any(char.IsControl));
         }
 
         public static decimal ResolvePaidAmount(IReadOnlyCollection<Payment> payments)
