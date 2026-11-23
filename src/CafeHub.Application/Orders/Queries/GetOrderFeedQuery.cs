@@ -17,5 +17,7 @@ namespace CafeHub.Application.Orders.Queries
         public string? Status { get; init; }
 
         public DateTimeOffset? UpdatedSince { get; init; }
+
+        public bool IncludeMuted { get; init; }
     }
 }

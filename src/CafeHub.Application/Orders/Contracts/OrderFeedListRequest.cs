@@ -9,5 +9,6 @@ namespace CafeHub.Application.Orders.Contracts
         Guid BranchId,
         OrderStatus? Status,
         DateTimeOffset? UpdatedSince,
-        IReadOnlyList<Guid>? StationIds);
+        IReadOnlyList<Guid>? StationIds,
+        bool IncludeMuted);
 }

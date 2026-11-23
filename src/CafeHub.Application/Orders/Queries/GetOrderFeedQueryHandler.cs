@@ -72,7 +72,8 @@ namespace CafeHub.Application.Orders.Queries
                     branchId.Value,
                     status,
                     query.UpdatedSince,
-                    visibleStationIds),
+                    visibleStationIds,
+                    query.IncludeMuted),
                 cancellationToken);
 
             var visible = OrderFeedStationFilter.Apply(listPage.FetchedItems, visibleStationIds);
