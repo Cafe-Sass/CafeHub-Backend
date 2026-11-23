@@ -12,6 +12,10 @@ namespace CafeHub.Application.Guests.DTOs
         DateTimeOffset? LiftedAt,
         Guid MutedByUserId)
     {
+        public string? MutedByName { get; init; }
+
+        public string? LiftedByName { get; init; }
+
         public static GuestMuteResult From(GuestMuteEntry entry) => new(
             entry.Id,
             entry.OrderId,
@@ -20,6 +24,10 @@ namespace CafeHub.Application.Guests.DTOs
             entry.CreatedAt,
             entry.ExpiresAt,
             entry.LiftedAt,
-            entry.MutedByUserId);
+            entry.MutedByUserId)
+        {
+            MutedByName = entry.MutedByName,
+            LiftedByName = entry.LiftedByName,
+        };
     }
 }

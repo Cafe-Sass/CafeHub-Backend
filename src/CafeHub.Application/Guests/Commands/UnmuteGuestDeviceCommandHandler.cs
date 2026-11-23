@@ -47,7 +47,12 @@ namespace CafeHub.Application.Guests.Commands
                 return Result.Failure<GuestMuteResult>(lifted.Error!);
             }
 
-            return Result.Success(GuestMuteResult.From(entry) with { LiftedAt = now });
+            var liftedByName = await store.FindUserNameAsync(actorId, cancellationToken);
+            return Result.Success(GuestMuteResult.From(entry) with
+            {
+                LiftedAt = now,
+                LiftedByName = liftedByName,
+            });
         }
     }
 }

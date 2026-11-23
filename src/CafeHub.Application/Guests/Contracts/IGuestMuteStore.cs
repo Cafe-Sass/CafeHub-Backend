@@ -19,6 +19,14 @@ namespace CafeHub.Application.Guests.Contracts
 
         Task<GuestMuteEntry?> FindAsync(Guid? branchId, Guid muteId, CancellationToken cancellationToken);
 
+        Task<GuestMuteListPage> ListAsync(GuestMuteListRequest request, CancellationToken cancellationToken);
+
+        Task<IReadOnlyList<GuestMuteSummaryEntry>> ListSummaryAsync(
+            GuestMuteSummaryRequest request,
+            CancellationToken cancellationToken);
+
+        Task<string?> FindUserNameAsync(Guid userId, CancellationToken cancellationToken);
+
         Task<Result> CreateAsync(GuestMute mute, CancellationToken cancellationToken);
 
         Task<Result> LiftAsync(
