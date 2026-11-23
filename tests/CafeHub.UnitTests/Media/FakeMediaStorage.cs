@@ -11,6 +11,10 @@ namespace CafeHub.UnitTests.Media
 
         public int Count => files.Count;
 
+        public bool IsEmpty => files.Count == 0;
+
+        public Error? SaveFailure { get; set; }
+
         public async Task<Result<MediaStorageResult>> SaveAsync(
             MediaKey key,
             Stream content,
@@ -19,6 +23,11 @@ namespace CafeHub.UnitTests.Media
             if (files.ContainsKey(key.Value))
             {
                 return Result.Failure<MediaStorageResult>(MediaErrors.KeyExists());
+            }
+
+            if (SaveFailure is not null)
+            {
+                return Result.Failure<MediaStorageResult>(SaveFailure);
             }
 
             using var buffer = new MemoryStream();
