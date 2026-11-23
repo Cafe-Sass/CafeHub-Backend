@@ -100,6 +100,14 @@ namespace CafeHub.Infrastructure.Audit
                     "CloseReason",
                     "RemainingAmount",
                 },
+                ["cafe_payment_settings"] = new(StringComparer.Ordinal)
+                {
+                    "OnlineEnabled",
+                    "MethodLabel",
+                    "PaymentLink",
+                    "PaymentAddress",
+                    "DisplayName",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",
