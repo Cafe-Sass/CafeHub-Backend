@@ -2,6 +2,7 @@ using System.Text.Json;
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
@@ -338,8 +339,9 @@ namespace CafeHub.UnitTests.Orders
             RecordingAuditWriter audit,
             DateTimeOffset now,
             FakeStationScope? stations = null,
-            FakeSender? sender = null) =>
-            new(sender ?? new FakeSender(), store, user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+            FakeSender? sender = null,
+            IBillStore? bills = null) =>
+            new(sender ?? new FakeSender(), store, bills ?? new FakeBillStore(), user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
 
         private static RejectOrderCommandHandler CreateRejectHandler(
             FakeOrderDecisionStore store,
@@ -427,6 +429,27 @@ namespace CafeHub.UnitTests.Orders
                 return SaveFailure is not null
                     ? Task.FromResult(Result.Failure<OrderStatus>(SaveFailure))
                     : Task.FromResult(Result.Success(order.Status));
+            }
+        }
+
+        private sealed class FakeBillStore : IBillStore
+        {
+            private readonly Dictionary<Guid, Bill> openBills = [];
+
+            public Task<Result<Bill>> ResolveOpenBillAsync(
+                Guid branchId,
+                Guid tableId,
+                DateTimeOffset now,
+                Guid? actorId,
+                CancellationToken cancellationToken)
+            {
+                if (!openBills.TryGetValue(tableId, out var bill))
+                {
+                    bill = Bill.Create(Guid.CreateVersion7(), branchId, tableId, "Abcdefghijklmnopqrstuv", now, actorId);
+                    openBills[tableId] = bill;
+                }
+
+                return Task.FromResult(Result.Success(bill));
             }
         }
 
