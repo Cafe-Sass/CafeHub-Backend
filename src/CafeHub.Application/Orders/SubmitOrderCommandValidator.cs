@@ -19,6 +19,9 @@ namespace CafeHub.Application.Orders
             RuleFor(command => command.ActingStaffUserId).Null()
                 .When(command => command.Source == OrderSource.Guest)
                 .WithMessage("A guest submission cannot name an acting staff user.");
+            RuleFor(command => command.ActingStaffUserId).NotNull()
+                .When(command => command.Source == OrderSource.Captain)
+                .WithMessage("A captain submission requires the acting staff user.");
 
             RuleFor(command => command.GuestDisplayName).Must(Order.IsValidGuestDisplayName)
                 .WithMessage("The guest name must be 1 to 64 characters after trimming, with no control characters.");

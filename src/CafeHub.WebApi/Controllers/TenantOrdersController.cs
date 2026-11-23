@@ -1,10 +1,13 @@
 using CafeHub.Application.Abstractions.Correlation;
+using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Orders.Queries;
 using CafeHub.Application.Pagination;
+using CafeHub.Domain.Tenants;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Errors;
 using MediatR;
@@ -16,6 +19,8 @@ namespace CafeHub.WebApi.Controllers
     [Route("t/{slug}/api/v1/orders")]
     public sealed class TenantOrdersController : ControllerBase
     {
+        private const string IdempotencyKeyHeaderName = "Idempotency-Key";
+
         private readonly ISender sender;
         private readonly ICorrelationIdAccessor? correlationIdAccessor;
 
@@ -88,6 +93,59 @@ namespace CafeHub.WebApi.Controllers
             }
 
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("assisted")]
+        [TenantAuthorize(TenantPermissions.OrdersCaptain)]
+        [ProducesResponseType<AssistedOrderResponse>(StatusCodes.Status201Created, "application/json")]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+        public async Task<ActionResult<AssistedOrderResponse>> SubmitAssisted(
+            [FromRoute] string slug,
+            [FromBody] SubmitAssistedOrderRequest request,
+            [FromHeader(Name = IdempotencyKeyHeaderName)] string? idempotencyKey,
+            CancellationToken cancellationToken)
+        {
+            if (!Enum.TryParse<OrderServiceType>(request.ServiceType, true, out var serviceType)
+                || !Enum.IsDefined(serviceType))
+            {
+                return Result.Failure<AssistedOrderResponse>(OrdersErrors.InvalidServiceType())
+                    .ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            var command = new SubmitAssistedOrderCommand
+            {
+                IdempotencyKey = idempotencyKey,
+                TableId = request.TableId,
+                ServiceType = serviceType,
+                GuestDisplayName = request.GuestDisplayName ?? string.Empty,
+                ExpectedTotal = request.ExpectedTotal,
+                Lines = request.Lines?
+                    .Select(line => new SubmitOrderLine(
+                        line.ProductId,
+                        line.SizeId,
+                        line.AddonIds ?? [],
+                        line.Quantity,
+                        line.ExpectedUnitPrice,
+                        line.ExpectedAddonPrices ?? []))
+                    .ToArray() ?? [],
+            };
+
+            var result = await sender.Send(command, cancellationToken);
+            if (result.IsFailure)
+            {
+                return result.ToProblemResult(HttpContext, correlationIdAccessor);
+            }
+
+            return Created(
+                $"/t/{slug}/api/v1/orders",
+                new AssistedOrderResponse(
+                    result.Value.OrderNumber,
+                    result.Value.PublicReference,
+                    result.Value.Status,
+                    result.Value.TotalAmount));
         }
 
         [HttpGet("missed-summary")]
