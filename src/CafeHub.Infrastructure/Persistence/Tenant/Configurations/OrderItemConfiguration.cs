@@ -19,6 +19,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 table.HasCheckConstraint("ck_order_items_quantity_range", "quantity BETWEEN 1 AND 50");
                 table.HasCheckConstraint(
                     "ck_order_items_line_total_range", "line_total >= 0 AND line_total <= 99999999.99");
+                table.HasCheckConstraint(
+                    "ck_order_items_product_or_wifi", "(product_id IS NULL) <> (wifi_package_id IS NULL)");
+                table.HasCheckConstraint(
+                    "ck_order_items_wifi_snapshot",
+                    "wifi_package_id IS NULL OR (wifi_duration_minutes IS NOT NULL AND wifi_duration_minutes BETWEEN 1 AND 43200)");
             });
 
             builder.HasKey(item => item.Id).HasName("pk_order_items");
@@ -27,6 +32,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(item => item.LineNumber).HasColumnName("line_number").HasColumnType("integer");
             builder.Property(item => item.ProductId).HasColumnName("product_id").HasColumnType("uuid");
             builder.Property(item => item.ProductSizeId).HasColumnName("product_size_id").HasColumnType("uuid");
+            builder.Property(item => item.WifiPackageId).HasColumnName("wifi_package_id").HasColumnType("uuid");
+            builder.Property(item => item.WifiDurationMinutes).HasColumnName("wifi_duration_minutes").HasColumnType("integer");
+            builder.Property(item => item.WifiSpeedMbps).HasColumnName("wifi_speed_mbps").HasColumnType("numeric(9,2)").HasPrecision(9, 2);
             builder.Property(item => item.StationId).HasColumnName("station_id").HasColumnType("uuid");
             builder.Property(item => item.ProductName).HasColumnName("product_name").HasColumnType("text");
             builder.Property(item => item.SizeName).HasColumnName("size_name").HasColumnType("text");
@@ -44,6 +52,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .IsUnique();
             builder.HasIndex(item => item.ProductId).HasDatabaseName("ix_order_items_product_id");
             builder.HasIndex(item => item.ProductSizeId).HasDatabaseName("ix_order_items_product_size_id");
+            builder.HasIndex(item => item.WifiPackageId).HasDatabaseName("ix_order_items_wifi_package_id");
             builder.HasIndex(item => item.StationId).HasDatabaseName("ix_order_items_station_id");
             builder.HasIndex(item => item.CreatedBy).HasDatabaseName("ix_order_items_created_by");
             builder.HasIndex(item => item.UpdatedBy).HasDatabaseName("ix_order_items_updated_by");
@@ -57,6 +66,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .WithMany()
                 .HasForeignKey(item => item.ProductSizeId)
                 .HasConstraintName("fk_order_items_product_size_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne<WifiPackage>()
+                .WithMany()
+                .HasForeignKey(item => item.WifiPackageId)
+                .HasConstraintName("fk_order_items_wifi_package_id")
                 .OnDelete(DeleteBehavior.Restrict);
             builder.HasOne<Station>()
                 .WithMany()

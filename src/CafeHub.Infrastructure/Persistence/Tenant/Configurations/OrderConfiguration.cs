@@ -11,7 +11,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.ToTable("orders", table =>
             {
                 table.HasCheckConstraint("ck_orders_order_number", "order_number >= 1");
-                table.HasCheckConstraint("ck_orders_service_type", "service_type IN ('DineIn', 'Takeaway')");
+                table.HasCheckConstraint("ck_orders_service_type", "service_type IN ('DineIn', 'Takeaway', 'WifiOnly')");
+                table.HasCheckConstraint(
+                    "ck_orders_service_table",
+                    "(service_type = 'WifiOnly' AND table_id IS NULL) OR (service_type <> 'WifiOnly' AND table_id IS NOT NULL)");
                 table.HasCheckConstraint("ck_orders_status", "status IN ('Pending', 'Accepted', 'Rejected', 'Expired')");
                 table.HasCheckConstraint("ck_orders_source", "source IN ('Guest', 'Captain')");
                 table.HasCheckConstraint(

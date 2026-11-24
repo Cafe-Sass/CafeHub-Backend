@@ -66,7 +66,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
-                    b.Property<Guid>("TableId")
+                    b.Property<Guid?>("TableId")
                         .HasColumnType("uuid")
                         .HasColumnName("table_id");
 
@@ -852,7 +852,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("submitted_at");
 
-                    b.Property<Guid>("TableId")
+                    b.Property<Guid?>("TableId")
                         .HasColumnType("uuid")
                         .HasColumnName("table_id");
 
@@ -931,7 +931,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                             t.HasCheckConstraint("ck_orders_response_deadline", "response_deadline > submitted_at");
 
-                            t.HasCheckConstraint("ck_orders_service_type", "service_type IN ('DineIn', 'Takeaway')");
+                            t.HasCheckConstraint("ck_orders_service_table", "(service_type = 'WifiOnly' AND table_id IS NULL) OR (service_type <> 'WifiOnly' AND table_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_orders_service_type", "service_type IN ('DineIn', 'Takeaway', 'WifiOnly')");
 
                             t.HasCheckConstraint("ck_orders_source", "source IN ('Guest', 'Captain')");
 
@@ -1007,6 +1009,19 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("updated_by");
 
+                    b.Property<int?>("WifiDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("wifi_duration_minutes");
+
+                    b.Property<Guid?>("WifiPackageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wifi_package_id");
+
+                    b.Property<decimal?>("WifiSpeedMbps")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("wifi_speed_mbps");
+
                     b.HasKey("Id")
                         .HasName("pk_order_items");
 
@@ -1028,6 +1043,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_order_items_updated_by");
 
+                    b.HasIndex("WifiPackageId")
+                        .HasDatabaseName("ix_order_items_wifi_package_id");
+
                     b.HasIndex("OrderId", "LineNumber")
                         .IsUnique()
                         .HasDatabaseName("uq_order_items_order_id_line_number");
@@ -1040,11 +1058,15 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                             t.HasCheckConstraint("ck_order_items_product_name_length", "char_length(product_name) BETWEEN 1 AND 96");
 
+                            t.HasCheckConstraint("ck_order_items_product_or_wifi", "(product_id IS NULL) <> (wifi_package_id IS NULL)");
+
                             t.HasCheckConstraint("ck_order_items_quantity_range", "quantity BETWEEN 1 AND 50");
 
                             t.HasCheckConstraint("ck_order_items_size_name_length", "char_length(size_name) BETWEEN 1 AND 32");
 
                             t.HasCheckConstraint("ck_order_items_unit_price_range", "unit_price >= 0 AND unit_price <= 99999999.99");
+
+                            t.HasCheckConstraint("ck_order_items_wifi_snapshot", "wifi_package_id IS NULL OR (wifi_duration_minutes IS NOT NULL AND wifi_duration_minutes BETWEEN 1 AND 43200)");
                         });
                 });
 
@@ -2756,7 +2778,6 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .WithMany()
                         .HasForeignKey("TableId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_bills_table_id");
 
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
@@ -3008,7 +3029,6 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .WithMany()
                         .HasForeignKey("TableId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_orders_table_id");
 
                     b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
@@ -3056,6 +3076,12 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_order_items_updated_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.WifiPackage", null)
+                        .WithMany()
+                        .HasForeignKey("WifiPackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_order_items_wifi_package_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.OrderItemAddon", b =>
