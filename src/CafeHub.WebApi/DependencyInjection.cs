@@ -194,6 +194,15 @@ namespace CafeHub.WebApi
                     policy.AddRequirements(new TenantBoundRequirement());
                     policy.RequireAssertion(context => context.Resource is HttpContext httpContext
                         && httpContext.Items[typeof(TenantAccountAccess)] is TenantAccountAccess { IsStaff: false });
+                })
+                .AddPolicy(TenantPolicies.WifiIssuedRead, policy =>
+                {
+                    policy.AddAuthenticationSchemes(TenantAuthenticationSchemes.Bearer);
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(
+                        new TenantBoundRequirement(),
+                        new TenantAnyPermissionRequirement(
+                            [TenantPermissions.WifiManage, TenantPermissions.WifiLookup]));
                 });
 
             foreach (var permission in TenantPermissions.All)
@@ -210,6 +219,7 @@ namespace CafeHub.WebApi
             services.AddScoped<ICurrentTenantUser, HttpContextCurrentTenantUser>();
             services.AddScoped<IAuthorizationHandler, TenantBoundAuthorizationHandler>();
             services.AddScoped<IAuthorizationHandler, TenantPermissionAuthorizationHandler>();
+            services.AddScoped<IAuthorizationHandler, TenantAnyPermissionAuthorizationHandler>();
 
             return services;
         }
