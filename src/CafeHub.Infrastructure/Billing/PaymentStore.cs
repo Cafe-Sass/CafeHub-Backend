@@ -71,6 +71,52 @@ namespace CafeHub.Infrastructure.Billing
             return new BillSettlement(bill, orders, payments);
         }
 
+        public async Task<PaymentReview?> FindReviewAsync(
+            Guid? branchId,
+            Guid paymentId,
+            CancellationToken cancellationToken)
+        {
+            var billId = await context.Payments.AsNoTracking()
+                .Where(payment => payment.Id == paymentId)
+                .Select(payment => (Guid?)payment.BillId)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (billId is null)
+            {
+                return null;
+            }
+
+            var bills = context.Bills.Where(bill => bill.Id == billId);
+            if (branchId is { } branch)
+            {
+                bills = bills.Where(bill => bill.BranchId == branch);
+            }
+
+            var bill = await bills.SingleOrDefaultAsync(cancellationToken);
+            if (bill is null)
+            {
+                return null;
+            }
+
+            await context.LockBillAsync(bill.Id, cancellationToken);
+
+            var orders = await context.Orders.AsNoTracking()
+                .Where(order => order.BillId == bill.Id)
+                .OrderBy(order => order.OrderNumber)
+                .ToListAsync(cancellationToken);
+            var payments = await context.Payments
+                .Where(payment => payment.BillId == bill.Id)
+                .OrderBy(payment => payment.CreatedAt)
+                .ThenBy(payment => payment.Id)
+                .ToListAsync(cancellationToken);
+            var reviewed = payments.SingleOrDefault(payment => payment.Id == paymentId);
+            if (reviewed is null)
+            {
+                return null;
+            }
+
+            return new PaymentReview(new BillSettlement(bill, orders, payments), reviewed);
+        }
+
         public async Task<Result<Payment>> AddProofAsync(Payment payment, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(payment);
@@ -97,6 +143,32 @@ namespace CafeHub.Infrastructure.Billing
 
                 return Result.Success(stored);
             }
+        }
+
+        public async Task<Result<Payment>> SaveReviewAsync(
+            Payment payment,
+            string? rejectionReason,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(payment);
+
+            var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry
+            {
+                Action = payment.Status == PaymentStatus.Confirmed
+                    ? "payments.online.confirmed.succeeded"
+                    : "payments.online.rejected.succeeded",
+                TargetType = TargetType,
+                TargetId = payment.Id,
+                ActorUserId = payment.UpdatedBy,
+                Changes = TenantAuditChangeSets.PaymentReview(payment, rejectionReason),
+            }, cancellationToken);
+            if (auditResult.IsFailure)
+            {
+                return Result.Failure<Payment>(auditResult.Error!);
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+            return Result.Success(payment);
         }
 
         public async Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken)

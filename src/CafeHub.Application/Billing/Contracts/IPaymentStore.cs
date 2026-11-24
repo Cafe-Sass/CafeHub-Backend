@@ -9,7 +9,8 @@ namespace CafeHub.Application.Billing.Contracts
     /// remaining check; the add persists the payment and its audit record as one save, and a concurrent
     /// confirm that lost the (bill, idempotency key) race returns the stored payment instead of a
     /// database error. A guest-submitted proof is persisted without an audit record: the submission
-    /// is anonymous and the proof note, media key, and image are never audited.
+    /// is anonymous and the proof note, media key, and image are never audited. A staff decision loads
+    /// the locked settlement and persists the payment with its audit record as one save.
     /// </summary>
     public interface IPaymentStore
     {
@@ -22,7 +23,17 @@ namespace CafeHub.Application.Billing.Contracts
             string billReference,
             CancellationToken cancellationToken);
 
+        Task<PaymentReview?> FindReviewAsync(
+            Guid? branchId,
+            Guid paymentId,
+            CancellationToken cancellationToken);
+
         Task<Result<Payment>> AddProofAsync(Payment payment, CancellationToken cancellationToken);
+
+        Task<Result<Payment>> SaveReviewAsync(
+            Payment payment,
+            string? rejectionReason,
+            CancellationToken cancellationToken);
 
         Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken);
     }
