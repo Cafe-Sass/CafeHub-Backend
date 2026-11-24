@@ -5,6 +5,7 @@ using CafeHub.Application.Wifi;
 using CafeHub.Application.Wifi.Contracts;
 using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
+using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -89,34 +90,7 @@ namespace CafeHub.Infrastructure.Wifi
                 TargetType = TargetType,
                 TargetId = package.Id,
                 ActorUserId = package.CreatedBy,
-                Changes = TenantAuditChanges.Create(new[]
-                {
-                    new TenantAuditChanges.FieldChange(nameof(WifiPackage.Name), null, package.Name),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.DurationMinutes),
-                        null,
-                        package.DurationMinutes.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.SpeedMbps),
-                        null,
-                        package.SpeedMbps?.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.DataMode), null, package.DataMode.ToString()),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.QuotaMb),
-                        null,
-                        package.QuotaMb?.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.Price),
-                        null,
-                        package.Price.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.SortOrder),
-                        null,
-                        package.SortOrder.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.Status), null, package.Status.ToString()),
-                }),
+                Changes = TenantAuditChangeSets.WifiPackageCreate(package),
             }, cancellationToken);
             if (auditResult.IsFailure)
             {
@@ -165,16 +139,7 @@ namespace CafeHub.Infrastructure.Wifi
                 return Result.Failure<WifiPackageResponse>(WifiErrors.PackageConcurrencyConflict());
             }
 
-            var old = new
-            {
-                package.Name,
-                package.DurationMinutes,
-                package.SpeedMbps,
-                package.DataMode,
-                package.QuotaMb,
-                package.Price,
-                package.SortOrder,
-            };
+            var before = WifiPackageAuditValues.From(package);
             if (!package.Update(
                     name,
                     durationMinutes,
@@ -196,32 +161,7 @@ namespace CafeHub.Infrastructure.Wifi
                 TargetType = TargetType,
                 TargetId = package.Id,
                 ActorUserId = actorUserId,
-                Changes = TenantAuditChanges.Update(new[]
-                {
-                    new TenantAuditChanges.FieldChange(nameof(WifiPackage.Name), old.Name, package.Name),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.DurationMinutes),
-                        old.DurationMinutes.ToString(CultureInfo.InvariantCulture),
-                        package.DurationMinutes.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.SpeedMbps),
-                        old.SpeedMbps?.ToString(CultureInfo.InvariantCulture),
-                        package.SpeedMbps?.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.DataMode), old.DataMode.ToString(), package.DataMode.ToString()),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.QuotaMb),
-                        old.QuotaMb?.ToString(CultureInfo.InvariantCulture),
-                        package.QuotaMb?.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.Price),
-                        old.Price.ToString(CultureInfo.InvariantCulture),
-                        package.Price.ToString(CultureInfo.InvariantCulture)),
-                    new TenantAuditChanges.FieldChange(
-                        nameof(WifiPackage.SortOrder),
-                        old.SortOrder.ToString(CultureInfo.InvariantCulture),
-                        package.SortOrder.ToString(CultureInfo.InvariantCulture)),
-                }),
+                Changes = TenantAuditChangeSets.WifiPackageUpdate(before, package),
             }, cancellationToken);
             if (auditResult.IsFailure)
             {
