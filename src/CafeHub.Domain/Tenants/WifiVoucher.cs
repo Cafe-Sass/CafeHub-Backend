@@ -76,7 +76,8 @@ namespace CafeHub.Domain.Tenants
         }
 
         public bool Void(DateTimeOffset now)
-        {            if (Status != WifiVoucherStatus.Available)
+        {
+            if (Status != WifiVoucherStatus.Available)
             {
                 throw new InvalidOperationException($"Only an available voucher can be voided. The status is {Status}.");
             }
