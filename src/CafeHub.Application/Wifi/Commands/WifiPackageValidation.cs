@@ -14,13 +14,13 @@ namespace CafeHub.Application.Wifi.Commands
             if (dataMode == WifiDataMode.Limited && quotaMb is null)
             {
                 context.AddFailure(new ValidationFailure(
-                    nameof(quotaMb), "A limited data mode requires a quota in MB."));
+                    "QuotaMb", "A limited data mode requires a quota in MB."));
             }
 
             if (dataMode == WifiDataMode.Unlimited && quotaMb is not null)
             {
                 context.AddFailure(new ValidationFailure(
-                    nameof(quotaMb), "An unlimited data mode cannot carry a quota."));
+                    "QuotaMb", "An unlimited data mode cannot carry a quota."));
             }
         }
     }
