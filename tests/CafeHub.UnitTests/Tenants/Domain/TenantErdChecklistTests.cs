@@ -38,6 +38,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "guest_mutes",
             "bills",
             "payments",
+            "receipts",
+            "receipt_lines",
+            "receipt_payments",
+            "receipt_number_counters",
         ];
 
         [Fact]
@@ -89,6 +93,10 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "guest_mutes" => nameof(GuestMute),
                     "bills" => nameof(Bill),
                     "payments" => nameof(Payment),
+                    "receipts" => nameof(Receipt),
+                    "receipt_lines" => nameof(ReceiptLine),
+                    "receipt_payments" => nameof(ReceiptPayment),
+                    "receipt_number_counters" => nameof(ReceiptNumberCounter),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

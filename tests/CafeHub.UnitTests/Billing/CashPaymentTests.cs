@@ -253,7 +253,8 @@ namespace CafeHub.UnitTests.Billing
             var order = AcceptedOrder("Latte", 10.00m);
             store.SeedOpenBillWithAcceptedOrders(order);
             var bills = new FakeBillStore();
-            var handler = CreateHandler(store, bills);
+            var receipts = new FakeReceiptIssuer();
+            var handler = CreateHandler(store, bills, receipts);
 
             var result = await handler.Handle(new ConfirmCashPaymentCommand
             {
@@ -269,6 +270,7 @@ namespace CafeHub.UnitTests.Billing
             Assert.Equal(UserId, closed.ClosedByUserId);
             Assert.Null(closed.CloseReason);
             Assert.Equal(0m, Assert.Single(bills.ClosedRemaining));
+            Assert.Single(receipts.Issued);
         }
 
         [Fact]
@@ -315,8 +317,11 @@ namespace CafeHub.UnitTests.Billing
             Assert.Empty(store.Payments(store.BillId));
         }
 
-        private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store, FakeBillStore? bills = null) =>
-            new(store, bills ?? new FakeBillStore(), new FakeReceiptIssuer(), StaffUser(), new FixedClock(Now));
+        private static ConfirmCashPaymentCommandHandler CreateHandler(
+            FakePaymentStore store,
+            FakeBillStore? bills = null,
+            FakeReceiptIssuer? receipts = null) =>
+            new(store, bills ?? new FakeBillStore(), receipts ?? new FakeReceiptIssuer(), StaffUser(), new FixedClock(Now));
 
         private static FakeTenantUser StaffUser() =>
             new(UserId, new TenantAccountAccess(true, null, true) { BranchId = BranchId });
