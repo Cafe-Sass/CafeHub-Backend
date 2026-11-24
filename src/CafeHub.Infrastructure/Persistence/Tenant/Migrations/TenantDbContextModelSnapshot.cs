@@ -1207,6 +1207,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                             t.HasCheckConstraint("ck_payments_media_reference_length", "media_reference IS NULL OR length(media_reference) <= 512");
 
+                            t.HasCheckConstraint("ck_payments_method", "method IN ('Cash', 'Online')");
+
                             t.HasCheckConstraint("ck_payments_note_length", "note IS NULL OR (length(note) >= 1 AND length(note) <= 140 AND note !~ '[[:cntrl:]]')");
 
                             t.HasCheckConstraint("ck_payments_online_proof", "method <> 'Online' OR (media_reference IS NOT NULL AND claimed_amount IS NOT NULL)");
