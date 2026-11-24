@@ -120,6 +120,17 @@ namespace CafeHub.Infrastructure.Audit
                     "Ssid",
                     "Security",
                 },
+                ["wifi_packages"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "DurationMinutes",
+                    "SpeedMbps",
+                    "DataMode",
+                    "QuotaMb",
+                    "Price",
+                    "SortOrder",
+                    "Status",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",

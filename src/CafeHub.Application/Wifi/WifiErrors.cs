@@ -14,5 +14,28 @@ namespace CafeHub.Application.Wifi
             Error.Conflict(
                 ConcurrencyConflictCode,
                 "The WiFi settings were modified by another request. Please reload and try again.");
+
+        public const string PackageNotFoundCode = "Wifi.PackageNotFound";
+        public const string PackageNameConflictCode = "Wifi.PackageNameConflict";
+        public const string PackagesRequirePaidPolicyCode = "Wifi.PackagesRequirePaidPolicy";
+        public const string PackageConcurrencyConflictCode = "Wifi.PackageConcurrencyConflict";
+
+        public static Error PackageNotFound() =>
+            Error.NotFound(PackageNotFoundCode, "The WiFi package was not found.");
+
+        public static Error PackageNameConflict() =>
+            Error.Conflict(
+                PackageNameConflictCode,
+                "Another active WiFi package already uses this name.");
+
+        public static Error PackagesRequirePaidPolicy() =>
+            Error.Conflict(
+                PackagesRequirePaidPolicyCode,
+                "WiFi packages can be managed only while the cafe policy is Paid.");
+
+        public static Error PackageConcurrencyConflict() =>
+            Error.Conflict(
+                PackageConcurrencyConflictCode,
+                "The WiFi package was modified by another request. Please reload and try again.");
     }
 }
