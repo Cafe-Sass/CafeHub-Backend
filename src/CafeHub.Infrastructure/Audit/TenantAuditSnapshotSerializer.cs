@@ -131,6 +131,10 @@ namespace CafeHub.Infrastructure.Audit
                     "SortOrder",
                     "Status",
                 },
+                ["branch_wifi_qr"] = new(StringComparer.Ordinal)
+                {
+                    "Status",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",
