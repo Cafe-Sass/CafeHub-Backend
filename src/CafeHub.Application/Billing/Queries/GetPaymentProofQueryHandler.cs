@@ -47,7 +47,7 @@ namespace CafeHub.Application.Billing.Queries
             }
 
             var detected = MediaFileValidator.Detect(content);
-            if (detected is null)
+            if (detected is null || !MediaPurposes.Allows(MediaPurpose.PaymentProof, detected.Value))
             {
                 await content.DisposeAsync();
                 return Result.Failure<PaymentProofFile>(BillingErrors.PaymentNotFound());
