@@ -1868,6 +1868,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("unit_price");
 
+                    b.Property<string>("WifiCode")
+                        .HasColumnType("text")
+                        .HasColumnName("wifi_code");
+
                     b.HasKey("Id")
                         .HasName("pk_receipt_lines");
 
@@ -1891,6 +1895,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                             t.HasCheckConstraint("ck_receipt_lines_size_name", "char_length(size_name) BETWEEN 1 AND 32");
 
                             t.HasCheckConstraint("ck_receipt_lines_unit_price", "unit_price >= 0 AND unit_price <= 99999999.99");
+
+                            t.HasCheckConstraint("ck_receipt_lines_wifi_code", "wifi_code IS NULL OR (char_length(wifi_code) BETWEEN 4 AND 64 AND wifi_code ~ '^[A-Za-z0-9-]+$')");
                         });
                 });
 

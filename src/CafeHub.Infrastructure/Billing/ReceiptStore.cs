@@ -45,6 +45,7 @@ namespace CafeHub.Infrastructure.Billing
 
             var businessDate = await businessDateProvider.GetBusinessDateAsync(cancellationToken);
             var number = await AllocateNumberAsync(bill.BranchId, businessDate, cancellationToken);
+            var wifiCodes = await ReadReleasedWifiCodesAsync(acceptedOrders, cancellationToken);
             var receipt = ReceiptComposer.Compose(
                 Guid.CreateVersion7(),
                 bill,
@@ -52,7 +53,8 @@ namespace CafeHub.Infrastructure.Billing
                 payments,
                 Receipt.FormatReceiptNumber(businessDate, number),
                 now,
-                actorId);
+                actorId,
+                wifiCodes);
 
             context.Receipts.Add(receipt);
             try
@@ -65,6 +67,28 @@ namespace CafeHub.Infrastructure.Billing
                 DetachAddedReceipt(receipt);
                 return Result.Success();
             }
+        }
+
+        private async Task<Dictionary<Guid, string>> ReadReleasedWifiCodesAsync(
+            IReadOnlyList<Order> acceptedOrders,
+            CancellationToken cancellationToken)
+        {
+            var itemIds = acceptedOrders
+                .SelectMany(order => order.Items)
+                .Select(item => item.Id)
+                .ToArray();
+            if (itemIds.Length == 0)
+            {
+                return [];
+            }
+
+            var rows = await context.WifiVouchers.AsNoTracking()
+                .Where(voucher => voucher.AssignedOrderItemId != null
+                    && itemIds.Contains(voucher.AssignedOrderItemId.Value))
+                .Select(voucher => new { ItemId = voucher.AssignedOrderItemId!.Value, voucher.Code })
+                .ToListAsync(cancellationToken);
+
+            return rows.ToDictionary(row => row.ItemId, row => row.Code);
         }
 
         private async Task<int> AllocateNumberAsync(

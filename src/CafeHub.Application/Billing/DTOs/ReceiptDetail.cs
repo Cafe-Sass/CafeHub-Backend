@@ -34,7 +34,8 @@ namespace CafeHub.Application.Billing.DTOs
                             line.Addons,
                             line.Quantity,
                             line.UnitPrice,
-                            line.LineTotal))
+                            line.LineTotal,
+                            line.WifiCode))
                         .ToArray()))
                 .OrderBy(group => group.GuestDisplayName, StringComparer.Ordinal)
                 .ToArray();

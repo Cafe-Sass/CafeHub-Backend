@@ -6,5 +6,6 @@ namespace CafeHub.Application.Billing.DTOs
         string? Addons,
         int Quantity,
         decimal UnitPrice,
-        decimal LineTotal);
+        decimal LineTotal,
+        string? WifiCode = null);
 }
