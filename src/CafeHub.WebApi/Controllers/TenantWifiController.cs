@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Pagination;
 using CafeHub.Application.Wifi.Commands;
 using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Application.Wifi.Queries;
@@ -22,6 +23,22 @@ namespace CafeHub.WebApi.Controllers
         public async Task<ActionResult<WifiSettingsResponse>> GetSettings(CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetWifiSettingsQuery(), cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("issued")]
+        [TenantAuthorize(TenantPolicies.WifiIssuedRead)]
+        public async Task<ActionResult<OffsetPage<IssuedWifiItem>>> Issued(
+            [FromQuery] GetIssuedWifiQuery query,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(query, cancellationToken);
 
             if (result.IsSuccess)
             {
