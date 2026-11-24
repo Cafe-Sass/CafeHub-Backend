@@ -213,7 +213,8 @@ namespace CafeHub.UnitTests.Billing
                 [payment],
                 Receipt.FormatReceiptNumber(new DateOnly(2026, 11, 24), 9),
                 Now,
-                UserId);
+                UserId,
+                new Dictionary<Guid, string> { [item.Id] = "WIFI-CODE-1" });
 
             var line = Assert.Single(receipt.Lines);
             Assert.Equal("One Hour", line.ProductName);
@@ -221,6 +222,7 @@ namespace CafeHub.UnitTests.Billing
             Assert.Equal(1, line.Quantity);
             Assert.Equal(5.00m, line.UnitPrice);
             Assert.Equal(5.00m, line.LineTotal);
+            Assert.Equal("WIFI-CODE-1", line.WifiCode);
             Assert.Equal(5.00m, receipt.TotalAmount);
         }
 

@@ -267,7 +267,7 @@ namespace CafeHub.UnitTests
                 else
                 {
                     Assert.Equal(TenantAuthenticationSchemes.Bearer, tenantAuthorization!.AuthenticationSchemes);
-                    Assert.Contains(tenantAuthorization.Policy, TenantPermissions.All.Concat([TenantPolicies.TenantOwner, TenantPolicies.TenantUser]));
+                    Assert.Contains(tenantAuthorization.Policy, TenantPermissions.All.Concat([TenantPolicies.TenantOwner, TenantPolicies.TenantUser, TenantPolicies.WifiIssuedRead]));
                 }
             }
         }
