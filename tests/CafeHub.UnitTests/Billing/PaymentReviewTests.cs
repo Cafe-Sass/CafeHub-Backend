@@ -328,22 +328,22 @@ namespace CafeHub.UnitTests.Billing
             rejectValidator.TestValidate(new RejectPaymentCommand { PaymentId = Guid.CreateVersion7(), Reason = "ab" })
                 .ShouldHaveValidationErrorFor(command => command.Reason);
             rejectValidator.TestValidate(new RejectPaymentCommand
-                {
-                    PaymentId = Guid.CreateVersion7(),
-                    Reason = new string('a', Payment.MaximumRejectionReasonLength + 1),
-                })
+            {
+                PaymentId = Guid.CreateVersion7(),
+                Reason = new string('a', Payment.MaximumRejectionReasonLength + 1),
+            })
                 .ShouldHaveValidationErrorFor(command => command.Reason);
             rejectValidator.TestValidate(new RejectPaymentCommand
-                {
-                    PaymentId = Guid.CreateVersion7(),
-                    Reason = "blurry\u0001proof",
-                })
+            {
+                PaymentId = Guid.CreateVersion7(),
+                Reason = "blurry\u0001proof",
+            })
                 .ShouldHaveValidationErrorFor(command => command.Reason);
             rejectValidator.TestValidate(new RejectPaymentCommand
-                {
-                    PaymentId = Guid.CreateVersion7(),
-                    Reason = "blurry proof",
-                })
+            {
+                PaymentId = Guid.CreateVersion7(),
+                Reason = "blurry proof",
+            })
                 .ShouldNotHaveAnyValidationErrors();
         }
 
