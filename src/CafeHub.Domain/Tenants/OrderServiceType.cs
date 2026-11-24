@@ -4,5 +4,6 @@ namespace CafeHub.Domain.Tenants
     {
         DineIn,
         Takeaway,
+        WifiOnly,
     }
 }

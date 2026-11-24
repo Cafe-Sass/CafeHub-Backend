@@ -14,7 +14,7 @@ namespace CafeHub.Domain.Tenants
 
         public Guid BranchId { get; private set; }
 
-        public Guid TableId { get; private set; }
+        public Guid? TableId { get; private set; }
 
         public BillStatus Status { get; private set; }
 
@@ -39,7 +39,7 @@ namespace CafeHub.Domain.Tenants
         public static Bill Create(
             Guid id,
             Guid branchId,
-            Guid tableId,
+            Guid? tableId,
             string publicReference,
             DateTimeOffset now,
             Guid? actorId)
@@ -56,7 +56,7 @@ namespace CafeHub.Domain.Tenants
 
             if (tableId == Guid.Empty)
             {
-                throw new ArgumentException("The table id is required.", nameof(tableId));
+                throw new ArgumentException("The table id cannot be empty.", nameof(tableId));
             }
 
             return new Bill

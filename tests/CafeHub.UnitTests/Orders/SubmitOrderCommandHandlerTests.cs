@@ -6,6 +6,8 @@ using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Tables;
 using CafeHub.Application.Tables.DTOs;
+using CafeHub.Application.Wifi.Contracts;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.UnitTests.Orders
@@ -254,7 +256,7 @@ namespace CafeHub.UnitTests.Orders
         }
 
         private SubmitOrderCommandHandler CreateHandler() =>
-            new(sender, store, allocator, references, new OrdersOptions(), new FixedClock(), audit);
+            new(sender, store, allocator, references, new FakeBillStore(), new FakeWifiPackageStore(), new FakeWifiSettingsStore(), new FakeWifiVoucherStore(), new OrdersOptions(), new FixedClock(), audit);
 
         private static SubmitOrderCommand Valid() => new()
         {
@@ -321,6 +323,130 @@ namespace CafeHub.UnitTests.Orders
                 var value = Calls.ToString().PadLeft(13, '0');
                 return $"reference{value}";
             }
+        }
+
+        private sealed class FakeBillStore : CafeHub.Application.Billing.Contracts.IBillStore
+        {
+            public Task<Result<Bill>> ResolveOpenBillAsync(
+                Guid branchId,
+                Guid? tableId,
+                DateTimeOffset now,
+                Guid? actorId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not resolve a bill.");
+
+            public Task<CafeHub.Application.Billing.Contracts.BillSettlement?> FindForCloseAsync(
+                Guid? branchId,
+                Guid billId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not close bills.");
+
+            public Task<Result> SaveCloseAsync(
+                Bill bill,
+                decimal remainingAmount,
+                Guid actorId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not close bills.");
+        }
+
+        private sealed class FakeWifiPackageStore : IWifiPackageStore
+        {
+            public Task<WifiPackageListPage> ListAsync(
+                WifiPackageListRequest request,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not list packages.");
+
+            public Task<WifiPackageResponse?> GetAsync(Guid packageId, CancellationToken cancellationToken) =>
+                Task.FromResult<WifiPackageResponse?>(null);
+
+            public Task<bool> ActiveNameExistsAsync(
+                string name,
+                Guid? excludePackageId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not check names.");
+
+            public Task<Result<WifiPackageResponse>> CreateAsync(
+                WifiPackage package,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not create packages.");
+
+            public Task<Result<WifiPackageResponse>> UpdateAsync(
+                Guid packageId,
+                string concurrencyToken,
+                string name,
+                int durationMinutes,
+                decimal? speedMbps,
+                WifiDataMode dataMode,
+                int? quotaMb,
+                decimal price,
+                int sortOrder,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not update packages.");
+
+            public Task<Result<WifiPackageResponse>> ChangeStatusAsync(
+                Guid packageId,
+                WifiPackageStatus status,
+                string concurrencyToken,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not change packages.");
+        }
+
+        private sealed class FakeWifiSettingsStore : IWifiSettingsStore
+        {
+            public Task<WifiSettingsResponse> GetAsync(Guid? branchId, CancellationToken cancellationToken) =>
+                Task.FromResult(new WifiSettingsResponse(WifiPolicy.Free, "1", []));
+
+            public Task<Result<WifiSettingsResponse>> UpdatePolicyAsync(
+                WifiPolicy policy,
+                string concurrencyToken,
+                Guid actorUserId,
+                Guid? branchId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not update the policy.");
+
+            public Task<Result<WifiNetworkResponse?>> SetNetworkAsync(
+                Guid? branchIdScope,
+                Guid branchId,
+                string? ssid,
+                WifiSecurity? security,
+                string? password,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not update a network.");
+        }
+
+        private sealed class FakeWifiVoucherStore : IWifiVoucherStore
+        {
+            public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
+                Task.FromResult(false);
+
+            public Task<IReadOnlySet<string>> FindExistingCodesAsync(
+                Guid packageId,
+                IReadOnlyCollection<string> codes,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not import vouchers.");
+
+            public Task<Result> InsertImportedAsync(
+                Guid packageId,
+                IReadOnlyList<WifiVoucher> vouchers,
+                WifiVoucherImportResult counts,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not import vouchers.");
+
+            public Task<WifiVoucherSummary> GetSummaryAsync(
+                Guid packageId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not read voucher counts.");
+
+            public Task<Result> VoidAsync(
+                Guid packageId,
+                string code,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The table submission does not void vouchers.");
         }
 
         private sealed class FakeOrderStore : IOrderStore

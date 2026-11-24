@@ -17,17 +17,20 @@ namespace CafeHub.Infrastructure.Billing
 
         public async Task<Result<Bill>> ResolveOpenBillAsync(
             Guid branchId,
-            Guid tableId,
+            Guid? tableId,
             DateTimeOffset now,
             Guid? actorId,
             CancellationToken cancellationToken)
         {
-            var openBill = await context.Bills
-                .Where(bill => bill.TableId == tableId && bill.Status == BillStatus.Open)
-                .SingleOrDefaultAsync(cancellationToken);
-            if (openBill is not null)
+            if (tableId is { } table)
             {
-                return Result.Success(openBill);
+                var openBill = await context.Bills
+                    .Where(bill => bill.TableId == table && bill.Status == BillStatus.Open)
+                    .SingleOrDefaultAsync(cancellationToken);
+                if (openBill is not null)
+                {
+                    return Result.Success(openBill);
+                }
             }
 
             var bill = Bill.Create(

@@ -2,10 +2,13 @@ using System.Globalization;
 using CafeHub.Application.Abstractions.Messaging;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Idempotency;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
+using CafeHub.Application.Wifi.Contracts;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 using MediatR;
 
@@ -16,6 +19,10 @@ namespace CafeHub.Application.Orders
         IOrderStore store,
         IOrderNumberAllocator allocator,
         IOrderPublicReferenceGenerator referenceGenerator,
+        IBillStore billStore,
+        IWifiPackageStore wifiPackages,
+        IWifiSettingsStore wifiSettings,
+        IWifiVoucherStore wifiVouchers,
         OrdersOptions options,
         TimeProvider timeProvider,
         ITenantAuditWriter auditWriter)
@@ -53,10 +60,40 @@ namespace CafeHub.Application.Orders
                 qr.BranchId,
                 command.Lines.Select(line => line.ProductId).Distinct().ToArray(),
                 cancellationToken);
-            var priced = OrderPricing.Evaluate(command.Lines, catalog, command.ExpectedTotal);
+            var packageCatalog = new Dictionary<Guid, WifiPackageResponse>();
+            foreach (var packageId in command.Lines
+                         .Select(line => line.WifiPackageId)
+                         .OfType<Guid>()
+                         .Distinct())
+            {
+                var package = await wifiPackages.GetAsync(packageId, cancellationToken);
+                if (package is not null)
+                {
+                    packageCatalog[packageId] = package;
+                }
+            }
+
+            var priced = OrderPricing.Evaluate(command.Lines, catalog, packageCatalog, command.ExpectedTotal);
             if (priced.IsFailure)
             {
                 return Result.Failure<SubmitOrderResult>(priced.Error!);
+            }
+
+            if (packageCatalog.Count > 0)
+            {
+                var settings = await wifiSettings.GetAsync(null, cancellationToken);
+                if (settings.Policy != WifiPolicy.Paid)
+                {
+                    return Result.Failure<SubmitOrderResult>(OrdersErrors.WifiPolicyNotPaid());
+                }
+
+                foreach (var packageId in packageCatalog.Keys)
+                {
+                    if (!await wifiVouchers.HasAvailableAsync(packageId, cancellationToken))
+                    {
+                        return Result.Failure<SubmitOrderResult>(OrdersErrors.WifiVoucherUnavailable());
+                    }
+                }
             }
 
             var allocation = await allocator.AllocateAsync(qr.BranchId, cancellationToken);
@@ -116,27 +153,39 @@ namespace CafeHub.Application.Orders
             string requestHash)
         {
             var items = priced.Lines
-                .Select(line => OrderItem.Create(
-                    Guid.CreateVersion7(),
-                    line.LineNumber,
-                    line.ProductId,
-                    line.SizeId,
-                    line.StationId,
-                    line.ProductName,
-                    line.SizeName,
-                    line.UnitPrice,
-                    line.Quantity,
-                    line.Addons
-                        .Select(addon => OrderItemAddon.Create(
-                            Guid.CreateVersion7(),
-                            addon.ProductAddonId,
-                            addon.Name,
-                            addon.Price,
-                            now,
-                            placedByUserId))
-                        .ToArray(),
-                    now,
-                    placedByUserId))
+                .Select(line => line.WifiPackageId is { } packageId
+                    ? OrderItem.CreateWifiLine(
+                        Guid.CreateVersion7(),
+                        line.LineNumber,
+                        packageId,
+                        line.ProductName,
+                        line.WifiDurationMinutes!.Value,
+                        line.WifiSpeedMbps,
+                        line.UnitPrice,
+                        line.Quantity,
+                        now,
+                        placedByUserId)
+                    : OrderItem.Create(
+                        Guid.CreateVersion7(),
+                        line.LineNumber,
+                        line.ProductId,
+                        line.SizeId,
+                        line.StationId,
+                        line.ProductName,
+                        line.SizeName,
+                        line.UnitPrice,
+                        line.Quantity,
+                        line.Addons
+                            .Select(addon => OrderItemAddon.Create(
+                                Guid.CreateVersion7(),
+                                addon.ProductAddonId,
+                                addon.Name,
+                                addon.Price,
+                                now,
+                                placedByUserId))
+                            .ToArray(),
+                        now,
+                        placedByUserId))
                 .ToArray();
 
             var order = Order.Create(

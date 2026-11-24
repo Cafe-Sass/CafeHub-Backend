@@ -7,7 +7,7 @@ namespace CafeHub.Application.Orders.DTOs
         int OrderNumber,
         string Status,
         string? RejectionReason,
-        int TableNumber,
+        int? TableNumber,
         string ServiceType,
         DateTimeOffset SubmittedAt,
         DateTimeOffset ResponseDeadline,

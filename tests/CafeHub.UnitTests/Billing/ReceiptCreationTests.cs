@@ -168,6 +168,62 @@ namespace CafeHub.UnitTests.Billing
             Assert.False(Receipt.IsValidReceiptNumber("X-20261124-1"));
         }
 
+        [Fact]
+        public void AWifiLineIsCopiedIntoTheReceiptSnapshot()
+        {
+            var bill = Bill.Create(Guid.CreateVersion7(), BranchId, null, Reference, Now, null);
+            var item = OrderItem.CreateWifiLine(
+                Guid.CreateVersion7(),
+                1,
+                Guid.CreateVersion7(),
+                "One Hour",
+                60,
+                1m,
+                5m,
+                1,
+                Now,
+                UserId);
+            var order = Order.Create(
+                Guid.CreateVersion7(),
+                BranchId,
+                null,
+                1,
+                new DateOnly(2026, 11, 24),
+                OrderServiceType.WifiOnly,
+                OrderSource.Guest,
+                "Sara",
+                null,
+                null,
+                Reference,
+                "wifi-key",
+                null,
+                Now.AddMinutes(-5),
+                Now.AddMinutes(5),
+                [item],
+                null);
+            order.AcceptAutomatically(Now.AddMinutes(-4));
+            order.AttachToBill(bill.Id);
+            var payment = Payment.ConfirmCash(
+                Guid.CreateVersion7(), bill.Id, null, 5m, UserId, "cash-key", Now, UserId);
+
+            var receipt = ReceiptComposer.Compose(
+                Guid.CreateVersion7(),
+                bill,
+                [order],
+                [payment],
+                Receipt.FormatReceiptNumber(new DateOnly(2026, 11, 24), 9),
+                Now,
+                UserId);
+
+            var line = Assert.Single(receipt.Lines);
+            Assert.Equal("One Hour", line.ProductName);
+            Assert.Equal("WiFi", line.SizeName);
+            Assert.Equal(1, line.Quantity);
+            Assert.Equal(5.00m, line.UnitPrice);
+            Assert.Equal(5.00m, line.LineTotal);
+            Assert.Equal(5.00m, receipt.TotalAmount);
+        }
+
         private static Order AcceptedOrder(
             Bill bill,
             string? guestDisplayName,
@@ -307,7 +363,7 @@ namespace CafeHub.UnitTests.Billing
 
             public Task<Result<Bill>> ResolveOpenBillAsync(
                 Guid branchId,
-                Guid tableId,
+                Guid? tableId,
                 DateTimeOffset now,
                 Guid? actorId,
                 CancellationToken cancellationToken) =>

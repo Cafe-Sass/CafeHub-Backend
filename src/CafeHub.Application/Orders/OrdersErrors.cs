@@ -27,6 +27,25 @@ namespace CafeHub.Application.Orders
         public static OrderSubmissionError ProductUnavailable(IReadOnlyList<OrderUnavailableItem> items) =>
             OrderSubmissionError.ProductUnavailable(items);
 
+        public const string WifiPolicyNotPaidCode = "Orders.WifiPolicyNotPaid";
+        public const string WifiVoucherUnavailableCode = "Orders.WifiVoucherUnavailable";
+        public const string WifiPackageUnavailableCode = "Orders.WifiPackageUnavailable";
+
+        public static Error WifiPolicyNotPaid() =>
+            Error.Conflict(
+                WifiPolicyNotPaidCode,
+                "WiFi packages can be ordered only while the cafe policy is Paid.");
+
+        public static Error WifiVoucherUnavailable() =>
+            Error.Conflict(
+                WifiVoucherUnavailableCode,
+                "No WiFi voucher is available for this package.");
+
+        public static Error WifiPackageUnavailable() =>
+            Error.Conflict(
+                WifiPackageUnavailableCode,
+                "The WiFi package is not available.");
+
         public static Error InvalidServiceType() =>
             Error.Validation(ServiceTypeInvalidCode, "The service type must be DineIn or Takeaway.");
 

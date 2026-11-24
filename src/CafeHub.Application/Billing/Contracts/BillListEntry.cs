@@ -5,8 +5,8 @@ namespace CafeHub.Application.Billing.Contracts
     public sealed record BillListEntry(
         Guid Id,
         Guid BranchId,
-        Guid TableId,
-        int TableNumber,
+        Guid? TableId,
+        int? TableNumber,
         BillStatus Status,
         string PublicReference,
         DateTimeOffset OpenedAt,

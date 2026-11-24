@@ -28,4 +28,6 @@ namespace CafeHub.WebApi.Controllers
     public sealed record ImportWifiVouchersRequest(IReadOnlyList<string?>? Codes);
 
     public sealed record VoidWifiVoucherRequest(string? Code);
+
+    public sealed record SubmitWifiOrderRequest(Guid PackageId, string? GuestDisplayName);
 }

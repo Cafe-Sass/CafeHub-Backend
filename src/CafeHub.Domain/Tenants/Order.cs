@@ -22,7 +22,7 @@ namespace CafeHub.Domain.Tenants
 
         public Guid BranchId { get; private set; }
 
-        public Guid TableId { get; private set; }
+        public Guid? TableId { get; private set; }
 
         public int OrderNumber { get; private set; }
 
@@ -73,7 +73,7 @@ namespace CafeHub.Domain.Tenants
         public static Order Create(
             Guid id,
             Guid branchId,
-            Guid tableId,
+            Guid? tableId,
             int orderNumber,
             DateOnly businessDate,
             OrderServiceType serviceType,
@@ -102,7 +102,19 @@ namespace CafeHub.Domain.Tenants
 
             if (tableId == Guid.Empty)
             {
-                throw new ArgumentException("The table id is required.", nameof(tableId));
+                throw new ArgumentException("The table id cannot be empty.", nameof(tableId));
+            }
+
+            if (serviceType == OrderServiceType.WifiOnly)
+            {
+                if (tableId is not null)
+                {
+                    throw new ArgumentException("A WiFi-only order cannot name a table.", nameof(tableId));
+                }
+            }
+            else if (tableId is null)
+            {
+                throw new ArgumentException("A table-service order requires a table.", nameof(tableId));
             }
 
             if (orderNumber < 1)
@@ -198,6 +210,22 @@ namespace CafeHub.Domain.Tenants
 
         public void Accept(Guid responderId, DateTimeOffset now) =>
             ApplyDecision(responderId, OrderStatus.Accepted, null, now);
+
+        public void AcceptAutomatically(DateTimeOffset now)
+        {
+            if (Status is not OrderStatus.Pending)
+            {
+                throw new InvalidOperationException(
+                    $"Only pending orders can be accepted. The current status is {Status}.");
+            }
+
+            Status = OrderStatus.Accepted;
+            RespondedByUserId = null;
+            RespondedAt = null;
+            RejectionReason = null;
+            UpdatedAt = now;
+            UpdatedBy = null;
+        }
 
         public void Reject(Guid responderId, string reason, DateTimeOffset now) =>
             ApplyDecision(responderId, OrderStatus.Rejected, ValidateRejectionReason(reason), now);

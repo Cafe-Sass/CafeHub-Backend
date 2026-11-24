@@ -15,7 +15,7 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(
                 new[] { "Pending", "Accepted", "Rejected", "Expired" },
                 Enum.GetNames<OrderStatus>());
-            Assert.Equal(new[] { "DineIn", "Takeaway" }, Enum.GetNames<OrderServiceType>());
+            Assert.Equal(new[] { "DineIn", "Takeaway", "WifiOnly" }, Enum.GetNames<OrderServiceType>());
             Assert.Equal(new[] { "Guest", "Captain" }, Enum.GetNames<OrderSource>());
         }
 

@@ -412,7 +412,7 @@ namespace CafeHub.UnitTests.Billing
 
             public Task<Result<Bill>> ResolveOpenBillAsync(
                 Guid branchId,
-                Guid tableId,
+                Guid? tableId,
                 DateTimeOffset now,
                 Guid? actorId,
                 CancellationToken cancellationToken) =>

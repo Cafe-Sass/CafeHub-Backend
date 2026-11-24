@@ -24,6 +24,12 @@ namespace CafeHub.Domain.Tenants
 
         public Guid? ProductSizeId { get; private set; }
 
+        public Guid? WifiPackageId { get; private set; }
+
+        public int? WifiDurationMinutes { get; private set; }
+
+        public decimal? WifiSpeedMbps { get; private set; }
+
         public Guid? StationId { get; private set; }
 
         public string ProductName { get; private set; } = string.Empty;
@@ -117,6 +123,85 @@ namespace CafeHub.Domain.Tenants
 
             item.LineTotal = item.ComputeLineTotal();
             return item;
+        }
+
+        public static OrderItem CreateWifiLine(
+            Guid id,
+            int lineNumber,
+            Guid wifiPackageId,
+            string packageName,
+            int durationMinutes,
+            decimal? speedMbps,
+            decimal price,
+            int quantity,
+            DateTimeOffset now,
+            Guid? actorId)
+        {
+            if (id == Guid.Empty)
+            {
+                throw new ArgumentException("The order item id is required.", nameof(id));
+            }
+
+            if (wifiPackageId == Guid.Empty)
+            {
+                throw new ArgumentException("The WiFi package id is required.", nameof(wifiPackageId));
+            }
+
+            if (!IsValidProductName(packageName))
+            {
+                throw new ArgumentException(
+                    "The WiFi package name must be 1 to 96 characters after trimming.",
+                    nameof(packageName));
+            }
+
+            if (durationMinutes is < 1 or > WifiPackage.MaximumDurationMinutes)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(durationMinutes),
+                    $"The duration must be between 1 and {WifiPackage.MaximumDurationMinutes} minutes.");
+            }
+
+            if (!WifiPackage.IsValidSpeed(speedMbps))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(speedMbps),
+                    "The WiFi speed snapshot must be null or positive with at most two decimal places.");
+            }
+
+            if (!IsValidUnitPrice(price))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(price),
+                    "The WiFi package price must be between 0.00 and 99999999.99 with at most two decimal places.");
+            }
+
+            if (!IsValidQuantity(quantity))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(quantity),
+                    $"The quantity must be between 1 and {MaximumQuantity}.");
+            }
+
+            return new OrderItem
+            {
+                Id = id,
+                LineNumber = lineNumber,
+                ProductId = null,
+                ProductSizeId = null,
+                WifiPackageId = wifiPackageId,
+                WifiDurationMinutes = durationMinutes,
+                WifiSpeedMbps = speedMbps,
+                StationId = null,
+                ProductName = packageName.Trim(),
+                SizeName = "WiFi",
+                UnitPrice = price,
+                Quantity = quantity,
+                LineTotal = price * quantity,
+                CreatedAt = now,
+                UpdatedAt = now,
+                CreatedBy = actorId,
+                UpdatedBy = actorId,
+            };
         }
 
         public static bool IsValidProductName(string? name) =>

@@ -44,7 +44,7 @@ namespace CafeHub.Infrastructure.Billing
                     bill.TableId,
                     context.BranchTables
                         .Where(table => table.Id == bill.TableId)
-                        .Select(table => table.Number)
+                        .Select(table => (int?)table.Number)
                         .FirstOrDefault(),
                     bill.Status,
                     bill.PublicReference,

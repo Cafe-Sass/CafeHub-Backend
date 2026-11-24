@@ -7,7 +7,7 @@ namespace CafeHub.Application.Orders
     public static class OrderRequestHash
     {
         public static string Compute(
-            Guid tableId,
+            Guid? tableId,
             OrderServiceType serviceType,
             OrderSource source,
             string guestDisplayName,
@@ -17,7 +17,7 @@ namespace CafeHub.Application.Orders
             ArgumentNullException.ThrowIfNull(lines);
 
             var builder = new StringBuilder()
-                .Append(tableId.ToString("N"))
+                .Append(tableId?.ToString("N") ?? "wifi")
                 .Append('|')
                 .Append(serviceType)
                 .Append('|')
@@ -29,13 +29,9 @@ namespace CafeHub.Application.Orders
             {
                 builder
                     .Append('|')
-                    .Append(line.ProductId.ToString("N"))
-                    .Append(':')
-                    .Append(line.SizeId.ToString("N"))
-                    .Append(':')
-                    .Append(line.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                    .Append(':')
-                    .AppendJoin(',', line.AddonIds.Select(addonId => addonId.ToString("N")));
+                    .Append(line.WifiPackageId is { } packageId
+                        ? $"W{packageId:N}:{line.Quantity}"
+                        : $"P{line.ProductId:N}:{line.SizeId:N}:{line.Quantity}:{string.Join(',', line.AddonIds.Select(addonId => addonId.ToString("N")))}");
             }
 
             var digest = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
