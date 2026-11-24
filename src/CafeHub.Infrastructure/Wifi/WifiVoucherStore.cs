@@ -22,7 +22,8 @@ namespace CafeHub.Infrastructure.Wifi
             Guid packageId,
             IReadOnlyCollection<string> codes,
             CancellationToken cancellationToken)
-        {            if (codes.Count == 0)
+        {
+            if (codes.Count == 0)
             {
                 return new HashSet<string>(StringComparer.Ordinal);
             }
