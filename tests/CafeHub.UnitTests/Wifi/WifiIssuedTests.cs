@@ -1,3 +1,4 @@
+using System.Reflection;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders.Contracts;
@@ -17,7 +18,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
 
 namespace CafeHub.UnitTests.Wifi
 {
