@@ -41,6 +41,11 @@ namespace CafeHub.Application.Billing.Commands
                 return Result.Success(BillDetail.From(settlement));
             }
 
+            if (settlement.Payments.Any(payment => payment.Status == PaymentStatus.PendingReview))
+            {
+                return Result.Failure<BillDetail>(BillingErrors.PendingProof());
+            }
+
             var remaining = Payment.ResolveBillRemainingAmount(
                 Bill.ResolveTotalAmount(settlement.AcceptedOrders),
                 settlement.Payments);
