@@ -77,6 +77,22 @@ namespace CafeHub.WebApi.Controllers
             return result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
 
+        [HttpGet("{billId:guid}/receipt")]
+        [TenantAuthorize(TenantPermissions.BillsView)]
+        public async Task<ActionResult<ReceiptDetail>> GetReceipt(
+            Guid billId,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetBillReceiptQuery(billId), cancellationToken);
+
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
         [HttpPost("{billId:guid}/close")]
         [TenantAuthorize(TenantPermissions.BillsClose)]
         public async Task<ActionResult<BillDetail>> Close(
