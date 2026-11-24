@@ -234,6 +234,13 @@ namespace CafeHub.UnitTests
                         Assert.True(guestOrderTemplates.TryGetValue(action.MethodInfo.Name, out var template));
                         Assert.Equal(template, action.AttributeRouteInfo?.Template);
                     }
+                    else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestBillsController))
+                    {
+                        Assert.Equal(nameof(TenantGuestBillsController.SubmitProof), action.MethodInfo.Name);
+                        Assert.Equal(
+                            "t/{slug}/api/v1/guest/bills/{billReference}/payment-proofs",
+                            action.AttributeRouteInfo?.Template);
+                    }
                     else
                     {
                         Assert.Equal(typeof(TenantAuthController), action.ControllerTypeInfo.AsType());

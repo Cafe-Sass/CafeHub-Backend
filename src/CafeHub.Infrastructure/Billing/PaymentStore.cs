@@ -45,6 +45,60 @@ namespace CafeHub.Infrastructure.Billing
             return new BillSettlement(bill, orders, payments);
         }
 
+        public async Task<BillSettlement?> FindForProofAsync(
+            string billReference,
+            CancellationToken cancellationToken)
+        {
+            var bill = await context.Bills
+                .Where(candidate => candidate.PublicReference == billReference)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (bill is null)
+            {
+                return null;
+            }
+
+            await context.LockBillAsync(bill.Id, cancellationToken);
+
+            var orders = await context.Orders.AsNoTracking()
+                .Where(order => order.BillId == bill.Id)
+                .OrderBy(order => order.OrderNumber)
+                .ToListAsync(cancellationToken);
+            var payments = await context.Payments.AsNoTracking()
+                .Where(payment => payment.BillId == bill.Id)
+                .OrderBy(payment => payment.CreatedAt)
+                .ThenBy(payment => payment.Id)
+                .ToListAsync(cancellationToken);
+            return new BillSettlement(bill, orders, payments);
+        }
+
+        public async Task<Result<Payment>> AddProofAsync(Payment payment, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(payment);
+
+            context.Payments.Add(payment);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                return Result.Success(payment);
+            }
+            catch (DbUpdateException exception) when (IsIdempotencyKeyClash(exception))
+            {
+                context.Entry(payment).State = EntityState.Detached;
+                var stored = await context.Payments.AsNoTracking()
+                    .Where(candidate => candidate.BillId == payment.BillId
+                        && candidate.IdempotencyKey == payment.IdempotencyKey
+                        && candidate.Method == PaymentMethod.Online
+                        && candidate.ClaimedAmount != null)
+                    .SingleOrDefaultAsync(cancellationToken);
+                if (stored is null)
+                {
+                    ExceptionDispatchInfo.Capture(exception).Throw();
+                }
+
+                return Result.Success(stored);
+            }
+        }
+
         public async Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(payment);

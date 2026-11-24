@@ -24,5 +24,12 @@ namespace CafeHub.Application.Billing
 
         public static Error AmountAboveRemaining() =>
             Error.Conflict(AmountAboveRemainingCode, "The amount exceeds the remaining amount to settle.");
+
+        public const string PendingProofLimitReachedCode = "Billing.PendingProofLimitReached";
+
+        public static Error PendingProofLimitReached(int limit) =>
+            Error.Conflict(
+                PendingProofLimitReachedCode,
+                $"The bill already carries the maximum of {limit} payment proofs awaiting review.");
     }
 }

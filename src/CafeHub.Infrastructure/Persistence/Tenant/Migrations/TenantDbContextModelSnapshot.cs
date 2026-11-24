@@ -1116,6 +1116,19 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("amount");
 
+                    b.Property<decimal?>("ClaimedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("claimed_amount");
+
+                    b.Property<string>("MediaReference")
+                        .HasColumnType("text")
+                        .HasColumnName("media_reference");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
                     b.Property<Guid>("BillId")
                         .HasColumnType("uuid")
                         .HasColumnName("bill_id");
@@ -1186,13 +1199,22 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         {
                             t.HasCheckConstraint("ck_payments_amount_range", "amount > 0");
 
+                            t.HasCheckConstraint("ck_payments_claimed_amount_range", "claimed_amount IS NULL OR claimed_amount > 0");
+
                             t.HasCheckConstraint("ck_payments_confirmation_pair", "(status = 'Confirmed') = (confirmed_at IS NOT NULL AND confirmed_by_user_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_payments_idempotency_key_length", "char_length(idempotency_key) BETWEEN 1 AND 128");
 
+                            t.HasCheckConstraint("ck_payments_media_reference_length", "media_reference IS NULL OR length(media_reference) <= 512");
+
                             t.HasCheckConstraint("ck_payments_method", "method IN ('Cash', 'Online')");
 
+                            t.HasCheckConstraint("ck_payments_note_length", "note IS NULL OR (length(note) >= 1 AND length(note) <= 140 AND note !~ '[[:cntrl:]]')");
+
+                            t.HasCheckConstraint("ck_payments_online_proof", "method <> 'Online' OR (media_reference IS NOT NULL AND claimed_amount IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_payments_status", "status IN ('Confirmed', 'PendingReview', 'Rejected')");
+
                         });
                 });
 

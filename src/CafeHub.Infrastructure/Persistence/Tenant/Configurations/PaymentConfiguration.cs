@@ -19,6 +19,16 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                     "(status = 'Confirmed') = (confirmed_at IS NOT NULL AND confirmed_by_user_id IS NOT NULL)");
                 table.HasCheckConstraint(
                     "ck_payments_idempotency_key_length", "char_length(idempotency_key) BETWEEN 1 AND 128");
+                table.HasCheckConstraint(
+                    "ck_payments_media_reference_length", "media_reference IS NULL OR length(media_reference) <= 512");
+                table.HasCheckConstraint(
+                    "ck_payments_claimed_amount_range", "claimed_amount IS NULL OR claimed_amount > 0");
+                table.HasCheckConstraint(
+                    "ck_payments_note_length",
+                    "note IS NULL OR (length(note) >= 1 AND length(note) <= 140 AND note !~ '[[:cntrl:]]')");
+                table.HasCheckConstraint(
+                    "ck_payments_online_proof",
+                    "method <> 'Online' OR (media_reference IS NOT NULL AND claimed_amount IS NOT NULL)");
             });
 
             builder.HasKey(payment => payment.Id).HasName("pk_payments");
@@ -31,6 +41,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(payment => payment.ConfirmedByUserId).HasColumnName("confirmed_by_user_id").HasColumnType("uuid");
             builder.Property(payment => payment.ConfirmedAt).HasColumnName("confirmed_at").HasColumnType("timestamptz");
             builder.Property(payment => payment.IdempotencyKey).HasColumnName("idempotency_key").HasColumnType("text");
+            builder.Property(payment => payment.MediaReference).HasColumnName("media_reference").HasColumnType("text");
+            builder.Property(payment => payment.ClaimedAmount).HasColumnName("claimed_amount").HasColumnType("numeric(12,2)").HasPrecision(12, 2);
+            builder.Property(payment => payment.Note).HasColumnName("note").HasColumnType("text");
             builder.Property(payment => payment.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz");
             builder.Property(payment => payment.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamptz");
             builder.Property(payment => payment.CreatedBy).HasColumnName("created_by").HasColumnType("uuid");
