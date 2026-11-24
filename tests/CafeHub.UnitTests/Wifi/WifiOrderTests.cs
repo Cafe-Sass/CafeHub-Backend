@@ -113,6 +113,7 @@ namespace CafeHub.UnitTests.Wifi
             Assert.Equal(60, item.WifiDurationMinutes);
             Assert.Equal(5m, item.UnitPrice);
             Assert.Equal(5m, order.TotalAmount);
+            Assert.Equal(1, setup.Vouchers.IssueCalls);
         }
 
         [Fact]
@@ -129,6 +130,7 @@ namespace CafeHub.UnitTests.Wifi
             Assert.Equal(first.Value!.PublicReference, repeat.Value!.PublicReference);
             Assert.Single(setup.Orders.Added);
             Assert.Single(setup.Bills.Bills);
+            Assert.Equal(1, setup.Vouchers.IssueCalls);
         }
 
         [Fact]
@@ -186,6 +188,7 @@ namespace CafeHub.UnitTests.Wifi
             var item = Assert.Single(order.Items);
             Assert.Equal(PackageId, item.WifiPackageId);
             Assert.Equal(5m, order.TotalAmount);
+            Assert.Equal(0, setup.Vouchers.IssueCalls);
         }
 
         private static WifiPackageResponse PackageResponse(decimal price, WifiPackageStatus status) =>
@@ -328,6 +331,17 @@ namespace CafeHub.UnitTests.Wifi
 
         private sealed class FakeWifiVoucherStore(bool hasAvailable) : IWifiVoucherStore
         {
+            public int IssueCalls { get; private set; }
+
+            public Task<Result> IssueForOrderAsync(
+                Order order,
+                Guid? actorUserId,
+                CancellationToken cancellationToken)
+            {
+                IssueCalls++;
+                return Task.FromResult(Result.Success());
+            }
+
             public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
                 Task.FromResult(hasAvailable && packageId == PackageId);
 

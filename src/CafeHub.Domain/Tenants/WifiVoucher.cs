@@ -56,9 +56,27 @@ namespace CafeHub.Domain.Tenants
             };
         }
 
-        public bool Void(DateTimeOffset now)
+        public void Assign(Guid orderItemId, DateTimeOffset now)
         {
             if (Status != WifiVoucherStatus.Available)
+            {
+                throw new InvalidOperationException(
+                    $"Only an available voucher can be assigned. The status is {Status}.");
+            }
+
+            if (orderItemId == Guid.Empty)
+            {
+                throw new ArgumentException("The order item id is required.", nameof(orderItemId));
+            }
+
+            Status = WifiVoucherStatus.Assigned;
+            AssignedOrderItemId = orderItemId;
+            AssignedAt = now;
+            UpdatedAt = now;
+        }
+
+        public bool Void(DateTimeOffset now)
+        {            if (Status != WifiVoucherStatus.Available)
             {
                 throw new InvalidOperationException($"Only an available voucher can be voided. The status is {Status}.");
             }

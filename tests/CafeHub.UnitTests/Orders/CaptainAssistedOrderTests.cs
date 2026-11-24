@@ -445,6 +445,12 @@ namespace CafeHub.UnitTests.Orders
 
         private sealed class FakeWifiVoucherStore : IWifiVoucherStore
         {
+            public Task<Result> IssueForOrderAsync(
+                Order order,
+                Guid? actorUserId,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
+
             public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
                 Task.FromResult(false);
 

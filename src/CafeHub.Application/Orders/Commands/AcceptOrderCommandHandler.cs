@@ -6,6 +6,7 @@ using CafeHub.Application.Identity;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Wifi.Contracts;
 using CafeHub.Domain.Tenants;
 using MediatR;
 
@@ -15,6 +16,7 @@ namespace CafeHub.Application.Orders.Commands
         ISender sender,
         IOrderDecisionStore decisionStore,
         IBillStore billStore,
+        IWifiVoucherStore wifiVouchers,
         ICurrentTenantUser currentUser,
         IStationScope stationScope,
         TimeProvider timeProvider,
@@ -77,6 +79,12 @@ namespace CafeHub.Application.Orders.Commands
             if (save.IsFailure)
             {
                 return Result.Failure<OrderDecisionResult>(save.Error!);
+            }
+
+            var issued = await wifiVouchers.IssueForOrderAsync(order, currentUser.UserId, cancellationToken);
+            if (issued.IsFailure)
+            {
+                return Result.Failure<OrderDecisionResult>(issued.Error!);
             }
 
             var auditResult = await auditWriter.WriteAsync(new TenantAuditEntry

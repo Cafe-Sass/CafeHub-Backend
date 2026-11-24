@@ -121,7 +121,16 @@ namespace CafeHub.Application.Orders.Commands
             }
 
             order.AttachToBill(bill.Value.Id);
-            return await store.AddAsync(order, cancellationToken);
+            var added = await store.AddAsync(order, cancellationToken);
+            if (added.IsFailure)
+            {
+                return added;
+            }
+
+            var issued = await wifiVouchers.IssueForOrderAsync(order, null, cancellationToken);
+            return issued.IsFailure
+                ? Result.Failure<SubmitOrderResult>(issued.Error!)
+                : added;
         }
     }
 }

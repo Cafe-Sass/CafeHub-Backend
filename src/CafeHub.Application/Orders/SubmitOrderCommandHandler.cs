@@ -106,6 +106,15 @@ namespace CafeHub.Application.Orders
                 var added = await store.AddAsync(order, cancellationToken);
                 if (added.IsSuccess)
                 {
+                    if (order.Status == OrderStatus.Accepted)
+                    {
+                        var issued = await wifiVouchers.IssueForOrderAsync(order, placedByUserId, cancellationToken);
+                        if (issued.IsFailure)
+                        {
+                            return Result.Failure<SubmitOrderResult>(issued.Error!);
+                        }
+                    }
+
                     if (placedByUserId is not null)
                     {
                         var auditResult = await auditWriter.WriteAsync(
