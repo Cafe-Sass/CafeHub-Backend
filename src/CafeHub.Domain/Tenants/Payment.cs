@@ -190,12 +190,19 @@ namespace CafeHub.Domain.Tenants
             UpdatedBy = actorId;
         }
 
-        public void RejectReview(Guid actorId, DateTimeOffset now)
+        public void RejectReview(string reason, Guid actorId, DateTimeOffset now)
         {
             if (Status is not PaymentStatus.PendingReview)
             {
                 throw new InvalidOperationException(
                     $"Only a payment awaiting review can be rejected. The current status is {Status}.");
+            }
+
+            if (!IsValidRejectionReason(reason))
+            {
+                throw new ArgumentException(
+                    "The rejection reason must be 3 to 256 characters without control characters.",
+                    nameof(reason));
             }
 
             if (actorId == Guid.Empty)

@@ -228,7 +228,7 @@ namespace CafeHub.UnitTests.Billing
         {
             var payment = Payment.SubmitOnlineProof(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), 5.00m, MediaReference(), "  secret note  ", "key-123", Now);
-            payment.RejectReview(UserId, Now);
+            payment.RejectReview("blurry proof", UserId, Now);
 
             var changes = TenantAuditChangeSets.PaymentReview(payment, "blurry proof");
             var fields = changes.Fields.ToDictionary(field => field.Name, StringComparer.Ordinal);

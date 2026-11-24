@@ -32,7 +32,9 @@ namespace CafeHub.Application.Billing.Commands
             }
 
             var review = await store.FindReviewAsync(scope.Value, command.PaymentId, cancellationToken);
-            if (review is null || review.Payment.Method is not PaymentMethod.Online)
+            if (review is null
+                || review.Payment.Method is not PaymentMethod.Online
+                || review.Payment.ClaimedAmount is null)
             {
                 return Result.Failure<RejectPaymentResult>(BillingErrors.PaymentNotFound());
             }
@@ -50,8 +52,9 @@ namespace CafeHub.Application.Billing.Commands
             if (payment.Status is PaymentStatus.PendingReview)
             {
                 var now = timeProvider.GetUtcNow();
-                payment.RejectReview(actorId, now);
-                var saved = await store.SaveReviewAsync(payment, command.Reason!.Trim(), cancellationToken);
+                var rejectionReason = command.Reason!.Trim();
+                payment.RejectReview(rejectionReason, actorId, now);
+                var saved = await store.SaveReviewAsync(payment, rejectionReason, cancellationToken);
                 if (saved.IsFailure)
                 {
                     return Result.Failure<RejectPaymentResult>(saved.Error!);

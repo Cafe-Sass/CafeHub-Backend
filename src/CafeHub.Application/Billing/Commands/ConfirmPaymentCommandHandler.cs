@@ -32,7 +32,9 @@ namespace CafeHub.Application.Billing.Commands
             }
 
             var review = await store.FindReviewAsync(scope.Value, command.PaymentId, cancellationToken);
-            if (review is null || review.Payment.Method is not PaymentMethod.Online)
+            if (review is null
+                || review.Payment.Method is not PaymentMethod.Online
+                || review.Payment.ClaimedAmount is null)
             {
                 return Result.Failure<ConfirmPaymentResult>(BillingErrors.PaymentNotFound());
             }
