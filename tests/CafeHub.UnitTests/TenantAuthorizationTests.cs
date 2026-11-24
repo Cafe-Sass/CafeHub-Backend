@@ -248,6 +248,13 @@ namespace CafeHub.UnitTests
                             "t/{slug}/api/v1/guest/receipts/{billReference}",
                             action.AttributeRouteInfo?.Template);
                     }
+                    else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestWifiController))
+                    {
+                        Assert.Equal(nameof(TenantGuestWifiController.Get), action.MethodInfo.Name);
+                        Assert.Equal(
+                            "t/{slug}/api/v1/guest/wifi/{code}",
+                            action.AttributeRouteInfo?.Template);
+                    }
                     else
                     {
                         Assert.Equal(typeof(TenantAuthController), action.ControllerTypeInfo.AsType());

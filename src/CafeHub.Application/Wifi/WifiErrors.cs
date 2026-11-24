@@ -33,6 +33,11 @@ namespace CafeHub.Application.Wifi
                 PackagesRequirePaidPolicyCode,
                 "WiFi packages can be managed only while the cafe policy is Paid.");
 
+        public const string QrConflictCode = "Wifi.QrConflict";
+
+        public static Error QrConflict() =>
+            Error.Conflict(QrConflictCode, "The WiFi QR code could not be regenerated. Please retry.");
+
         public static Error PackageConcurrencyConflict() =>
             Error.Conflict(
                 PackageConcurrencyConflictCode,

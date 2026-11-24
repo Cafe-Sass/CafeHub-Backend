@@ -170,6 +170,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IReceiptQueryStore, ReceiptQueryStore>();
             services.AddScoped<IWifiSettingsStore, WifiSettingsStore>();
             services.AddScoped<IWifiPackageStore, WifiPackageStore>();
+            services.AddScoped<IWifiQrStore, WifiQrStore>();
             services.AddScoped<IOrderNumberCounterStore, OrderNumberCounterStore>();
             services.AddScoped<ICafeBusinessDateProvider, CafeBusinessDateProvider>();
             services.AddScoped<IStationScope, StationScope>();
