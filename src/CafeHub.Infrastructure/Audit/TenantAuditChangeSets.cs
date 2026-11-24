@@ -342,6 +342,67 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges WifiSettingsCreate(WifiSettings settings)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(WifiSettings.Policy), null, settings.Policy.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges WifiSettingsPolicy(WifiPolicy previousPolicy, WifiPolicy policy)
+        {
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiSettings.Policy), previousPolicy.ToString(), policy.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges BranchWifiNetworkCreate(
+            Guid branchId,
+            string ssid,
+            WifiSecurity security,
+            string? password)
+        {
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.BranchId), null, branchId.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Ssid), null, ssid),
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Security), null, security.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Password), null, password),
+            });
+        }
+
+        public static TenantAuditChanges BranchWifiNetworkUpdate(
+            BranchWifiNetwork network,
+            string ssid,
+            WifiSecurity security,
+            string? password)
+        {
+            ArgumentNullException.ThrowIfNull(network);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Ssid), network.Ssid, ssid),
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchWifiNetwork.Security), network.Security.ToString(), security.ToString()),
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Password), network.Password, password),
+            });
+        }
+
+        public static TenantAuditChanges BranchWifiNetworkClear(BranchWifiNetwork network)
+        {
+            ArgumentNullException.ThrowIfNull(network);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Ssid), network.Ssid, null),
+                new TenantAuditChanges.FieldChange(
+                    nameof(BranchWifiNetwork.Security), network.Security.ToString(), null),
+                new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Password), network.Password, null),
+            });
+        }
+
         public static TenantAuditChanges PaymentReview(Payment payment, string? rejectionReason)
         {
             ArgumentNullException.ThrowIfNull(payment);
