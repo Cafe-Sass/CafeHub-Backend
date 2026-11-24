@@ -1,6 +1,7 @@
 using System.Globalization;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tenancy;
+using CafeHub.Application.Wifi.DTOs;
 
 namespace CafeHub.WebApi.Controllers
 {
@@ -31,6 +32,14 @@ namespace CafeHub.WebApi.Controllers
             return new TableQrLinkResponse(
                 table.TableId, table.Number, table.Label, path, new Uri(origin, path).AbsoluteUri,
                 table.Version.ToString(CultureInfo.InvariantCulture));
+        }
+
+        public WifiQrLinkResponse CreateWifi(WifiQrData wifi)
+        {
+            var slug = tenantContextAccessor.GetRequired().Slug
+                ?? throw new InvalidTenantContextException("WiFi QR links require a resolved tenant slug.");
+            var path = $"/t/{slug}/w/{wifi.Code}";
+            return new WifiQrLinkResponse(wifi.BranchId, path, new Uri(origin, path).AbsoluteUri);
         }
 
         private static bool IsOriginLiteral(string value)
