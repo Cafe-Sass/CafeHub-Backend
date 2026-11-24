@@ -2468,6 +2468,102 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("tenant_user_stations", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DataMode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_mode");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("price");
+
+                    b.Property<int?>("QuotaMb")
+                        .HasColumnType("integer")
+                        .HasColumnName("quota_mb");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<decimal?>("SpeedMbps")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("speed_mbps");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wifi_packages");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_wifi_packages_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_wifi_packages_updated_by");
+
+                    b.ToTable("wifi_packages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wifi_packages_data_mode", "data_mode IN ('Unlimited', 'Limited')");
+
+                            t.HasCheckConstraint("ck_wifi_packages_duration", "duration_minutes BETWEEN 1 AND 43200");
+
+                            t.HasCheckConstraint("ck_wifi_packages_name", "char_length(name) BETWEEN 1 AND 48 AND name !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_wifi_packages_price", "price >= 0");
+
+                            t.HasCheckConstraint("ck_wifi_packages_quota", "quota_mb IS NULL OR quota_mb BETWEEN 1 AND 1000000");
+
+                            t.HasCheckConstraint("ck_wifi_packages_quota_mode", "(data_mode = 'Limited') = (quota_mb IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_wifi_packages_sort_order", "sort_order >= 0");
+
+                            t.HasCheckConstraint("ck_wifi_packages_speed", "speed_mbps IS NULL OR (speed_mbps > 0 AND speed_mbps <= 999999.99)");
+
+                            t.HasCheckConstraint("ck_wifi_packages_status", "status IN ('Active', 'Inactive')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.WifiSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3270,6 +3366,21 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_stations_tenant_user_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiPackage", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_packages_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_packages_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.WifiSettings", b =>
