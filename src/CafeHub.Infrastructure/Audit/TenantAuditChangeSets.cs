@@ -342,6 +342,29 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges PaymentReview(Payment payment, string? rejectionReason)
+        {
+            ArgumentNullException.ThrowIfNull(payment);
+            var fields = new List<TenantAuditChanges.FieldChange>
+            {
+                new(nameof(Payment.Status), PaymentStatus.PendingReview.ToString(), payment.Status.ToString()),
+                new(
+                    nameof(Payment.Amount),
+                    payment.ClaimedAmount is { } claimed ? FormatNumber(claimed) : null,
+                    FormatNumber(payment.Amount)),
+                new(
+                    nameof(Payment.ConfirmedAt),
+                    null,
+                    payment.ConfirmedAt?.ToString("O", CultureInfo.InvariantCulture)),
+            };
+            if (rejectionReason is not null)
+            {
+                fields.Add(new TenantAuditChanges.FieldChange("RejectionReason", null, rejectionReason));
+            }
+
+            return TenantAuditChanges.Update(fields.Where(field => field.HasChanged));
+        }
+
         public static TenantAuditChanges BillOpen(Bill bill)
         {
             ArgumentNullException.ThrowIfNull(bill);

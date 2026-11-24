@@ -502,6 +502,18 @@ namespace CafeHub.UnitTests.Billing
             public Task<Result<Payment>> AddProofAsync(Payment payment, CancellationToken cancellationToken) =>
                 throw new NotSupportedException("The cash flow must not submit a proof.");
 
+            public Task<PaymentReview?> FindReviewAsync(
+                Guid? branchId,
+                Guid paymentId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The cash flow must not review a payment.");
+
+            public Task<Result<Payment>> SaveReviewAsync(
+                Payment payment,
+                string? rejectionReason,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The cash flow must not review a payment.");
+
             public Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken)
             {
                 var existing = payments.GetValueOrDefault(payment.BillId, [])

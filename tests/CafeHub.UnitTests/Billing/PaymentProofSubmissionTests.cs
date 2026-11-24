@@ -344,6 +344,18 @@ namespace CafeHub.UnitTests.Billing
             public Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken) =>
                 throw new NotSupportedException("The proof flow never writes an audited payment.");
 
+            public Task<PaymentReview?> FindReviewAsync(
+                Guid? branchId,
+                Guid paymentId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The proof flow never reviews a payment.");
+
+            public Task<Result<Payment>> SaveReviewAsync(
+                Payment payment,
+                string? rejectionReason,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The proof flow never reviews a payment.");
+
             private void Add(Payment payment)
             {
                 if (!payments.TryGetValue(BillId, out var billPayments))

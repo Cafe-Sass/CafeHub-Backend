@@ -56,6 +56,26 @@ namespace CafeHub.Application.Media
             return Result.Success(detected.Value);
         }
 
+        public static MediaContentType? Detect(Stream content)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+
+            Span<byte> header = stackalloc byte[HeaderLength];
+            var read = 0;
+            while (read < header.Length)
+            {
+                var current = content.Read(header[read..]);
+                if (current == 0)
+                {
+                    break;
+                }
+
+                read += current;
+            }
+
+            return Detect(header[..read]);
+        }
+
         private static MediaContentType? Detect(ReadOnlySpan<byte> header)
         {
             if (header.Length >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
