@@ -1,24 +1,65 @@
 using CafeHub.Application.Abstractions.Results;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Orders
 {
     public static class OrderPricing
     {
+        private static readonly IReadOnlyDictionary<Guid, WifiPackageResponse> NoWifiPackages =
+            new Dictionary<Guid, WifiPackageResponse>();
+
         public static Result<PricedOrder> Evaluate(
-            IReadOnlyList<SubmitOrderLine> lines, OrderCatalog catalog, decimal? expectedTotal)
+            IReadOnlyList<SubmitOrderLine> lines,
+            OrderCatalog catalog,
+            decimal? expectedTotal) =>
+            Evaluate(lines, catalog, NoWifiPackages, expectedTotal);
+
+        public static Result<PricedOrder> Evaluate(
+            IReadOnlyList<SubmitOrderLine> lines,
+            OrderCatalog catalog,
+            IReadOnlyDictionary<Guid, WifiPackageResponse> wifiPackages,
+            decimal? expectedTotal)
         {
             ArgumentNullException.ThrowIfNull(lines);
             ArgumentNullException.ThrowIfNull(catalog);
+            ArgumentNullException.ThrowIfNull(wifiPackages);
 
             var pricedLines = new List<PricedOrderLine>(lines.Count);
             var unavailable = new List<OrderUnavailableItem>();
             var priceChanges = new List<OrderPriceChange>();
+            var packageUnavailable = false;
 
             for (var index = 0; index < lines.Count; index++)
             {
                 var line = lines[index];
                 var lineNumber = index + 1;
+                if (line.WifiPackageId is { } packageId)
+                {
+                    if (!wifiPackages.TryGetValue(packageId, out var package)
+                        || package.Status != WifiPackageStatus.Active.ToString())
+                    {
+                        packageUnavailable = true;
+                        continue;
+                    }
+
+                    pricedLines.Add(new PricedOrderLine(
+                        lineNumber,
+                        null,
+                        null,
+                        package.Id,
+                        null,
+                        package.Name,
+                        "WiFi",
+                        package.DurationMinutes,
+                        package.SpeedMbps,
+                        package.Price,
+                        line.Quantity,
+                        [],
+                        package.Price * line.Quantity));
+                    continue;
+                }
+
                 var product = catalog.FindProduct(line.ProductId);
                 if (product is null
                     || product.Status != ProductStatus.Active
@@ -60,9 +101,12 @@ namespace CafeHub.Application.Orders
                     lineNumber,
                     product.Id,
                     size.Id,
+                    null,
                     product.StationId,
                     product.Name,
                     size.Name,
+                    null,
+                    null,
                     size.Price,
                     line.Quantity,
                     addons,
@@ -81,6 +125,11 @@ namespace CafeHub.Application.Orders
                             .ToArray(),
                         lineTotal));
                 }
+            }
+
+            if (packageUnavailable)
+            {
+                return Result.Failure<PricedOrder>(OrdersErrors.WifiPackageUnavailable());
             }
 
             if (unavailable.Count > 0)
@@ -126,11 +175,14 @@ namespace CafeHub.Application.Orders
 
     public sealed record PricedOrderLine(
         int LineNumber,
-        Guid ProductId,
-        Guid SizeId,
+        Guid? ProductId,
+        Guid? SizeId,
+        Guid? WifiPackageId,
         Guid? StationId,
         string ProductName,
         string SizeName,
+        int? WifiDurationMinutes,
+        decimal? WifiSpeedMbps,
         decimal UnitPrice,
         int Quantity,
         IReadOnlyList<PricedOrderAddon> Addons,

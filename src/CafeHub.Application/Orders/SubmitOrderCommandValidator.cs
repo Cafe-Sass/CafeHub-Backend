@@ -13,6 +13,8 @@ namespace CafeHub.Application.Orders
             RuleFor(command => command.Code).Must(BranchTable.IsValidQrCode)
                 .WithMessage("The table QR code must be 22 URL-safe base64url characters.");
             RuleFor(command => command.ServiceType).IsInEnum();
+            RuleFor(command => command.ServiceType).NotEqual(OrderServiceType.WifiOnly)
+                .WithMessage("A WiFi-only order is submitted from the branch WiFi QR, not the table QR.");
             RuleFor(command => command.Source).IsInEnum();
             RuleFor(command => command.ActingStaffUserId).Must(id => id != Guid.Empty)
                 .WithMessage("The acting staff id cannot be empty.");
@@ -43,8 +45,52 @@ namespace CafeHub.Application.Orders
 
             RuleForEach(command => command.Lines).ChildRules(line =>
             {
-                line.RuleFor(item => item.ProductId).NotEmpty();
-                line.RuleFor(item => item.SizeId).NotEmpty();
+                line.RuleFor(item => item.WifiPackageId)
+                    .Must(packageId => packageId is null || packageId != Guid.Empty);
+                line.RuleFor(item => item)
+                    .Custom((item, context) =>
+                    {
+                        if (item.WifiPackageId is { } packageId)
+                        {
+                            if (packageId == Guid.Empty)
+                            {
+                                context.AddFailure(
+                                    nameof(item.WifiPackageId),
+                                    "The WiFi package id cannot be empty.");
+                            }
+
+                            if (item.ProductId != Guid.Empty || item.SizeId != Guid.Empty)
+                            {
+                                context.AddFailure(
+                                    nameof(item.WifiPackageId),
+                                    "A WiFi package line cannot name a product or size.");
+                            }
+
+                            if (item.AddonIds.Count > 0 || item.ExpectedAddonPrices.Count > 0)
+                            {
+                                context.AddFailure(
+                                    nameof(item.WifiPackageId),
+                                    "A WiFi package line cannot carry add-ons.");
+                            }
+                        }
+                        else
+                        {
+                            if (item.ProductId == Guid.Empty)
+                            {
+                                context.AddFailure(nameof(item.ProductId), "The product id is required.");
+                            }
+
+                            if (item.SizeId == Guid.Empty)
+                            {
+                                context.AddFailure(nameof(item.SizeId), "The size id is required.");
+                            }
+                        }
+                    });
+
+                line.RuleFor(item => item.ProductId).NotEmpty()
+                    .When(item => item.WifiPackageId is null);
+                line.RuleFor(item => item.SizeId).NotEmpty()
+                    .When(item => item.WifiPackageId is null);
                 line.RuleFor(item => item.Quantity).InclusiveBetween(1, OrderItem.MaximumQuantity);
                 line.RuleFor(item => item.ExpectedUnitPrice).GreaterThanOrEqualTo(0m)
                     .Must(price => decimal.Round(price, 2) == price)

@@ -22,8 +22,7 @@ namespace CafeHub.Infrastructure.Wifi
             Guid packageId,
             IReadOnlyCollection<string> codes,
             CancellationToken cancellationToken)
-        {
-            if (codes.Count == 0)
+        {            if (codes.Count == 0)
             {
                 return new HashSet<string>(StringComparer.Ordinal);
             }
@@ -36,6 +35,13 @@ namespace CafeHub.Infrastructure.Wifi
 
             return existing.ToHashSet(StringComparer.Ordinal);
         }
+
+        public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
+            context.WifiVouchers.AsNoTracking()
+                .AnyAsync(
+                    voucher => voucher.PackageId == packageId
+                        && voucher.Status == WifiVoucherStatus.Available,
+                    cancellationToken);
 
         public async Task<Result> InsertImportedAsync(
             Guid packageId,
