@@ -1348,6 +1348,152 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.PrintRoute", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("document_type");
+
+                    b.Property<Guid>("PrinterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("printer_id");
+
+                    b.Property<Guid?>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_print_routes");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_print_routes_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_print_routes_created_by");
+
+                    b.HasIndex("PrinterId")
+                        .HasDatabaseName("ix_print_routes_printer_id");
+
+                    b.HasIndex("StationId")
+                        .HasDatabaseName("ix_print_routes_station_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_print_routes_updated_by");
+
+                    b.ToTable("print_routes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_print_routes_document_type", "document_type IN ('OrderTicket', 'Receipt')");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Printer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("ConnectionKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("connection_kind");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("profile");
+
+                    b.Property<Guid?>("StationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("station_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_printers");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_printers_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_printers_created_by");
+
+                    b.HasIndex("StationId")
+                        .HasDatabaseName("ix_printers_station_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_printers_updated_by");
+
+                    b.ToTable("printers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_printers_connection_kind", "char_length(connection_kind) BETWEEN 1 AND 32 AND connection_kind !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_printers_name", "char_length(name) BETWEEN 1 AND 64 AND name !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_printers_profile", "profile IN ('Escpos80mm', 'Escpos58mm')");
+
+                            t.HasCheckConstraint("ck_printers_status", "status IN ('Active', 'Inactive')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3206,6 +3352,69 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_payments_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.PrintRoute", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_print_routes_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_print_routes_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Printer", null)
+                        .WithMany()
+                        .HasForeignKey("PrinterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_print_routes_printer_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_print_routes_station_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_print_routes_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.Printer", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_printers_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_printers_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Station", null)
+                        .WithMany()
+                        .HasForeignKey("StationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_printers_station_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_printers_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Product", b =>
