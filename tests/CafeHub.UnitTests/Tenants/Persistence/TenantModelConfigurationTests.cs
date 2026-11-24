@@ -53,6 +53,10 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "guest_mutes",
             "bills",
             "payments",
+            "receipts",
+            "receipt_lines",
+            "receipt_payments",
+            "receipt_number_counters",
         ];
 
         [Fact]

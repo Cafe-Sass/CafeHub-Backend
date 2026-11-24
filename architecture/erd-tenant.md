@@ -2,9 +2,9 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 30 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), and the money record of its payments (`payments`).
+The Tenant model contains 34 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), the money record of its payments (`payments`), and the digital receipt snapshot (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`).
 
-Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427).
+Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427). The receipt schema (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`) is added by the amendment for Story CFMD-433 (CFMD-434).
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
 
@@ -209,6 +209,40 @@ erDiagram
         timestamptz lifted_at
         uuid lifted_by_user_id FK
     }
+    receipts {
+        uuid id PK
+        uuid bill_id FK, UK
+        uuid branch_id FK
+        text receipt_number UK
+        timestamptz issued_at
+        numeric total_amount
+        numeric paid_amount
+        numeric remaining_amount
+    }
+    receipt_lines {
+        uuid id PK
+        uuid receipt_id FK
+        integer order_number
+        text guest_display_name
+        text product_name
+        text size_name
+        text addons
+        integer quantity
+        numeric unit_price
+        numeric line_total
+    }
+    receipt_payments {
+        uuid id PK
+        uuid receipt_id FK
+        text method
+        numeric amount
+        timestamptz confirmed_at
+    }
+    receipt_number_counters {
+        uuid branch_id PK, FK
+        date business_date PK
+        integer last_number
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
@@ -256,6 +290,11 @@ erDiagram
     bills ||--o{ payments : "payments"
     orders |o--o{ payments : "named settlement"
     tenant_users |o--o{ payments : "confirmed by"
+    bills |o--o| receipts : "receipt"
+    branches ||--o{ receipts : "receipts"
+    receipts ||--o{ receipt_lines : "lines"
+    receipts ||--o{ receipt_payments : "payment snapshot"
+    branches ||--o{ receipt_number_counters : "receipt counters"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -670,13 +709,66 @@ Purpose: the money record of one confirmed or pending payment against a bill (FR
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_payments_created_by` / `fk_payments_updated_by` with ON DELETE RESTRICT and its own index.
 - Payment rows are never physically deleted; settlement history is immutable financial history.
 
+### receipts
+
+Purpose: the immutable digital receipt created exactly once when a bill becomes fully paid (FR-REC-001, Story CFMD-433, CFMD-434). It is a convenience record of what was bought and paid and is never presented as tax-compliance proof (FR-REC-002). A bill force-closed while money is still owed has no receipt. The receipt and its lines and payment snapshots are append-only: application workflows never update or delete them after insertion, so a later product price or order change cannot rewrite history.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_receipts`.
+- `bill_id uuid NOT NULL` — `fk_receipts_bill_id` to `bills.id` (ON DELETE RESTRICT); `uq_receipts_bill_id` makes the bill unique, so exactly one receipt exists per fully paid bill and a repeated completion attempts nothing new.
+- `branch_id uuid NOT NULL` — `fk_receipts_branch_id` to `branches.id` (ON DELETE RESTRICT); the first column of `ix_receipts_branch_issued_at` on `(branch_id, issued_at)`, which serves the staff reads.
+- `receipt_number text NOT NULL` — the stable per-branch number formatted `R-<yyyyMMdd>-<number>` from the cafe-local business date and the daily counter: `ck_receipts_receipt_number_format` over `char_length(receipt_number) BETWEEN 11 AND 32 AND receipt_number ~ '^R-[0-9]{8}-[0-9]+$'`; `uq_receipts_branch_receipt_number` on `(branch_id, receipt_number)`.
+- `issued_at timestamptz NOT NULL` — the server time of the completion recorded through `TimeProvider`.
+- `total_amount numeric(12,2) NOT NULL` — the bill total at issue: `ck_receipts_total_amount_range CHECK (total_amount >= 0)`.
+- `paid_amount numeric(12,2) NOT NULL` — the confirmed amount paid at issue: `ck_receipts_paid_amount_range CHECK (paid_amount > 0)`.
+- `remaining_amount numeric(12,2) NOT NULL` — `ck_receipts_fully_paid CHECK (remaining_amount = 0)`; only a bill with zero remaining and no payment awaiting review reaches this table.
+- `created_at timestamptz NOT NULL` and `created_by uuid NULL` (`fk_receipts_created_by` to `tenant_users.id`, ON DELETE RESTRICT; `ix_receipts_created_by`) — the completing actor. There is no `updated_at` or `updated_by` because the row is append-only by design.
+
+### receipt_lines
+
+Purpose: the immutable line snapshot copied from the accepted orders' item snapshots when the receipt is issued (Story CFMD-434). Future WiFi lines are copied the same generic way, so the copy never depends on the line type.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_receipt_lines`.
+- `receipt_id uuid NOT NULL` — `fk_receipt_lines_receipt_id` to `receipts.id` (ON DELETE RESTRICT); `ix_receipt_lines_receipt_id`.
+- `order_number integer NOT NULL` — `ck_receipt_lines_order_number CHECK (order_number >= 1)`; the source order number keeps the grouping and ordering stable.
+- `guest_display_name text NOT NULL` — `ck_receipt_lines_guest_name CHECK (char_length(guest_display_name) BETWEEN 1 AND 64 AND guest_display_name !~ '[[:cntrl:]]')`; copied from the order and normalized to `Guest` when the order carried no name. No other personal data is copied.
+- `product_name text NOT NULL` — `ck_receipt_lines_product_name CHECK (char_length(product_name) BETWEEN 1 AND 96)`.
+- `size_name text NOT NULL` — `ck_receipt_lines_size_name CHECK (char_length(size_name) BETWEEN 1 AND 32)`.
+- `addons text NULL` — the comma-joined add-on names copied from the line snapshot: `ck_receipt_lines_addons CHECK (addons IS NULL OR (char_length(addons) BETWEEN 1 AND 512 AND addons !~ '[[:cntrl:]]'))`.
+- `quantity integer NOT NULL` — `ck_receipt_lines_quantity CHECK (quantity BETWEEN 1 AND 50)`.
+- `unit_price numeric(12,2) NOT NULL` — `ck_receipt_lines_unit_price CHECK (unit_price >= 0 AND unit_price <= 99999999.99)`.
+- `line_total numeric(12,2) NOT NULL` — `ck_receipt_lines_line_total CHECK (line_total >= 0 AND line_total <= 99999999.99)`.
+- `created_at timestamptz NOT NULL` — the issue time. There are no actor or update columns: a line inherits the receipt's actor and is never updated.
+
+### receipt_payments
+
+Purpose: the immutable payment snapshot of the receipt (Story CFMD-434): one row per `Confirmed` payment, carrying only the method, amount, and confirmation time.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_receipt_payments`.
+- `receipt_id uuid NOT NULL` — `fk_receipt_payments_receipt_id` to `receipts.id` (ON DELETE RESTRICT); `ix_receipt_payments_receipt_id`.
+- `method text NOT NULL` — `ck_receipt_payments_method CHECK (method IN ('Cash', 'Online'))`.
+- `amount numeric(12,2) NOT NULL` — `ck_receipt_payments_amount_range CHECK (amount > 0)`.
+- `confirmed_at timestamptz NOT NULL` — the payment's stored confirmation time; no staff identity is copied.
+- `created_at timestamptz NOT NULL` — the issue time. There is no `payment_id` foreign key because the row is the immutable snapshot itself; the rejected alternative is a reference to `payments`, which would couple the printed record to a mutable payment row.
+- There are no actor or update columns: a snapshot inherits the receipt's actor and is never updated.
+
+### receipt_number_counters
+
+Purpose: the per-branch, per-business-date counter that hands out receipt numbers (Proposed). It mirrors `order_number_counters` so numbering is atomic without scanning `receipts` and restarts each cafe-local day.
+
+- `branch_id uuid NOT NULL` — `fk_receipt_number_counters_branch_id` to `branches.id` (ON DELETE RESTRICT).
+- `business_date date NOT NULL` — the cafe-local date; together with the branch it forms `pk_receipt_number_counters`.
+- `last_number integer NOT NULL` — `ck_receipt_number_counters_last_number CHECK (last_number >= 1)`.
+- `updated_at timestamptz NOT NULL` — the moment of the last increment.
+- No `created_at`, `created_by`, or `updated_by`: the counter is derived infrastructure state, not an audited business row.
+- Allocation uses the same single-statement upsert pattern as order numbers: `INSERT INTO receipt_number_counters (branch_id, business_date, last_number, updated_at) VALUES (..., 1, ...) ON CONFLICT (branch_id, business_date) DO UPDATE SET last_number = receipt_number_counters.last_number + 1, updated_at = EXCLUDED.updated_at RETURNING last_number`, inside the transaction that closes the bill. The receipt number prefixes the counter with `R-` and the business date.
+
 ## Explicitly out of scope (later stories)
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
-- Online payments and receipts — the online provider flows, digital receipts, and refunds; the `payments` schema and the cash confirmation are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
+- Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi — packages, purchases, and tokens (FR-WIFI-001 through FR-WIFI-006; token/redemption rules TBD-07; router/platform integration TBD-08).
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
 - Printing — local print jobs and connector targets (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD without a TBD number).

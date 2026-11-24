@@ -158,8 +158,9 @@ namespace CafeHub.UnitTests.Billing
             store.SeedOpenBillWithAcceptedOrders(AcceptedOrder(10.00m));
             var payment = store.SeedPendingProof(10.00m);
             var bills = new FakeBillStore();
+            var receipts = new FakeReceiptIssuer();
 
-            var result = await ConfirmHandler(store, bills).Handle(
+            var result = await ConfirmHandler(store, bills, receipts).Handle(
                 new ConfirmPaymentCommand { PaymentId = payment.Id }, default);
 
             Assert.True(result.IsSuccess, result.Error?.Code);
@@ -168,6 +169,7 @@ namespace CafeHub.UnitTests.Billing
             Assert.Equal(BillStatus.Closed, closed.Status);
             Assert.Equal(UserId, closed.ClosedByUserId);
             Assert.Equal(0m, Assert.Single(bills.ClosedRemaining));
+            Assert.Single(receipts.Issued);
         }
 
         [Fact]
@@ -352,13 +354,14 @@ namespace CafeHub.UnitTests.Billing
 
         private static ConfirmPaymentCommandHandler ConfirmHandler(
             FakePaymentStore store,
-            FakeBillStore? bills = null) =>
-            new(store, bills ?? new FakeBillStore(), StaffUser(), new FixedClock(Now));
+            FakeBillStore? bills = null,
+            FakeReceiptIssuer? receipts = null) =>
+            new(store, bills ?? new FakeBillStore(), receipts ?? new FakeReceiptIssuer(), StaffUser(), new FixedClock(Now));
 
         private static RejectPaymentCommandHandler RejectHandler(
             FakePaymentStore store,
             FakeBillStore? bills = null) =>
-            new(store, bills ?? new FakeBillStore(), StaffUser(), new FixedClock(Now));
+            new(store, bills ?? new FakeBillStore(), new FakeReceiptIssuer(), StaffUser(), new FixedClock(Now));
 
         private static GetPaymentsQueryHandler CreateListHandler(
             FakePaymentQueryStore store,
@@ -429,6 +432,23 @@ namespace CafeHub.UnitTests.Billing
         private sealed class FixedClock(DateTimeOffset now) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => now;
+        }
+
+        private sealed class FakeReceiptIssuer : IReceiptIssuer
+        {
+            public List<Bill> Issued { get; } = [];
+
+            public Task<Result> IssueAsync(
+                Bill bill,
+                IReadOnlyList<Order> acceptedOrders,
+                IReadOnlyList<Payment> payments,
+                Guid actorId,
+                DateTimeOffset now,
+                CancellationToken cancellationToken)
+            {
+                Issued.Add(bill);
+                return Task.FromResult(Result.Success());
+            }
         }
 
         private sealed class FakeBillStore : IBillStore
