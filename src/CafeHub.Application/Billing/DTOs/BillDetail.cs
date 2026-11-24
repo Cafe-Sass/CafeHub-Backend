@@ -13,7 +13,7 @@ namespace CafeHub.Application.Billing.DTOs
     public sealed record BillDetail(
         Guid Id,
         Guid BranchId,
-        Guid TableId,
+        Guid? TableId,
         string Status,
         string PublicReference,
         DateTimeOffset OpenedAt,

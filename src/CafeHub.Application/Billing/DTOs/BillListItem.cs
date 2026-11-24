@@ -5,8 +5,8 @@ namespace CafeHub.Application.Billing.DTOs
     public sealed record BillListItem(
         Guid Id,
         Guid BranchId,
-        Guid TableId,
-        int TableNumber,
+        Guid? TableId,
+        int? TableNumber,
         string Status,
         string PublicReference,
         DateTimeOffset OpenedAt,

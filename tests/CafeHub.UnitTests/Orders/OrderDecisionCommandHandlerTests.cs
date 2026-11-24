@@ -434,11 +434,11 @@ namespace CafeHub.UnitTests.Orders
 
         private sealed class FakeBillStore : IBillStore
         {
-            private readonly Dictionary<Guid, Bill> openBills = [];
+            private readonly Dictionary<Guid?, Bill> openBills = [];
 
             public Task<Result<Bill>> ResolveOpenBillAsync(
                 Guid branchId,
-                Guid tableId,
+                Guid? tableId,
                 DateTimeOffset now,
                 Guid? actorId,
                 CancellationToken cancellationToken)

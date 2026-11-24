@@ -236,7 +236,7 @@ namespace CafeHub.UnitTests.Billing
 
             public async Task<Result<Bill>> ResolveOpenBillAsync(
                 Guid branchId,
-                Guid tableId,
+                Guid? tableId,
                 DateTimeOffset now,
                 Guid? actorId,
                 CancellationToken cancellationToken)
@@ -273,7 +273,7 @@ namespace CafeHub.UnitTests.Billing
                 return Result.Success(bill);
             }
 
-            public Bill? FindOpen(Guid tableId) =>
+            public Bill? FindOpen(Guid? tableId) =>
                 committed.FirstOrDefault(bill => bill.TableId == tableId && bill.Status == BillStatus.Open);
 
             public Task<BillSettlement?> FindForCloseAsync(
