@@ -34,7 +34,11 @@ namespace CafeHub.Application.Orders.DTOs
                         item.ProductName,
                         item.SizeName,
                         item.Quantity,
-                        item.AddonNames))
+                        item.AddonNames,
+                        item.WifiDurationMinutes,
+                        item.WifiSpeedMbps,
+                        item.WifiCode,
+                        item.WifiCodePending))
                     .ToArray())
             {
                 BillReference = entry.BillReference,

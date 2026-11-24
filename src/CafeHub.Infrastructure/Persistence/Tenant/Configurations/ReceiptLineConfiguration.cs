@@ -25,6 +25,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                     "ck_receipt_lines_unit_price", "unit_price >= 0 AND unit_price <= 99999999.99");
                 table.HasCheckConstraint(
                     "ck_receipt_lines_line_total", "line_total >= 0 AND line_total <= 99999999.99");
+                table.HasCheckConstraint(
+                    "ck_receipt_lines_wifi_code",
+                    "wifi_code IS NULL OR (char_length(wifi_code) BETWEEN 4 AND 64 AND wifi_code ~ '^[A-Za-z0-9-]+$')");
             });
 
             builder.HasKey(line => line.Id).HasName("pk_receipt_lines");
@@ -38,6 +41,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(line => line.Quantity).HasColumnName("quantity").HasColumnType("integer");
             builder.Property(line => line.UnitPrice).HasColumnName("unit_price").HasColumnType("numeric(12,2)").HasPrecision(12, 2);
             builder.Property(line => line.LineTotal).HasColumnName("line_total").HasColumnType("numeric(12,2)").HasPrecision(12, 2);
+            builder.Property(line => line.WifiCode).HasColumnName("wifi_code").HasColumnType("text");
             builder.Property(line => line.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz");
 
             builder.HasIndex(line => line.ReceiptId).HasDatabaseName("ix_receipt_lines_receipt_id");

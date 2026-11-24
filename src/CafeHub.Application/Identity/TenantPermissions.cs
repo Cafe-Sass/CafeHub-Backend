@@ -25,9 +25,10 @@ namespace CafeHub.Application.Identity
         public const string BillsView = "bills.view";
         public const string BillsClose = "bills.close";
         public const string WifiManage = "wifi.manage";
+        public const string WifiLookup = "wifi.lookup";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage, WifiManage });
+            new[] { BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage, WifiLookup, WifiManage });
 
         public static bool IsOwnerOnly(string? code) => code is RolesManage or BranchesManage or CafeProfileManage;
 

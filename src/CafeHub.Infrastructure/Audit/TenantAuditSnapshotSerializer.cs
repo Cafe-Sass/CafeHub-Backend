@@ -141,6 +141,8 @@ namespace CafeHub.Infrastructure.Audit
                     "Duplicate",
                     "Invalid",
                     "Voided",
+                    "PackageId",
+                    "OrderId",
                 },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {

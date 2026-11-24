@@ -5,5 +5,7 @@ namespace CafeHub.WebApi.Authorization
         public const string TenantUser = "TenantUser";
 
         public const string TenantOwner = "TenantOwner";
+
+        public const string WifiIssuedRead = "wifi.issued.read";
     }
 }

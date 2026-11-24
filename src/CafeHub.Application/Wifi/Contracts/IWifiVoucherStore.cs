@@ -19,6 +19,11 @@ namespace CafeHub.Application.Wifi.Contracts
 
         Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken);
 
+        Task<Result> IssueForOrderAsync(
+            Order order,
+            Guid? actorUserId,
+            CancellationToken cancellationToken);
+
         Task<Result> InsertImportedAsync(
             Guid packageId,
             IReadOnlyList<WifiVoucher> vouchers,

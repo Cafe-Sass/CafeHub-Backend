@@ -273,6 +273,12 @@ namespace CafeHub.UnitTests.Wifi
             public WifiVoucherStatus StatusOf(string code) =>
                 statuses.TryGetValue(code, out var status) ? status : WifiVoucherStatus.Available;
 
+            public Task<Result> IssueForOrderAsync(
+                Order order,
+                Guid? actorUserId,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
+
             public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
                 Task.FromResult(existing.Count > 0 || statuses.Values.Contains(WifiVoucherStatus.Available));
 

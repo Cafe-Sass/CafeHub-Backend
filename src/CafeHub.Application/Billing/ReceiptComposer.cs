@@ -11,7 +11,8 @@ namespace CafeHub.Application.Billing
             IReadOnlyList<Payment> payments,
             string receiptNumber,
             DateTimeOffset issuedAt,
-            Guid? actorId)
+            Guid? actorId,
+            IReadOnlyDictionary<Guid, string>? wifiCodes = null)
         {
             ArgumentNullException.ThrowIfNull(bill);
             ArgumentNullException.ThrowIfNull(acceptedOrders);
@@ -32,7 +33,8 @@ namespace CafeHub.Application.Billing
                         item.Quantity,
                         item.UnitPrice,
                         item.LineTotal,
-                        issuedAt)))
+                        issuedAt,
+                        wifiCodes?.GetValueOrDefault(item.Id))))
                 .ToArray();
             var receiptPayments = payments
                 .Where(payment => payment.Status == PaymentStatus.Confirmed)

@@ -8,6 +8,8 @@ using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Wifi.Contracts;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 using MediatR;
 
@@ -146,7 +148,7 @@ namespace CafeHub.UnitTests.Billing
             RecordingAuditWriter audit)
         {
             bills.Audit = audit;
-            return new(new FakeSender(), store, bills, user, new FakeStationScope(null), new FixedClock(Now), audit);
+            return new(new FakeSender(), store, bills, new FakeWifiVoucherStore(), user, new FakeStationScope(null), new FixedClock(Now), audit);
         }
 
         private static FakeTenantUser StaffUser() =>
@@ -221,6 +223,44 @@ namespace CafeHub.UnitTests.Billing
 
                 return Task.FromResult(Result.Success(order.Status));
             }
+        }
+
+        private sealed class FakeWifiVoucherStore : IWifiVoucherStore
+        {
+            public Task<Result> IssueForOrderAsync(
+                Order order,
+                Guid? actorUserId,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
+
+            public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
+                Task.FromResult(false);
+
+            public Task<IReadOnlySet<string>> FindExistingCodesAsync(
+                Guid packageId,
+                IReadOnlyCollection<string> codes,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The bill flow does not import vouchers.");
+
+            public Task<Result> InsertImportedAsync(
+                Guid packageId,
+                IReadOnlyList<WifiVoucher> vouchers,
+                WifiVoucherImportResult counts,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The bill flow does not import vouchers.");
+
+            public Task<WifiVoucherSummary> GetSummaryAsync(
+                Guid packageId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The bill flow does not read voucher counts.");
+
+            public Task<Result> VoidAsync(
+                Guid packageId,
+                string code,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The bill flow does not void vouchers.");
         }
 
         private sealed class FakeBillStore(bool raceMode = false) : IBillStore

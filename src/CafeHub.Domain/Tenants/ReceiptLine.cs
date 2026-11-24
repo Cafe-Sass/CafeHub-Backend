@@ -28,6 +28,8 @@ namespace CafeHub.Domain.Tenants
 
         public decimal LineTotal { get; private set; }
 
+        public string? WifiCode { get; private set; }
+
         public DateTimeOffset CreatedAt { get; private set; }
 
         public static ReceiptLine Create(
@@ -40,7 +42,8 @@ namespace CafeHub.Domain.Tenants
             int quantity,
             decimal unitPrice,
             decimal lineTotal,
-            DateTimeOffset createdAt)
+            DateTimeOffset createdAt,
+            string? wifiCode = null)
         {
             if (id == Guid.Empty)
             {
@@ -87,6 +90,13 @@ namespace CafeHub.Domain.Tenants
                     "The receipt line prices must be between 0.00 and 99999999.99 with at most two decimal places.");
             }
 
+            if (wifiCode is not null && !WifiVoucher.IsValidCode(wifiCode))
+            {
+                throw new ArgumentException(
+                    $"The receipt WiFi code must be {WifiVoucher.MinimumCodeLength} to {WifiVoucher.MaximumCodeLength} letters, digits, or hyphens.",
+                    nameof(wifiCode));
+            }
+
             return new ReceiptLine
             {
                 Id = id,
@@ -98,6 +108,7 @@ namespace CafeHub.Domain.Tenants
                 Quantity = quantity,
                 UnitPrice = unitPrice,
                 LineTotal = lineTotal,
+                WifiCode = wifiCode?.Trim(),
                 CreatedAt = createdAt,
             };
         }

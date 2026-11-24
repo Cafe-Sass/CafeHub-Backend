@@ -8,6 +8,8 @@ using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Wifi.Contracts;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 using MediatR;
 
@@ -341,7 +343,7 @@ namespace CafeHub.UnitTests.Orders
             FakeStationScope? stations = null,
             FakeSender? sender = null,
             IBillStore? bills = null) =>
-            new(sender ?? new FakeSender(), store, bills ?? new FakeBillStore(), user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+            new(sender ?? new FakeSender(), store, bills ?? new FakeBillStore(), new FakeWifiVoucherStore(), user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
 
         private static RejectOrderCommandHandler CreateRejectHandler(
             FakeOrderDecisionStore store,
@@ -430,6 +432,44 @@ namespace CafeHub.UnitTests.Orders
                     ? Task.FromResult(Result.Failure<OrderStatus>(SaveFailure))
                     : Task.FromResult(Result.Success(order.Status));
             }
+        }
+
+        private sealed class FakeWifiVoucherStore : IWifiVoucherStore
+        {
+            public Task<Result> IssueForOrderAsync(
+                Order order,
+                Guid? actorUserId,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
+
+            public Task<bool> HasAvailableAsync(Guid packageId, CancellationToken cancellationToken) =>
+                Task.FromResult(false);
+
+            public Task<IReadOnlySet<string>> FindExistingCodesAsync(
+                Guid packageId,
+                IReadOnlyCollection<string> codes,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The decision flow does not import vouchers.");
+
+            public Task<Result> InsertImportedAsync(
+                Guid packageId,
+                IReadOnlyList<WifiVoucher> vouchers,
+                WifiVoucherImportResult counts,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The decision flow does not import vouchers.");
+
+            public Task<WifiVoucherSummary> GetSummaryAsync(
+                Guid packageId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The decision flow does not read voucher counts.");
+
+            public Task<Result> VoidAsync(
+                Guid packageId,
+                string code,
+                Guid actorUserId,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The decision flow does not void vouchers.");
         }
 
         private sealed class FakeBillStore : IBillStore
