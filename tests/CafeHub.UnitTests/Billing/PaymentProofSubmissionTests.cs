@@ -34,7 +34,7 @@ namespace CafeHub.UnitTests.Billing
             var handler = CreateHandler(store, media);
 
             var result = await handler.Handle(
-                Command(4.50m, "lunch", Png), default);
+                Command(4.50m, "  lunch  ", Png), default);
 
             Assert.True(result.IsSuccess, result.Error?.Code);
             Assert.Equal("PendingReview", result.Value!.Status);
@@ -319,8 +319,7 @@ namespace CafeHub.UnitTests.Billing
                 CancellationToken cancellationToken)
             {
                 var bill = bills.Values.FirstOrDefault(
-                    candidate => candidate.PublicReference == billReference
-                        && candidate.Status == BillStatus.Open);
+                    candidate => candidate.PublicReference == billReference);
                 return Task.FromResult(bill is null
                     ? null
                     : new BillSettlement(

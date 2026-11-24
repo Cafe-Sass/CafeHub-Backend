@@ -43,6 +43,11 @@ namespace CafeHub.Application.Billing.Commands
                     stored.ClaimedAmount!.Value));
             }
 
+            if (settlement.Bill.Status is not BillStatus.Open)
+            {
+                return Result.Failure<SubmitPaymentProofResult>(BillingErrors.NotFound());
+            }
+
             var billTotal = Bill.ResolveTotalAmount(settlement.AcceptedOrders);
             var remaining = Payment.ResolveBillRemainingAmount(billTotal, settlement.Payments);
             if (command.ClaimedAmount > remaining)

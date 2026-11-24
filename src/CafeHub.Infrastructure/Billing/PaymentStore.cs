@@ -50,7 +50,7 @@ namespace CafeHub.Infrastructure.Billing
             CancellationToken cancellationToken)
         {
             var bill = await context.Bills
-                .Where(candidate => candidate.PublicReference == billReference && candidate.Status == BillStatus.Open)
+                .Where(candidate => candidate.PublicReference == billReference)
                 .SingleOrDefaultAsync(cancellationToken);
             if (bill is null)
             {

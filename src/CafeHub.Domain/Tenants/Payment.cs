@@ -152,7 +152,7 @@ namespace CafeHub.Domain.Tenants
                 IdempotencyKey = ValidateIdempotencyKey(idempotencyKey),
                 MediaReference = mediaReference,
                 ClaimedAmount = claimedAmount,
-                Note = note,
+                Note = note?.Trim(),
                 CreatedAt = now,
                 UpdatedAt = now,
                 CreatedBy = null,
