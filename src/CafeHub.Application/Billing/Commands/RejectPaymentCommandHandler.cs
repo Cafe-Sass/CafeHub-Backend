@@ -10,6 +10,7 @@ namespace CafeHub.Application.Billing.Commands
     public sealed class RejectPaymentCommandHandler(
         IPaymentStore store,
         IBillStore billStore,
+        IReceiptIssuer receiptIssuer,
         ICurrentTenantUser currentUser,
         TimeProvider timeProvider)
         : ICommandHandler<RejectPaymentCommand, RejectPaymentResult>
@@ -60,10 +61,11 @@ namespace CafeHub.Application.Billing.Commands
                     return Result.Failure<RejectPaymentResult>(saved.Error!);
                 }
 
-                var closed = await PaymentReviewClose.TryAutoCloseAsync(
+                var closed = await BillCompletion.TryCompleteAsync(
                     billStore,
+                    receiptIssuer,
                     settlement.Bill,
-                    billTotal - paid,
+                    settlement.AcceptedOrders,
                     settlement.Payments,
                     actorId,
                     now,

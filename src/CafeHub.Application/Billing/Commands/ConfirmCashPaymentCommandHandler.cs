@@ -11,6 +11,7 @@ namespace CafeHub.Application.Billing.Commands
     public sealed class ConfirmCashPaymentCommandHandler(
         IPaymentStore store,
         IBillStore billStore,
+        IReceiptIssuer receiptIssuer,
         ICurrentTenantUser currentUser,
         TimeProvider timeProvider)
         : ICommandHandler<ConfirmCashPaymentCommand, ConfirmCashPaymentResult>
@@ -95,9 +96,11 @@ namespace CafeHub.Application.Billing.Commands
                 }
 
                 var freshResult = BuildSettlementResult(fresh, add.Value);
-                var freshClose = await TryAutoCloseAsync(
+                var freshClose = await BillCompletion.TryCompleteAsync(
+                    billStore,
+                    receiptIssuer,
                     fresh.Bill,
-                    freshResult.BillRemainingAmount,
+                    fresh.AcceptedOrders,
                     fresh.Payments,
                     actorId,
                     now,
@@ -107,11 +110,14 @@ namespace CafeHub.Application.Billing.Commands
                     : Result.Success(freshResult);
             }
 
-            var paid = Payment.ResolvePaidAmount(settlement.Payments) + add.Value.Amount;
-            var closed = await TryAutoCloseAsync(
+            var applied = settlement.Payments.Append(add.Value).ToArray();
+            var paid = Payment.ResolvePaidAmount(applied);
+            var closed = await BillCompletion.TryCompleteAsync(
+                billStore,
+                receiptIssuer,
                 settlement.Bill,
-                billTotal - paid,
-                settlement.Payments,
+                settlement.AcceptedOrders,
+                applied,
                 actorId,
                 now,
                 cancellationToken);
@@ -129,25 +135,6 @@ namespace CafeHub.Application.Billing.Commands
                 paid,
                 billTotal - paid,
                 add.Value.ConfirmedAt!.Value));
-        }
-
-        private async Task<Result> TryAutoCloseAsync(
-            Bill bill,
-            decimal remainingAmount,
-            IReadOnlyList<Payment> payments,
-            Guid actorId,
-            DateTimeOffset now,
-            CancellationToken cancellationToken)
-        {
-            if (remainingAmount != 0m
-                || bill.Status is not BillStatus.Open
-                || payments.Any(payment => payment.Status == PaymentStatus.PendingReview))
-            {
-                return Result.Success();
-            }
-
-            bill.Close(null, actorId, now);
-            return await billStore.SaveCloseAsync(bill, remainingAmount, actorId, cancellationToken);
         }
 
         private static ConfirmCashPaymentResult BuildSettlementResult(BillSettlement settlement, Payment payment)

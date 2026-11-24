@@ -316,7 +316,7 @@ namespace CafeHub.UnitTests.Billing
         }
 
         private static ConfirmCashPaymentCommandHandler CreateHandler(FakePaymentStore store, FakeBillStore? bills = null) =>
-            new(store, bills ?? new FakeBillStore(), StaffUser(), new FixedClock(Now));
+            new(store, bills ?? new FakeBillStore(), new FakeReceiptIssuer(), StaffUser(), new FixedClock(Now));
 
         private static FakeTenantUser StaffUser() =>
             new(UserId, new TenantAccountAccess(true, null, true) { BranchId = BranchId });
@@ -380,6 +380,23 @@ namespace CafeHub.UnitTests.Billing
         private sealed class FixedClock(DateTimeOffset now) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => now;
+        }
+
+        private sealed class FakeReceiptIssuer : IReceiptIssuer
+        {
+            public List<Bill> Issued { get; } = [];
+
+            public Task<Result> IssueAsync(
+                Bill bill,
+                IReadOnlyList<Order> acceptedOrders,
+                IReadOnlyList<Payment> payments,
+                Guid actorId,
+                DateTimeOffset now,
+                CancellationToken cancellationToken)
+            {
+                Issued.Add(bill);
+                return Task.FromResult(Result.Success());
+            }
         }
 
         private sealed class FakeBillStore : IBillStore
