@@ -5,7 +5,7 @@ namespace CafeHub.Application.Orders.DTOs
     public sealed record OrderFeedItem(
         Guid Id,
         int OrderNumber,
-        int TableNumber,
+        int? TableNumber,
         string ServiceType,
         string Status,
         string GuestDisplayName,

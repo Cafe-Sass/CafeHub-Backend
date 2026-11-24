@@ -3,7 +3,7 @@ namespace CafeHub.Application.Orders.Contracts
     public sealed record OrderFeedEntry(
         Guid Id,
         int OrderNumber,
-        int TableNumber,
+        int? TableNumber,
         string ServiceType,
         string Status,
         string GuestDisplayName,

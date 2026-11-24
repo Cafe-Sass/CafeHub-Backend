@@ -133,7 +133,7 @@ namespace CafeHub.Infrastructure.Orders
                     order.OrderNumber,
                     context.BranchTables
                         .Where(table => table.Id == order.TableId)
-                        .Select(table => table.Number)
+                        .Select(table => (int?)table.Number)
                         .FirstOrDefault(),
                     order.ServiceType.ToString(),
                     order.Status.ToString(),
