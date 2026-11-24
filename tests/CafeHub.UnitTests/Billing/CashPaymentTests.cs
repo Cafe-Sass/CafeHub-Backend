@@ -494,6 +494,14 @@ namespace CafeHub.UnitTests.Billing
                     payments.GetValueOrDefault(billId, []).ToList()));
             }
 
+            public Task<BillSettlement?> FindForProofAsync(
+                string billReference,
+                CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The cash flow must not look up a bill for a proof.");
+
+            public Task<Result<Payment>> AddProofAsync(Payment payment, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The cash flow must not submit a proof.");
+
             public Task<Result<Payment>> AddAsync(Payment payment, CancellationToken cancellationToken)
             {
                 var existing = payments.GetValueOrDefault(payment.BillId, [])
