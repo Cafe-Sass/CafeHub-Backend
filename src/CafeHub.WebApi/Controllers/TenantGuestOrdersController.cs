@@ -59,7 +59,8 @@ namespace CafeHub.WebApi.Controllers
                         line.AddonIds ?? [],
                         line.Quantity,
                         line.ExpectedUnitPrice,
-                        line.ExpectedAddonPrices ?? []))
+                        line.ExpectedAddonPrices ?? [],
+                        line.WifiPackageId))
                     .ToArray() ?? [],
             };
 

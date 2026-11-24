@@ -6,5 +6,6 @@ namespace CafeHub.WebApi.Controllers
         IReadOnlyList<Guid>? AddonIds,
         int Quantity,
         decimal ExpectedUnitPrice,
-        IReadOnlyList<decimal>? ExpectedAddonPrices);
+        IReadOnlyList<decimal>? ExpectedAddonPrices,
+        Guid? WifiPackageId = null);
 }
