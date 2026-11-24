@@ -403,6 +403,59 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges WifiPackageCreate(WifiPackage package)
+        {
+            ArgumentNullException.ThrowIfNull(package);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange(nameof(WifiPackage.Name), null, package.Name),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.DurationMinutes), null, package.DurationMinutes.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.SpeedMbps), null, package.SpeedMbps?.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.DataMode), null, package.DataMode.ToString()),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.QuotaMb), null, package.QuotaMb?.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.Price), null, package.Price.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.SortOrder), null, package.SortOrder.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    nameof(WifiPackage.Status), null, package.Status.ToString()),
+            });
+        }
+
+        public static TenantAuditChanges WifiPackageUpdate(
+            WifiPackageAuditValues before,
+            WifiPackage package)
+        {
+            ArgumentNullException.ThrowIfNull(before);
+            ArgumentNullException.ThrowIfNull(package);
+            return TenantAuditChanges.Update(new[]
+                {
+                    new TenantAuditChanges.FieldChange(nameof(WifiPackage.Name), before.Name, package.Name),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.DurationMinutes), before.DurationMinutesText,
+                        package.DurationMinutes.ToString(CultureInfo.InvariantCulture)),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.SpeedMbps), before.SpeedMbpsText,
+                        package.SpeedMbps?.ToString(CultureInfo.InvariantCulture)),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.DataMode), before.DataMode.ToString(), package.DataMode.ToString()),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.QuotaMb), before.QuotaMbText,
+                        package.QuotaMb?.ToString(CultureInfo.InvariantCulture)),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.Price), before.PriceText,
+                        package.Price.ToString(CultureInfo.InvariantCulture)),
+                    new TenantAuditChanges.FieldChange(
+                        nameof(WifiPackage.SortOrder), before.SortOrderText,
+                        package.SortOrder.ToString(CultureInfo.InvariantCulture)),
+                }
+                .Where(field => field.HasChanged));
+        }
+
         public static TenantAuditChanges PaymentReview(Payment payment, string? rejectionReason)
         {
             ArgumentNullException.ThrowIfNull(payment);
