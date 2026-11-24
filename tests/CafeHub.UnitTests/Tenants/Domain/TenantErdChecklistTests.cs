@@ -47,6 +47,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "wifi_packages",
             "branch_wifi_qr",
             "wifi_vouchers",
+            "printers",
+            "print_routes",
         ];
 
         [Fact]
@@ -56,7 +58,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                 .GetTypes()
                 .Where(t => t.Namespace == "CafeHub.Domain.Tenants" && t.IsClass && !t.IsAbstract && !t.IsEnum)
                 .Where(t => !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
-                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun))
+                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun) and not nameof(PrinterProfileDefinition))
                 .ToList();
 
             var entityNames = entityTypes
@@ -107,6 +109,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "wifi_packages" => nameof(WifiPackage),
                     "branch_wifi_qr" => nameof(BranchWifiQr),
                     "wifi_vouchers" => nameof(WifiVoucher),
+                    "printers" => nameof(Printer),
+                    "print_routes" => nameof(PrintRoute),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
