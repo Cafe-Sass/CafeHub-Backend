@@ -42,6 +42,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "receipt_lines",
             "receipt_payments",
             "receipt_number_counters",
+            "wifi_settings",
+            "branch_wifi_networks",
         ];
 
         [Fact]
@@ -97,6 +99,8 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "receipt_lines" => nameof(ReceiptLine),
                     "receipt_payments" => nameof(ReceiptPayment),
                     "receipt_number_counters" => nameof(ReceiptNumberCounter),
+                    "wifi_settings" => nameof(WifiSettings),
+                    "branch_wifi_networks" => nameof(BranchWifiNetwork),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

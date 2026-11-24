@@ -324,6 +324,61 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.BranchWifiNetwork", b =>
+                {
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Password")
+                        .HasColumnType("text")
+                        .HasColumnName("password");
+
+                    b.Property<string>("Security")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("security");
+
+                    b.Property<string>("Ssid")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ssid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("BranchId")
+                        .HasName("pk_branch_wifi_networks");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_branch_wifi_networks_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_branch_wifi_networks_updated_by");
+
+                    b.ToTable("branch_wifi_networks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_branch_wifi_networks_password", "password IS NULL OR (char_length(password) BETWEEN 1 AND 63 AND password !~ '[[:cntrl:]]')");
+
+                            t.HasCheckConstraint("ck_branch_wifi_networks_security", "security IN ('None', 'WPA', 'WEP')");
+
+                            t.HasCheckConstraint("ck_branch_wifi_networks_ssid", "char_length(ssid) BETWEEN 1 AND 32 AND ssid !~ '[[:cntrl:]]'");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.CafePaymentSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2413,6 +2468,56 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("tenant_user_stations", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Policy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Free")
+                        .HasColumnName("policy");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wifi_settings");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_wifi_settings_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_wifi_settings_updated_by");
+
+                    b.ToTable("wifi_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wifi_settings_policy", "policy IN ('Free', 'Paid')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.Branch", null)
@@ -2512,6 +2617,28 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_branch_tables_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.BranchWifiNetwork", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_branch_wifi_networks_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_branch_wifi_networks_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_branch_wifi_networks_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.CafePaymentSettings", b =>
@@ -3143,6 +3270,21 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_user_stations_tenant_user_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiSettings", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_settings_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_settings_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>

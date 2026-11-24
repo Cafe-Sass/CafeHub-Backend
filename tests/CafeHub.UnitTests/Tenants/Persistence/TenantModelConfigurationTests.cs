@@ -57,6 +57,8 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "receipt_lines",
             "receipt_payments",
             "receipt_number_counters",
+            "wifi_settings",
+            "branch_wifi_networks",
         ];
 
         [Fact]
