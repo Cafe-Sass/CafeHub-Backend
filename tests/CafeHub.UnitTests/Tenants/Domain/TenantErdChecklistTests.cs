@@ -46,6 +46,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "branch_wifi_networks",
             "wifi_packages",
             "branch_wifi_qr",
+            "wifi_vouchers",
         ];
 
         [Fact]
@@ -105,6 +106,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "branch_wifi_networks" => nameof(BranchWifiNetwork),
                     "wifi_packages" => nameof(WifiPackage),
                     "branch_wifi_qr" => nameof(BranchWifiQr),
+                    "wifi_vouchers" => nameof(WifiVoucher),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

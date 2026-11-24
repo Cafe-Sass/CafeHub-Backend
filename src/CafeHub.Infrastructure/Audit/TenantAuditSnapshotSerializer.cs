@@ -135,6 +135,13 @@ namespace CafeHub.Infrastructure.Audit
                 {
                     "Status",
                 },
+                ["wifi_vouchers"] = new(StringComparer.Ordinal)
+                {
+                    "Added",
+                    "Duplicate",
+                    "Invalid",
+                    "Voided",
+                },
                 [ProductsTarget] = new(StringComparer.Ordinal)
                 {
                     "Name",

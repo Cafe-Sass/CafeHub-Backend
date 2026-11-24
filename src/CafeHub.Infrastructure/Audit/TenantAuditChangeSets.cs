@@ -1,5 +1,6 @@
 using System.Globalization;
 using CafeHub.Application.Audit;
+using CafeHub.Application.Wifi.DTOs;
 using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Infrastructure.Audit
@@ -402,6 +403,25 @@ namespace CafeHub.Infrastructure.Audit
                 new TenantAuditChanges.FieldChange(nameof(BranchWifiNetwork.Password), network.Password, null),
             });
         }
+
+        public static TenantAuditChanges WifiVoucherImport(WifiVoucherImportResult counts)
+        {
+            ArgumentNullException.ThrowIfNull(counts);
+            return TenantAuditChanges.Create(new[]
+            {
+                new TenantAuditChanges.FieldChange("Added", null, counts.Added.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    "Duplicate", null, counts.Duplicate.ToString(CultureInfo.InvariantCulture)),
+                new TenantAuditChanges.FieldChange(
+                    "Invalid", null, counts.Invalid.ToString(CultureInfo.InvariantCulture)),
+            });
+        }
+
+        public static TenantAuditChanges WifiVoucherVoid() =>
+            TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange("Voided", null, "1"),
+            });
 
         public static TenantAuditChanges WifiPackageCreate(WifiPackage package)
         {

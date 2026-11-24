@@ -44,6 +44,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<BranchWifiNetwork> BranchWifiNetworks => Set<BranchWifiNetwork>();
         public DbSet<WifiPackage> WifiPackages => Set<WifiPackage>();
         public DbSet<BranchWifiQr> BranchWifiQr => Set<BranchWifiQr>();
+        public DbSet<WifiVoucher> WifiVouchers => Set<WifiVoucher>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

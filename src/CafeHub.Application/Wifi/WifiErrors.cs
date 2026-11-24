@@ -42,5 +42,20 @@ namespace CafeHub.Application.Wifi
             Error.Conflict(
                 PackageConcurrencyConflictCode,
                 "The WiFi package was modified by another request. Please reload and try again.");
+
+        public const string VoucherNotFoundCode = "Wifi.VoucherNotFound";
+        public const string VoucherNotAvailableCode = "Wifi.VoucherNotAvailable";
+        public const string VoucherImportConflictCode = "Wifi.VoucherImportConflict";
+
+        public static Error VoucherNotFound() =>
+            Error.NotFound(VoucherNotFoundCode, "The WiFi voucher was not found.");
+
+        public static Error VoucherNotAvailable() =>
+            Error.Conflict(VoucherNotAvailableCode, "Only an available WiFi voucher can be voided.");
+
+        public static Error VoucherImportConflict() =>
+            Error.Conflict(
+                VoucherImportConflictCode,
+                "The voucher import collided with another import. Please retry; nothing was stored.");
     }
 }

@@ -61,6 +61,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "branch_wifi_networks",
             "wifi_packages",
             "branch_wifi_qr",
+            "wifi_vouchers",
         ];
 
         [Fact]
