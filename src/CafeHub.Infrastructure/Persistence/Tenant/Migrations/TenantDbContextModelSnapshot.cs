@@ -2667,6 +2667,70 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiVoucher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AssignedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid?>("AssignedOrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_order_item_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("ImportedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("imported_at");
+
+                    b.Property<Guid?>("ImportedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("imported_by");
+
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("package_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wifi_vouchers");
+
+                    b.HasIndex("AssignedOrderItemId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_wifi_vouchers_assigned_order_item_id");
+
+                    b.HasIndex("ImportedBy")
+                        .HasDatabaseName("ix_wifi_vouchers_imported_by");
+
+                    b.HasIndex("PackageId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("uq_wifi_vouchers_package_id_code");
+
+                    b.ToTable("wifi_vouchers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wifi_vouchers_assignment_pair", "(status = 'Assigned') = (assigned_order_item_id IS NOT NULL AND assigned_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_wifi_vouchers_code", "char_length(code) BETWEEN 4 AND 64 AND code ~ '^[A-Za-z0-9-]+$'");
+
+                            t.HasCheckConstraint("ck_wifi_vouchers_status", "status IN ('Available', 'Assigned', 'Void')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.Branch", null)
@@ -3471,6 +3535,28 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_wifi_settings_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.WifiVoucher", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_vouchers_assigned_order_item_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ImportedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_wifi_vouchers_imported_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.WifiPackage", null)
+                        .WithMany()
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_wifi_vouchers_package_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Order", b =>
