@@ -24,4 +24,8 @@ namespace CafeHub.WebApi.Controllers
         string? ConcurrencyToken);
 
     public sealed record WifiPackageLifecycleRequest(string? ConcurrencyToken);
+
+    public sealed record ImportWifiVouchersRequest(IReadOnlyList<string?>? Codes);
+
+    public sealed record VoidWifiVoucherRequest(string? Code);
 }
