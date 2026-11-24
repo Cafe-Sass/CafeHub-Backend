@@ -91,6 +91,8 @@ namespace CafeHub.Infrastructure.Audit
                     "Amount",
                     "BillId",
                     "OrderId",
+                    "ConfirmedAt",
+                    "RejectionReason",
                 },
                 ["bills"] = new(StringComparer.Ordinal)
                 {

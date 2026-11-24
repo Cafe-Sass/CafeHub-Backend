@@ -353,10 +353,6 @@ namespace CafeHub.Infrastructure.Audit
                     payment.ClaimedAmount is { } claimed ? FormatNumber(claimed) : null,
                     FormatNumber(payment.Amount)),
                 new(
-                    nameof(Payment.ConfirmedByUserId),
-                    null,
-                    payment.ConfirmedByUserId?.ToString()),
-                new(
                     nameof(Payment.ConfirmedAt),
                     null,
                     payment.ConfirmedAt?.ToString("O", CultureInfo.InvariantCulture)),
