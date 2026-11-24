@@ -36,6 +36,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<GuestMute> GuestMutes => Set<GuestMute>();
         public DbSet<Bill> Bills => Set<Bill>();
         public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<Receipt> Receipts => Set<Receipt>();
+        public DbSet<ReceiptLine> ReceiptLines => Set<ReceiptLine>();
+        public DbSet<ReceiptPayment> ReceiptPayments => Set<ReceiptPayment>();
+        public DbSet<ReceiptNumberCounter> ReceiptNumberCounters => Set<ReceiptNumberCounter>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
