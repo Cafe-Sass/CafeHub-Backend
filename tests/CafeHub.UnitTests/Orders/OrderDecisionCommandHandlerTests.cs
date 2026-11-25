@@ -44,6 +44,21 @@ namespace CafeHub.UnitTests.Orders
         }
 
         [Fact]
+        public async Task Accept_QueuesOneTicketForTheAcceptedOrder()
+        {
+            var order = PendingOrder();
+            var store = new FakeOrderDecisionStore(order);
+            var printJobs = new FakePrintJobQueue();
+            var handler = CreateAcceptHandler(
+                store, StaffUser(BranchId), new RecordingAuditWriter(), Now, printJobs: printJobs);
+
+            var result = await handler.Handle(new AcceptOrderCommand(order.Id), default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Same(order, Assert.Single(printJobs.TicketOrders));
+        }
+
+        [Fact]
         public async Task Accept_StaffAreFixedToTheirOwnBranch()
         {
             var store = new FakeOrderDecisionStore(PendingOrder());
