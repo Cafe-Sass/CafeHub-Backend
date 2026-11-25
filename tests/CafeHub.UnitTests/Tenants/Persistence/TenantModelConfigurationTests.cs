@@ -67,6 +67,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "print_jobs",
             "print_connectors",
             "inventory_items",
+            "inventory_batches",
         ];
 
         [Fact]
@@ -964,6 +965,82 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.NotNull(xmin);
             Assert.True(xmin.IsConcurrencyToken);
             Assert.False(xmin.IsNullable);
+        }
+
+        [Fact]
+        public void InventoryBatchesTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(InventoryBatch));
+            Assert.NotNull(entity);
+
+            Assert.Equal("inventory_batches", entity.GetTableName());
+            Assert.Equal("pk_inventory_batches", entity.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", Assert.Single(entity.FindPrimaryKey()!.Properties).GetColumnName());
+
+            Assert.Equal("item_id", entity.FindProperty(nameof(InventoryBatch.ItemId))!.GetColumnName());
+            Assert.Equal("branch_id", entity.FindProperty(nameof(InventoryBatch.BranchId))!.GetColumnName());
+            Assert.Equal(
+                "received_quantity", entity.FindProperty(nameof(InventoryBatch.ReceivedQuantity))!.GetColumnName());
+            Assert.Equal(
+                "remaining_quantity", entity.FindProperty(nameof(InventoryBatch.RemainingQuantity))!.GetColumnName());
+            Assert.Equal(
+                "received_date", entity.FindProperty(nameof(InventoryBatch.ReceivedDate))!.GetColumnName());
+            Assert.Equal("expiry_date", entity.FindProperty(nameof(InventoryBatch.ExpiryDate))!.GetColumnName());
+            Assert.Equal(
+                "received_by_user_id", entity.FindProperty(nameof(InventoryBatch.ReceivedByUserId))!.GetColumnName());
+            Assert.Equal(
+                "idempotency_key", entity.FindProperty(nameof(InventoryBatch.IdempotencyKey))!.GetColumnName());
+
+            var received = entity.FindProperty(nameof(InventoryBatch.ReceivedQuantity))!;
+            Assert.Equal("numeric(12,3)", received.GetColumnType());
+            Assert.Equal(3, received.GetScale());
+            var remaining = entity.FindProperty(nameof(InventoryBatch.RemainingQuantity))!;
+            Assert.Equal("numeric(12,3)", remaining.GetColumnType());
+            Assert.Equal(3, remaining.GetScale());
+            Assert.Equal("date", entity.FindProperty(nameof(InventoryBatch.ReceivedDate))!.GetColumnType());
+            Assert.True(entity.FindProperty(nameof(InventoryBatch.ExpiryDate))!.IsNullable);
+
+            foreach (var check in new[]
+            {
+                "ck_inventory_batches_received_quantity",
+                "ck_inventory_batches_remaining_quantity",
+                "ck_inventory_batches_expiry_not_before_received",
+                "ck_inventory_batches_idempotency_key_length",
+            })
+            {
+                Assert.Contains(entity.GetCheckConstraints(), candidate => candidate.Name == check);
+            }
+
+            foreach (var index in new[]
+            {
+                "uq_inventory_batches_branch_idempotency_key",
+                "ix_inventory_batches_item_id",
+                "ix_inventory_batches_received_by_user_id",
+                "ix_inventory_batches_created_by",
+                "ix_inventory_batches_updated_by",
+            })
+            {
+                Assert.Contains(entity.GetIndexes(), candidate => candidate.GetDatabaseName() == index);
+            }
+
+            Assert.True(entity.GetIndexes()
+                .Single(candidate => candidate.GetDatabaseName() == "uq_inventory_batches_branch_idempotency_key")
+                .IsUnique);
+            Assert.Equal(
+                typeof(InventoryItem),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_batches_item_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(Branch),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_batches_branch_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_batches_received_by_user_id").PrincipalEntityType.ClrType);
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.True(xmin.IsConcurrencyToken);
         }
     }
 }
