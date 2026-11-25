@@ -4,6 +4,7 @@ using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Billing;
 using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Orders.Contracts;
+using CafeHub.Application.Printing.Contracts;
 using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,8 @@ namespace CafeHub.Infrastructure.Billing
     internal sealed class ReceiptStore(
         TenantDbContext context,
         ICafeBusinessDateProvider businessDateProvider,
-        TimeProvider timeProvider) : IReceiptIssuer
+        TimeProvider timeProvider,
+        IPrintJobQueue printJobs) : IReceiptIssuer
     {
         internal const string AllocateSql =
             "INSERT INTO receipt_number_counters (branch_id, business_date, last_number, updated_at) " +
@@ -57,6 +59,7 @@ namespace CafeHub.Infrastructure.Billing
                 wifiCodes);
 
             context.Receipts.Add(receipt);
+            await printJobs.EnqueueReceiptAsync(receipt, cancellationToken);
             try
             {
                 await context.SaveChangesAsync(cancellationToken);
@@ -128,7 +131,10 @@ namespace CafeHub.Infrastructure.Billing
                          .Where(entry => entry.State == EntityState.Added
                              && (ReferenceEquals(entry.Entity, receipt)
                                  || entry.Entity is ReceiptLine line && line.ReceiptId == receipt.Id
-                                 || entry.Entity is ReceiptPayment payment && payment.ReceiptId == receipt.Id))
+                                 || entry.Entity is ReceiptPayment payment && payment.ReceiptId == receipt.Id
+                                 || entry.Entity is PrintJob job
+                                     && job.DocumentType == PrintDocumentType.Receipt
+                                     && job.SourceId == receipt.BillId))
                          .ToList())
             {
                 entry.State = EntityState.Detached;

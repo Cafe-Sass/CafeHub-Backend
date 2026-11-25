@@ -47,6 +47,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<WifiVoucher> WifiVouchers => Set<WifiVoucher>();
         public DbSet<Printer> Printers => Set<Printer>();
         public DbSet<PrintRoute> PrintRoutes => Set<PrintRoute>();
+        public DbSet<PrintJob> PrintJobs => Set<PrintJob>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

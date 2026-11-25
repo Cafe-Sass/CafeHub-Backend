@@ -7,6 +7,7 @@ using CafeHub.Application.Identity;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
+using CafeHub.Application.Printing.Contracts;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Application.Wifi.Contracts;
 using CafeHub.Application.Wifi.DTOs;
@@ -40,6 +41,21 @@ namespace CafeHub.UnitTests.Orders
             Assert.Equal(Now, order.UpdatedAt);
             Assert.Equal(7, result.Value!.OrderNumber);
             Assert.Equal("Accepted", result.Value.Status);
+        }
+
+        [Fact]
+        public async Task Accept_QueuesOneTicketForTheAcceptedOrder()
+        {
+            var order = PendingOrder();
+            var store = new FakeOrderDecisionStore(order);
+            var printJobs = new FakePrintJobQueue();
+            var handler = CreateAcceptHandler(
+                store, StaffUser(BranchId), new RecordingAuditWriter(), Now, printJobs: printJobs);
+
+            var result = await handler.Handle(new AcceptOrderCommand(order.Id), default);
+
+            Assert.True(result.IsSuccess);
+            Assert.Same(order, Assert.Single(printJobs.TicketOrders));
         }
 
         [Fact]
@@ -342,8 +358,9 @@ namespace CafeHub.UnitTests.Orders
             DateTimeOffset now,
             FakeStationScope? stations = null,
             FakeSender? sender = null,
-            IBillStore? bills = null) =>
-            new(sender ?? new FakeSender(), store, bills ?? new FakeBillStore(), new FakeWifiVoucherStore(), user, stations ?? new FakeStationScope(null), new FixedClock(now), audit);
+            IBillStore? bills = null,
+            IPrintJobQueue? printJobs = null) =>
+            new(sender ?? new FakeSender(), store, bills ?? new FakeBillStore(), new FakeWifiVoucherStore(), user, stations ?? new FakeStationScope(null), new FixedClock(now), audit, printJobs ?? new FakePrintJobQueue());
 
         private static RejectOrderCommandHandler CreateRejectHandler(
             FakeOrderDecisionStore store,
@@ -510,6 +527,25 @@ namespace CafeHub.UnitTests.Orders
         {
             public Task<IReadOnlyList<Guid>?> GetVisibleStationIdsAsync(Guid userId, CancellationToken cancellationToken) =>
                 Task.FromResult(stationIds);
+        }
+
+        private sealed class FakePrintJobQueue : IPrintJobQueue
+        {
+            public List<Order> TicketOrders { get; } = [];
+
+            public List<Receipt> Receipts { get; } = [];
+
+            public Task EnqueueOrderTicketAsync(Order order, CancellationToken cancellationToken)
+            {
+                TicketOrders.Add(order);
+                return Task.CompletedTask;
+            }
+
+            public Task EnqueueReceiptAsync(Receipt receipt, CancellationToken cancellationToken)
+            {
+                Receipts.Add(receipt);
+                return Task.CompletedTask;
+            }
         }
 
         private sealed class FakeTenantUser(Guid? userId, TenantAccountAccess? accountAccess) : ICurrentTenantUser
