@@ -1,6 +1,6 @@
 namespace CafeHub.Domain.Tenants
 {
-    public sealed record StockAllocationLine(Guid BatchId, decimal Quantity);
+    public readonly record struct StockAllocationLine(Guid BatchId, decimal Quantity);
 
     public static class StockAllocation
     {

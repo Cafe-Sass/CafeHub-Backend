@@ -68,6 +68,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "print_connectors",
             "inventory_items",
             "inventory_batches",
+            "stock_movements",
         ];
 
         [Fact]
