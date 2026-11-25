@@ -53,6 +53,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
 
+        public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
