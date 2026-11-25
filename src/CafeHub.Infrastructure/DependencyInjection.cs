@@ -13,6 +13,7 @@ using CafeHub.Application.Onboarding.PaymentGateway;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Plans.Contracts;
+using CafeHub.Application.Printing;
 using CafeHub.Application.Printing.Contracts;
 using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
@@ -176,6 +177,8 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IWifiVoucherStore, WifiVoucherStore>();
             services.AddScoped<IIssuedWifiQueryStore, IssuedWifiQueryStore>();
             services.AddScoped<IPrinterStore, PrinterStore>();
+            services.AddScoped<IPrintJobStore, PrintJobStore>();
+            services.AddScoped<IPrintJobQueue, PrintJobCreator>();
             services.AddScoped<IOrderNumberCounterStore, OrderNumberCounterStore>();
             services.AddScoped<ICafeBusinessDateProvider, CafeBusinessDateProvider>();
             services.AddScoped<IStationScope, StationScope>();

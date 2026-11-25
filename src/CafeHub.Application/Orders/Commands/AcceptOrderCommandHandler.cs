@@ -5,6 +5,7 @@ using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Identity;
 using CafeHub.Application.Orders.Contracts;
 using CafeHub.Application.Orders.DTOs;
+using CafeHub.Application.Printing.Contracts;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Application.Wifi.Contracts;
 using CafeHub.Domain.Tenants;
@@ -20,7 +21,8 @@ namespace CafeHub.Application.Orders.Commands
         ICurrentTenantUser currentUser,
         IStationScope stationScope,
         TimeProvider timeProvider,
-        ITenantAuditWriter auditWriter)
+        ITenantAuditWriter auditWriter,
+        IPrintJobQueue printJobs)
         : ICommandHandler<AcceptOrderCommand, OrderDecisionResult>
     {
         private const string TargetType = "orders";
@@ -74,6 +76,8 @@ namespace CafeHub.Application.Orders.Commands
             }
 
             order.AttachToBill(bill.Value.Id);
+
+            await printJobs.EnqueueOrderTicketAsync(order, cancellationToken);
 
             var save = await decisionStore.SaveDecisionAsync(order, cancellationToken);
             if (save.IsFailure)

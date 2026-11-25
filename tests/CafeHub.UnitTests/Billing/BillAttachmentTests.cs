@@ -7,6 +7,7 @@ using CafeHub.Application.Identity;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Orders.Commands;
 using CafeHub.Application.Orders.Contracts;
+using CafeHub.Application.Printing.Contracts;
 using CafeHub.Application.Stations.Contracts;
 using CafeHub.Application.Wifi.Contracts;
 using CafeHub.Application.Wifi.DTOs;
@@ -148,7 +149,7 @@ namespace CafeHub.UnitTests.Billing
             RecordingAuditWriter audit)
         {
             bills.Audit = audit;
-            return new(new FakeSender(), store, bills, new FakeWifiVoucherStore(), user, new FakeStationScope(null), new FixedClock(Now), audit);
+            return new(new FakeSender(), store, bills, new FakeWifiVoucherStore(), user, new FakeStationScope(null), new FixedClock(Now), audit, new FakePrintJobQueue());
         }
 
         private static FakeTenantUser StaffUser() =>
@@ -342,6 +343,15 @@ namespace CafeHub.UnitTests.Billing
         {
             public Task<IReadOnlyList<Guid>?> GetVisibleStationIdsAsync(Guid userId, CancellationToken cancellationToken) =>
                 Task.FromResult(stationIds);
+        }
+
+        private sealed class FakePrintJobQueue : IPrintJobQueue
+        {
+            public Task EnqueueOrderTicketAsync(Order order, CancellationToken cancellationToken) =>
+                Task.CompletedTask;
+
+            public Task EnqueueReceiptAsync(Receipt receipt, CancellationToken cancellationToken) =>
+                Task.CompletedTask;
         }
 
         private sealed class FakeTenantUser(Guid? userId, TenantAccountAccess? accountAccess) : ICurrentTenantUser
