@@ -153,6 +153,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IMenuCategoryStore, MenuCategoryStore>();
             services.AddScoped<IProductStore, ProductStore>();
             services.AddScoped<IInventoryItemStore, InventoryItemStore>();
+            services.AddScoped<IInventoryBatchStore, InventoryBatchStore>();
             services.AddScoped<IProductCatalogSchema, ProductCatalogSchema>();
             services.AddScoped<IProductStationAssignmentStore, ProductStationAssignmentStore>();
             services.AddScoped<IBranchProductAvailabilityStore, BranchProductAvailabilityStore>();
