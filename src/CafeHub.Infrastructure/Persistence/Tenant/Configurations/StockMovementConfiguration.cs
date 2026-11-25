@@ -48,11 +48,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
             builder.Property(movement => movement.CreatedBy).HasColumnName("created_by").HasColumnType("uuid");
 
             builder.HasIndex(movement => new
-                {
-                    movement.BranchId,
-                    movement.IdempotencyKey,
-                    movement.BatchId,
-                })
+            {
+                movement.BranchId,
+                movement.IdempotencyKey,
+                movement.BatchId,
+            })
                 .HasDatabaseName("uq_stock_movements_branch_key_batch")
                 .IsUnique();
             builder.HasIndex(movement => movement.ItemId).HasDatabaseName("ix_stock_movements_item_id");

@@ -141,15 +141,15 @@ namespace CafeHub.UnitTests.Inventory
             decimal quantity = 2.5m,
             string? reason = "spillage",
             string? idempotencyKey = "movement-key-1") => new()
-        {
-            BranchId = branchId ?? BranchId,
-            ItemId = itemId ?? ItemId,
-            BatchId = batchId,
-            Type = type,
-            Quantity = quantity,
-            Reason = reason,
-            IdempotencyKey = idempotencyKey,
-        };
+            {
+                BranchId = branchId ?? BranchId,
+                ItemId = itemId ?? ItemId,
+                BatchId = batchId,
+                Type = type,
+                Quantity = quantity,
+                Reason = reason,
+                IdempotencyKey = idempotencyKey,
+            };
 
         private static FakeTenantUser User() => new();
 
