@@ -65,6 +65,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "printers",
             "print_routes",
             "print_jobs",
+            "print_connectors",
         ];
 
         [Fact]
@@ -859,6 +860,45 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(
                 typeof(Printer),
                 entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_print_jobs_printer_id").PrincipalEntityType.ClrType);
+        }
+
+        [Fact]
+        public void PrintConnectorsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(PrintConnector));
+            Assert.NotNull(entity);
+
+            Assert.Equal("print_connectors", entity.GetTableName());
+            Assert.Equal("pk_print_connectors", entity.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", Assert.Single(entity.FindPrimaryKey()!.Properties).GetColumnName());
+
+            Assert.Equal("branch_id", entity.FindProperty(nameof(PrintConnector.BranchId))!.GetColumnName());
+            Assert.Equal("name", entity.FindProperty(nameof(PrintConnector.Name))!.GetColumnName());
+            Assert.Equal("key_hash", entity.FindProperty(nameof(PrintConnector.KeyHash))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(PrintConnector.Status))!.GetColumnName());
+            Assert.Equal("last_seen_at", entity.FindProperty(nameof(PrintConnector.LastSeenAt))!.GetColumnName());
+
+            foreach (var check in new[]
+            {
+                "ck_print_connectors_name",
+                "ck_print_connectors_key_hash",
+                "ck_print_connectors_status",
+            })
+            {
+                Assert.Contains(entity.GetCheckConstraints(), candidate => candidate.Name == check);
+            }
+
+            var keyHashIndex = entity.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_print_connectors_key_hash");
+            Assert.True(keyHashIndex.IsUnique);
+            Assert.Equal(
+                "key_hash",
+                Assert.Single(keyHashIndex.Properties).GetColumnName());
+
+            Assert.Equal(
+                typeof(Branch),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_print_connectors_branch_id").PrincipalEntityType.ClrType);
         }
     }
 }
