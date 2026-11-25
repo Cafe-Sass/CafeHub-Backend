@@ -33,6 +33,21 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+
+var mediaPath = Path.GetFullPath(
+    Path.Combine(
+        builder.Environment.ContentRootPath,
+        "..",
+        "private",
+        "media"));
+
+Console.WriteLine(
+    $"[MONSTER-PATH-DIAGNOSTIC] ContentRootPath: {builder.Environment.ContentRootPath}");
+
+Console.WriteLine(
+    $"[MONSTER-PATH-DIAGNOSTIC] Calculated Media RootPath: {mediaPath}");
+
+builder.Configuration["Media:RootPath"] = mediaPath;
 builder.Services.AddMediaStorage(builder.Configuration, builder.Environment);
 builder.Services.AddSuperAdminSeeding();
 builder.Services.AddCorrelationId();
