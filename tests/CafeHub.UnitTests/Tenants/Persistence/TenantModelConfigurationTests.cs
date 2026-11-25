@@ -66,6 +66,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "print_routes",
             "print_jobs",
             "print_connectors",
+            "inventory_items",
         ];
 
         [Fact]
@@ -899,6 +900,70 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(
                 typeof(Branch),
                 entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_print_connectors_branch_id").PrincipalEntityType.ClrType);
+        }
+
+        [Fact]
+        public void InventoryItemsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(InventoryItem));
+            Assert.NotNull(entity);
+
+            Assert.Equal("inventory_items", entity.GetTableName());
+            Assert.Equal("pk_inventory_items", entity.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", Assert.Single(entity.FindPrimaryKey()!.Properties).GetColumnName());
+
+            Assert.Equal("name", entity.FindProperty(nameof(InventoryItem.Name))!.GetColumnName());
+            Assert.Equal("unit", entity.FindProperty(nameof(InventoryItem.Unit))!.GetColumnName());
+            Assert.Equal(
+                "low_stock_threshold", entity.FindProperty(nameof(InventoryItem.LowStockThreshold))!.GetColumnName());
+            Assert.Equal("tracks_expiry", entity.FindProperty(nameof(InventoryItem.TracksExpiry))!.GetColumnName());
+            Assert.Equal("near_expiry_days", entity.FindProperty(nameof(InventoryItem.NearExpiryDays))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(InventoryItem.Status))!.GetColumnName());
+
+            var threshold = entity.FindProperty(nameof(InventoryItem.LowStockThreshold))!;
+            Assert.Equal("numeric(12,3)", threshold.GetColumnType());
+            Assert.Equal(12, threshold.GetPrecision());
+            Assert.Equal(3, threshold.GetScale());
+            Assert.False(threshold.IsNullable);
+
+            var nearExpiryDays = entity.FindProperty(nameof(InventoryItem.NearExpiryDays))!;
+            Assert.Equal(InventoryItem.DefaultNearExpiryDays, (int)nearExpiryDays.GetDefaultValue()!);
+            Assert.False(nearExpiryDays.IsNullable);
+
+            foreach (var check in new[]
+            {
+                "ck_inventory_items_name",
+                "ck_inventory_items_unit",
+                "ck_inventory_items_low_stock_threshold",
+                "ck_inventory_items_near_expiry_days",
+                "ck_inventory_items_status",
+            })
+            {
+                Assert.Contains(entity.GetCheckConstraints(), candidate => candidate.Name == check);
+            }
+
+            foreach (var index in new[]
+            {
+                "ix_inventory_items_created_by",
+                "ix_inventory_items_updated_by",
+            })
+            {
+                Assert.Contains(entity.GetIndexes(), candidate => candidate.GetDatabaseName() == index);
+            }
+
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_items_created_by").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_items_updated_by").PrincipalEntityType.ClrType);
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+
+            var xmin = entity.FindProperty("xmin");
+            Assert.NotNull(xmin);
+            Assert.True(xmin.IsConcurrencyToken);
+            Assert.False(xmin.IsNullable);
         }
     }
 }
