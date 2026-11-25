@@ -149,6 +149,18 @@ namespace CafeHub.Infrastructure.Audit
                     "DocumentType",
                     "PrinterId",
                 },
+                ["print_jobs"] = new(StringComparer.Ordinal)
+                {
+                    "Status",
+                    "Attempts",
+                    "LastErrorCode",
+                },
+                ["print_connectors"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "Status",
+                    "BranchId",
+                },
                 ["wifi_vouchers"] = new(StringComparer.Ordinal)
                 {
                     "Added",

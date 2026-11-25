@@ -248,6 +248,20 @@ namespace CafeHub.UnitTests
                             "t/{slug}/api/v1/guest/receipts/{billReference}",
                             action.AttributeRouteInfo?.Template);
                     }
+                    else if (action.ControllerTypeInfo.AsType() == typeof(TenantPrintConnectorController))
+                    {
+                        var connectorTemplates = new Dictionary<string, string>
+                        {
+                            [nameof(TenantPrintConnectorController.Claim)] =
+                                "t/{slug}/api/v1/connector/print/claim",
+                            [nameof(TenantPrintConnectorController.Succeeded)] =
+                                "t/{slug}/api/v1/connector/print/jobs/{jobId:guid}/succeeded",
+                            [nameof(TenantPrintConnectorController.Failed)] =
+                                "t/{slug}/api/v1/connector/print/jobs/{jobId:guid}/failed",
+                        };
+                        Assert.True(connectorTemplates.TryGetValue(action.MethodInfo.Name, out var connectorTemplate));
+                        Assert.Equal(connectorTemplate, action.AttributeRouteInfo?.Template);
+                    }
                     else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestWifiController))
                     {
                         var guestWifiTemplates = new Dictionary<string, string>

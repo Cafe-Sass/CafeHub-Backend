@@ -50,6 +50,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "printers",
             "print_routes",
             "print_jobs",
+            "print_connectors",
         ];
 
         [Fact]
@@ -113,6 +114,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "printers" => nameof(Printer),
                     "print_routes" => nameof(PrintRoute),
                     "print_jobs" => nameof(PrintJob),
+                    "print_connectors" => nameof(PrintConnector),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

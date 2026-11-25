@@ -63,6 +63,19 @@ namespace CafeHub.WebApi
             return services;
         }
 
+        public static IServiceCollection AddConnectorRateLimiting(this IServiceCollection services)
+        {
+            if (services is null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            services.AddSingleton<ConnectorRateLimiter>();
+            services.AddScoped<ConnectorKeyAuthorizationFilter>();
+
+            return services;
+        }
+
         public static IServiceCollection AddGlobalRateLimiting(this IServiceCollection services, IConfiguration configuration)
         {
             if (services is null)

@@ -37,6 +37,7 @@ builder.Services.AddMediaStorage(builder.Configuration, builder.Environment);
 builder.Services.AddSuperAdminSeeding();
 builder.Services.AddCorrelationId();
 builder.Services.AddAuthRateLimiting(builder.Configuration);
+builder.Services.AddConnectorRateLimiting();
 builder.Services.AddTransportSecurity(builder.Configuration);
 builder.Services.AddRequestLimits(builder.Configuration);
 builder.Services.AddConfiguredCors(builder.Configuration);

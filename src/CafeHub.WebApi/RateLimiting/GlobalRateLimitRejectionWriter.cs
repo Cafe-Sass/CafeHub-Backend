@@ -50,6 +50,19 @@ namespace CafeHub.WebApi.RateLimiting
             await JsonSerializer.SerializeAsync(httpContext.Response.Body, problemDetails, ResponseJsonOptions, cancellationToken);
         }
 
+        public static ObjectResult CreateResult(HttpContext httpContext, RateLimitLease lease)
+        {
+            ArgumentNullException.ThrowIfNull(httpContext);
+            ArgumentNullException.ThrowIfNull(lease);
+
+            AddRetryAfter(httpContext.Response, lease);
+            return new ObjectResult(CreateProblemDetails(httpContext))
+            {
+                StatusCode = StatusCodes.Status429TooManyRequests,
+                ContentTypes = { ProblemJsonContentType },
+            };
+        }
+
         private static ProblemDetails CreateProblemDetails(HttpContext httpContext)
         {
             var traceIdentifier = Activity.Current?.Id ?? httpContext.TraceIdentifier;

@@ -177,8 +177,12 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IWifiVoucherStore, WifiVoucherStore>();
             services.AddScoped<IIssuedWifiQueryStore, IssuedWifiQueryStore>();
             services.AddScoped<IPrinterStore, PrinterStore>();
-            services.AddScoped<IPrintJobStore, PrintJobStore>();
+            services.AddScoped<PrintJobStore>();
+            services.AddScoped<IPrintJobStore>(provider => provider.GetRequiredService<PrintJobStore>());
+            services.AddScoped<IPrintJobOperationsStore>(provider => provider.GetRequiredService<PrintJobStore>());
             services.AddScoped<IPrintJobQueue, PrintJobCreator>();
+            services.AddScoped<IPrintConnectorStore, PrintConnectorStore>();
+            services.AddScoped<PrintConnectorAuthenticator>();
             services.AddScoped<IOrderNumberCounterStore, OrderNumberCounterStore>();
             services.AddScoped<ICafeBusinessDateProvider, CafeBusinessDateProvider>();
             services.AddScoped<IStationScope, StationScope>();

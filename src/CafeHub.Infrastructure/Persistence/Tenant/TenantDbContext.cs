@@ -49,6 +49,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
         public DbSet<PrintRoute> PrintRoutes => Set<PrintRoute>();
         public DbSet<PrintJob> PrintJobs => Set<PrintJob>();
 
+        public DbSet<PrintConnector> PrintConnectors => Set<PrintConnector>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
