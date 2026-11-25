@@ -6,6 +6,9 @@ namespace CafeHub.Domain.Tenants
         public const int MaximumDedupeKeyLength = 160;
         public const int MaximumPayloadLength = 16_384;
         public const int DefaultMaxAttempts = 3;
+        public const int DefaultLeaseSeconds = 60;
+
+        public static TimeSpan DefaultLease => TimeSpan.FromSeconds(DefaultLeaseSeconds);
 
         private PrintJob()
         {
@@ -125,5 +128,87 @@ namespace CafeHub.Domain.Tenants
         public static bool IsValidPayload(string? documentPayload) =>
             !string.IsNullOrWhiteSpace(documentPayload)
             && documentPayload.Length <= MaximumPayloadLength;
+
+        public bool TryClaim(DateTimeOffset now, TimeSpan lease)
+        {
+            if (Status != PrintJobStatus.Queued || lease <= TimeSpan.Zero)
+            {
+                return false;
+            }
+
+            Status = PrintJobStatus.Claimed;
+            LeaseExpiresAt = now.Add(lease);
+            UpdatedAt = now;
+            return true;
+        }
+
+        public bool RequeueExpiredLease(DateTimeOffset now)
+        {
+            if (Status != PrintJobStatus.Claimed || LeaseExpiresAt is null || LeaseExpiresAt > now)
+            {
+                return false;
+            }
+
+            Status = PrintJobStatus.Queued;
+            LeaseExpiresAt = null;
+            UpdatedAt = now;
+            return true;
+        }
+
+        public bool ReportSucceeded(DateTimeOffset now)
+        {
+            if (Status != PrintJobStatus.Claimed)
+            {
+                return false;
+            }
+
+            Status = PrintJobStatus.Succeeded;
+            LeaseExpiresAt = null;
+            UpdatedAt = now;
+            return true;
+        }
+
+        public bool ReportFailed(string failureCode, DateTimeOffset now)
+        {
+            if (Status != PrintJobStatus.Claimed || !PrintFailureCodes.IsSupported(failureCode))
+            {
+                return false;
+            }
+
+            Attempts++;
+            LastErrorCode = failureCode;
+            LeaseExpiresAt = null;
+            Status = Attempts >= MaxAttempts ? PrintJobStatus.Failed : PrintJobStatus.Queued;
+            UpdatedAt = now;
+            return true;
+        }
+
+        public bool Cancel(DateTimeOffset now)
+        {
+            if (Status is PrintJobStatus.Succeeded or PrintJobStatus.Cancelled)
+            {
+                return false;
+            }
+
+            Status = PrintJobStatus.Cancelled;
+            LeaseExpiresAt = null;
+            UpdatedAt = now;
+            return true;
+        }
+
+        public bool Requeue(DateTimeOffset now)
+        {
+            if (Status != PrintJobStatus.Failed)
+            {
+                return false;
+            }
+
+            Status = PrintJobStatus.Queued;
+            Attempts = 0;
+            LastErrorCode = null;
+            LeaseExpiresAt = null;
+            UpdatedAt = now;
+            return true;
+        }
     }
 }
