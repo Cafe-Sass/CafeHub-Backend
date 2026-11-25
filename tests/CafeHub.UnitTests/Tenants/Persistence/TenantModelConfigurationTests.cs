@@ -64,6 +64,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "wifi_vouchers",
             "printers",
             "print_routes",
+            "print_jobs",
         ];
 
         [Fact]
@@ -804,6 +805,60 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             var productFk = entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_product_tags_product_id");
             Assert.Equal(typeof(Product), productFk.PrincipalEntityType.ClrType);
             Assert.Equal(DeleteBehavior.Restrict, productFk.DeleteBehavior);
+        }
+
+        [Fact]
+        public void PrintJobsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(PrintJob));
+            Assert.NotNull(entity);
+
+            Assert.Equal("print_jobs", entity.GetTableName());
+            Assert.Equal("pk_print_jobs", entity.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", Assert.Single(entity.FindPrimaryKey()!.Properties).GetColumnName());
+
+            Assert.Equal("branch_id", entity.FindProperty(nameof(PrintJob.BranchId))!.GetColumnName());
+            Assert.Equal("printer_id", entity.FindProperty(nameof(PrintJob.PrinterId))!.GetColumnName());
+            Assert.Equal("document_type", entity.FindProperty(nameof(PrintJob.DocumentType))!.GetColumnName());
+            Assert.Equal("source_type", entity.FindProperty(nameof(PrintJob.SourceType))!.GetColumnName());
+            Assert.Equal("source_id", entity.FindProperty(nameof(PrintJob.SourceId))!.GetColumnName());
+            Assert.Equal("dedupe_key", entity.FindProperty(nameof(PrintJob.DedupeKey))!.GetColumnName());
+            Assert.Equal("status", entity.FindProperty(nameof(PrintJob.Status))!.GetColumnName());
+            Assert.Equal("attempts", entity.FindProperty(nameof(PrintJob.Attempts))!.GetColumnName());
+            Assert.Equal("max_attempts", entity.FindProperty(nameof(PrintJob.MaxAttempts))!.GetColumnName());
+            Assert.Equal("last_error_code", entity.FindProperty(nameof(PrintJob.LastErrorCode))!.GetColumnName());
+            Assert.Equal("jsonb", entity.FindProperty(nameof(PrintJob.DocumentPayload))!.GetColumnType());
+            Assert.Equal("lease_expires_at", entity.FindProperty(nameof(PrintJob.LeaseExpiresAt))!.GetColumnName());
+
+            var checks = entity.GetCheckConstraints().ToList();
+            foreach (var check in new[]
+            {
+                "ck_print_jobs_document_type",
+                "ck_print_jobs_source_type",
+                "ck_print_jobs_dedupe_key_length",
+                "ck_print_jobs_status",
+                "ck_print_jobs_attempts",
+                "ck_print_jobs_max_attempts",
+                "ck_print_jobs_last_error_code",
+            })
+            {
+                Assert.Contains(checks, candidate => candidate.Name == check);
+            }
+
+            var dedupeIndex = entity.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_print_jobs_branch_dedupe_key");
+            Assert.True(dedupeIndex.IsUnique);
+            Assert.Equal(
+                new[] { "branch_id", "dedupe_key" },
+                dedupeIndex.Properties.Select(property => property.GetColumnName()));
+
+            Assert.Equal(
+                typeof(Branch),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_print_jobs_branch_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(Printer),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_print_jobs_printer_id").PrincipalEntityType.ClrType);
         }
     }
 }

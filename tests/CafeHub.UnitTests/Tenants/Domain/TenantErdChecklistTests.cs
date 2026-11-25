@@ -49,6 +49,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "wifi_vouchers",
             "printers",
             "print_routes",
+            "print_jobs",
         ];
 
         [Fact]
@@ -111,6 +112,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "wifi_vouchers" => nameof(WifiVoucher),
                     "printers" => nameof(Printer),
                     "print_routes" => nameof(PrintRoute),
+                    "print_jobs" => nameof(PrintJob),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
