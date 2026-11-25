@@ -38,6 +38,12 @@ namespace CafeHub.UnitTests.Inventory
             Assert.Equal(ExpiryDate, result.Value.ExpiryDate);
             var batch = Assert.Single(context.InventoryBatches.Local);
             Assert.Equal(2.5m, batch.RemainingQuantity);
+            var movement = Assert.Single(context.StockMovements.Local);
+            Assert.Equal(StockMovementType.Receive, movement.Type);
+            Assert.Equal(2.5m, movement.Quantity);
+            Assert.Equal(batch.Id, movement.BatchId);
+            Assert.Equal("receipt-key-1", movement.IdempotencyKey);
+            Assert.Null(movement.Reason);
             var entry = Assert.Single(audit.Entries);
             Assert.Equal("inventory_batches.received.succeeded", entry.Action);
             Assert.Equal("inventory_batches", entry.TargetType);
