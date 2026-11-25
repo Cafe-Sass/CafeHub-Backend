@@ -55,6 +55,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
 
+        public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

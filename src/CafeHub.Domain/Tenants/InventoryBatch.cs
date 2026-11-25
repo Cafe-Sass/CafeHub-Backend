@@ -106,6 +106,39 @@ namespace CafeHub.Domain.Tenants
         public static bool IsValidExpiryDate(DateOnly? expiryDate) =>
             expiryDate is not { } expiry || expiry != default;
 
+        public static bool IsValidMovementQuantity(decimal signedQuantity) =>
+            signedQuantity != 0m
+            && signedQuantity <= MaximumQuantity
+            && signedQuantity >= -MaximumQuantity
+            && signedQuantity == decimal.Round(signedQuantity, MaximumQuantityScale);
+
+        public bool CanApplyMovement(decimal signedQuantity)
+        {
+            if (!IsValidMovementQuantity(signedQuantity))
+            {
+                return false;
+            }
+
+            var remaining = RemainingQuantity + signedQuantity;
+            return remaining >= 0m
+                && remaining <= ReceivedQuantity
+                && remaining == decimal.Round(remaining, MaximumQuantityScale);
+        }
+
+        public void ApplyMovement(decimal signedQuantity, DateTimeOffset now, Guid actorId)
+        {
+            if (!CanApplyMovement(signedQuantity))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(signedQuantity),
+                    "The movement must keep the remaining quantity between zero and the received quantity.");
+            }
+
+            RemainingQuantity += signedQuantity;
+            UpdatedAt = now;
+            UpdatedBy = actorId;
+        }
+
         public static string FormatDate(DateOnly date) =>
             date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

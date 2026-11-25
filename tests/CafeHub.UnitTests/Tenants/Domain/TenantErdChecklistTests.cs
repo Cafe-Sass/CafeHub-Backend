@@ -53,6 +53,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "print_connectors",
             "inventory_items",
             "inventory_batches",
+            "stock_movements",
         ];
 
         [Fact]
@@ -119,6 +120,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "print_connectors" => nameof(PrintConnector),
                     "inventory_items" => nameof(InventoryItem),
                     "inventory_batches" => nameof(InventoryBatch),
+                    "stock_movements" => nameof(StockMovement),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)
