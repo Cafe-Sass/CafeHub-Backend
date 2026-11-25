@@ -23,7 +23,7 @@ namespace CafeHub.UnitTests
             var fromRoles = new[] { TenantPermissions.StaffRead, TenantPermissions.BranchesRead };
             var personal = new[] { TenantPermissions.StaffManage, TenantPermissions.StaffRead, TenantPermissions.RolesManage, "unknown" };
 
-            Assert.Equal(new[] { "bills.close", "bills.view", "branches.manage", "branches.read", "cafe-profile.manage", "guests.mute", "guests.mute.audit", "menu.availability", "menu.manage", "orders.captain", "orders.decide", "orders.misses.view", "orders.view", "payments.cash.confirm", "payments.online.review", "payments.settings.manage", "printers.manage", "roles.manage", "staff.manage", "staff.read", "stations.manage", "tables.manage", "wifi.lookup", "wifi.manage" },
+            Assert.Equal(new[] { "bills.close", "bills.view", "branches.manage", "branches.read", "cafe-profile.manage", "guests.mute", "guests.mute.audit", "inventory.manage", "menu.availability", "menu.manage", "orders.captain", "orders.decide", "orders.misses.view", "orders.view", "payments.cash.confirm", "payments.online.review", "payments.settings.manage", "printers.manage", "roles.manage", "staff.manage", "staff.read", "stations.manage", "tables.manage", "wifi.lookup", "wifi.manage" },
                 TenantPermissions.All);
             Assert.Equal(new[] { TenantPermissions.BranchesRead, TenantPermissions.StaffManage, TenantPermissions.StaffRead },
                 TenantPermissions.StaffUnion(fromRoles.Concat(personal)));

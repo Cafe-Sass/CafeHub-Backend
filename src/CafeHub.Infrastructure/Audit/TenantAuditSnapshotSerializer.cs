@@ -161,6 +161,15 @@ namespace CafeHub.Infrastructure.Audit
                     "Status",
                     "BranchId",
                 },
+                ["inventory_items"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "Unit",
+                    "LowStockThreshold",
+                    "TracksExpiry",
+                    "NearExpiryDays",
+                    "Status",
+                },
                 ["wifi_vouchers"] = new(StringComparer.Ordinal)
                 {
                     "Added",
