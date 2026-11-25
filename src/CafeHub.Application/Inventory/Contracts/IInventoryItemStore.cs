@@ -32,5 +32,10 @@ namespace CafeHub.Application.Inventory.Contracts
             uint version,
             Guid actorUserId,
             CancellationToken cancellationToken);
+
+        Task<InventoryItemResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+        Task<InventoryItemListPage> ListAsync(
+            InventoryItemListRequest request, CancellationToken cancellationToken);
     }
 }

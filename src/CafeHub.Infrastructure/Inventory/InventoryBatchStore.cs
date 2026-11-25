@@ -164,6 +164,55 @@ namespace CafeHub.Infrastructure.Inventory
             return Result.Success(InventoryBatchResponse.From(batch));
         }
 
+        public async Task<Result<InventoryBatchListPage>> ListAsync(
+            InventoryBatchListRequest request, CancellationToken cancellationToken)
+        {
+            var branchExists = await context.Branches.AsNoTracking()
+                .AnyAsync(branch => branch.Id == request.BranchId, cancellationToken);
+            if (!branchExists)
+            {
+                return Result.Failure<InventoryBatchListPage>(InventoryBatchErrors.BranchNotFound());
+            }
+
+            var query = context.InventoryBatches.AsNoTracking()
+                .Where(batch => batch.BranchId == request.BranchId);
+            if (request.ItemId is { } itemId)
+            {
+                query = query.Where(batch => batch.ItemId == itemId);
+            }
+
+            if (request.ExpiryFrom is { } from)
+            {
+                query = query.Where(batch => batch.ExpiryDate != null && batch.ExpiryDate >= from);
+            }
+
+            if (request.ExpiryTo is { } to)
+            {
+                query = query.Where(batch => batch.ExpiryDate != null && batch.ExpiryDate <= to);
+            }
+
+            int? totalCount = null;
+            if (request.IncludeTotalCount)
+            {
+                totalCount = await query.CountAsync(cancellationToken);
+            }
+
+            var fetched = await query
+                .OrderByDescending(batch => batch.ReceivedDate)
+                .ThenByDescending(batch => batch.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            var items = new List<InventoryBatchResponse>(fetched.Count);
+            foreach (var batch in fetched)
+            {
+                items.Add(InventoryBatchResponse.From(batch));
+            }
+
+            return Result.Success(new InventoryBatchListPage(items, totalCount));
+        }
+
         private Task<InventoryBatch?> FindByKeyAsync(
             Guid branchId, string idempotencyKey, CancellationToken cancellationToken) =>
             context.InventoryBatches.AsNoTracking()

@@ -160,6 +160,48 @@ namespace CafeHub.Infrastructure.Inventory
             return await SaveAsync(item, actorUserId, action, changes, cancellationToken);
         }
 
+        public async Task<InventoryItemResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            var row = await context.InventoryItems.AsNoTracking()
+                .Where(item => item.Id == id)
+                .Select(item => new { Item = item, Version = EF.Property<uint>(item, "xmin") })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return row is null ? null : ToResponse(row.Item, row.Version);
+        }
+
+        public async Task<InventoryItemListPage> ListAsync(
+            InventoryItemListRequest request, CancellationToken cancellationToken)
+        {
+            var query = context.InventoryItems.AsNoTracking();
+            if (request.Status is { } status)
+            {
+                query = query.Where(item => item.Status == status);
+            }
+
+            int? totalCount = null;
+            if (request.IncludeTotalCount)
+            {
+                totalCount = await query.CountAsync(cancellationToken);
+            }
+
+            var fetched = await query
+                .Select(item => new { Item = item, Version = EF.Property<uint>(item, "xmin") })
+                .OrderBy(row => row.Item.Name)
+                .ThenBy(row => row.Item.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            var items = new List<InventoryItemResponse>(fetched.Count);
+            foreach (var row in fetched)
+            {
+                items.Add(ToResponse(row.Item, row.Version));
+            }
+
+            return new InventoryItemListPage(items, totalCount);
+        }
+
         private Task<InventoryItem?> LoadAsync(Guid id, CancellationToken cancellationToken) =>
             context.InventoryItems.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
