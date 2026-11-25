@@ -18,6 +18,7 @@ namespace CafeHub.Infrastructure.Inventory
     {
         private const string TargetType = "inventory_batches";
         private const string IdempotencyIndex = "uq_inventory_batches_branch_idempotency_key";
+        private const string MovementIdempotencyIndex = "uq_stock_movements_branch_key_batch";
         private const string SavepointSql = "SAVEPOINT inventory_batch_insert";
         private const string ReleaseSavepointSql = "RELEASE SAVEPOINT inventory_batch_insert";
         private const string RollbackSavepointSql = "ROLLBACK TO SAVEPOINT inventory_batch_insert";
@@ -72,6 +73,7 @@ namespace CafeHub.Infrastructure.Inventory
                 return Result.Failure<InventoryBatchResponse>(InventoryBatchErrors.ExpiryBeforeReceived());
             }
 
+            var now = timeProvider.GetUtcNow();
             var batch = InventoryBatch.Create(
                 Guid.CreateVersion7(),
                 itemId,
@@ -82,9 +84,22 @@ namespace CafeHub.Infrastructure.Inventory
                 item.TracksExpiry,
                 actorUserId,
                 idempotencyKey,
-                timeProvider.GetUtcNow(),
+                now,
                 actorUserId);
             context.InventoryBatches.Add(batch);
+
+            var movement = StockMovement.Create(
+                Guid.CreateVersion7(),
+                itemId,
+                branchId,
+                batch.Id,
+                StockMovementType.Receive,
+                receivedQuantity,
+                null,
+                idempotencyKey,
+                now,
+                actorUserId);
+            context.StockMovements.Add(movement);
 
             var changes = TenantAuditChanges.Create(new[]
             {
@@ -134,10 +149,11 @@ namespace CafeHub.Infrastructure.Inventory
             catch (DbUpdateException exception) when (exception.InnerException is PostgresException
             {
                 SqlState: PostgresErrorCodes.UniqueViolation,
-                ConstraintName: IdempotencyIndex,
-            })
+            } postgres
+                && postgres.ConstraintName is IdempotencyIndex or MovementIdempotencyIndex)
             {
                 context.Entry(batch).State = EntityState.Detached;
+                context.Entry(movement).State = EntityState.Detached;
                 foreach (var entry in context.ChangeTracker.Entries<TenantAuditRecord>()
                     .Where(candidate => candidate.State == EntityState.Added)
                     .ToArray())
