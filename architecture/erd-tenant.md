@@ -2,9 +2,9 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 42 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), the money record of its payments (`payments`), the digital receipt snapshot (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`), the cafe WiFi policy with its per-branch network details, paid packages, per-branch WiFi QR, and imported voucher pool (`wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, `wifi_vouchers`), the per-branch printer registry with its document routes (`printers`, `print_routes`), and the print job queue (`print_jobs`).
+The Tenant model contains 43 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), the money record of its payments (`payments`), the digital receipt snapshot (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`), the cafe WiFi policy with its per-branch network details, paid packages, per-branch WiFi QR, and imported voucher pool (`wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, `wifi_vouchers`), the per-branch printer registry with its document routes (`printers`, `print_routes`), the print job queue (`print_jobs`), and the per-branch connector registrations (`print_connectors`).
 
-Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427). The receipt schema (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`) is added by the amendment for Story CFMD-433 (CFMD-434). The WiFi settings schema (`wifi_settings`, `branch_wifi_networks`) is added by the amendment for Story CFMD-436 (CFMD-437). The paid WiFi package schema (`wifi_packages`) is added by the same story (CFMD-438). The branch WiFi QR (`branch_wifi_qr`) is added by the same story (CFMD-439). The WiFi voucher pool (`wifi_vouchers`) is added by Story CFMD-440 (CFMD-441). The WiFi package order lines and the WiFi-only order shape are added by the same story (CFMD-442). Voucher assignment, the released code on guest status and receipt lines (`receipt_lines.wifi_code`), and the issued lookup are added by the same story (CFMD-443). The printer registry and its document routes (`printers`, `print_routes`) are added by Story CFMD-444 (CFMD-445). The print job queue (`print_jobs`) is added by the same story (CFMD-446).
+Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427). The receipt schema (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`) is added by the amendment for Story CFMD-433 (CFMD-434). The WiFi settings schema (`wifi_settings`, `branch_wifi_networks`) is added by the amendment for Story CFMD-436 (CFMD-437). The paid WiFi package schema (`wifi_packages`) is added by the same story (CFMD-438). The branch WiFi QR (`branch_wifi_qr`) is added by the same story (CFMD-439). The WiFi voucher pool (`wifi_vouchers`) is added by Story CFMD-440 (CFMD-441). The WiFi package order lines and the WiFi-only order shape are added by the same story (CFMD-442). Voucher assignment, the released code on guest status and receipt lines (`receipt_lines.wifi_code`), and the issued lookup are added by the same story (CFMD-443). The printer registry and its document routes (`printers`, `print_routes`) are added by Story CFMD-444 (CFMD-445). The print job queue (`print_jobs`) is added by the same story (CFMD-446). The connector registrations (`print_connectors`) are added by the same story (CFMD-447).
 
 Note: the Mermaid diagram shows the tables and relationships with key columns only; the dictionary below is the complete column list (pervasive `created_at`/`updated_at` audit boilerplate is omitted from the diagram, and is stated per table in the dictionary). Every foreign key constraint receives a `fk_<table>_<column>` name and every index a `uq_` or `ix_` name through the mapping work for each table (CFMD-74); the dictionary names the ones whose definition is not obvious.
 
@@ -314,6 +314,14 @@ erDiagram
         jsonb document_payload
         timestamptz lease_expires_at
     }
+    print_connectors {
+        uuid id PK
+        uuid branch_id FK
+        text name
+        text key_hash UK
+        text status
+        timestamptz last_seen_at
+    }
     tenant_users ||--o{ tenant_user_roles : "membership"
     tenant_roles ||--o{ tenant_user_roles : "membership"
     tenant_users ||--o{ tenant_user_claims : "user claim"
@@ -378,6 +386,7 @@ erDiagram
     printers ||--o{ print_routes : "routed printer"
     branches ||--o{ print_jobs : "print jobs"
     printers ||--o{ print_jobs : "job printer"
+    branches ||--o{ print_connectors : "print connectors"
 ```
 
 **Proposed, pending owner confirmation (diagram conventions):** the diagram omits every table's audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) for readability; the dictionary states them per table. Cardinality markers follow the FK optionality in the dictionary: a non-null child FK draws the parent side as exactly-one, a nullable child FK draws it as zero-or-one, and a unique child FK caps the other side at zero-or-one.
@@ -951,9 +960,22 @@ Purpose: the per-branch print queue created by business events (FR-PRN-004, Stor
 - `max_attempts integer NOT NULL` — `ck_print_jobs_max_attempts CHECK (max_attempts BETWEEN 1 AND 3)`; the Proposed bound of 3 attempts.
 - `last_error_code text NULL` — `ck_print_jobs_last_error_code CHECK (last_error_code IS NULL OR last_error_code IN ('PrinterOffline', 'PaperOut', 'PayloadRejected', 'Unknown'))`.
 - `document_payload jsonb NOT NULL` — the structured line list; never filtered or joined.
-- `lease_expires_at timestamptz NULL` — the claim lease; an expired lease returns the job to Queued.
+- `lease_expires_at timestamptz NULL` — the claim lease; the default is 60 seconds and an expired lease returns the job to Queued without counting an attempt (Proposed, pending owner confirmation).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`.
 - `uq_print_jobs_branch_dedupe_key` on `(branch_id, dedupe_key)` makes a repeated business event a no-op.
+- Lifecycle (Story CFMD-447): a connector claims the oldest Queued job of its branch and the claim sets `status = 'Claimed'` with `lease_expires_at`; a success report is the only path to `Succeeded`; a failure report increments `attempts`, stores the closed-list `last_error_code`, and returns the job to `Queued`, or to `Failed` once `attempts` reaches `max_attempts`; staff cancel a Queued, Claimed, or Failed job to `Cancelled`; requeueing a Failed job returns it to `Queued` with `attempts = 0` and `last_error_code = NULL` (Proposed, pending owner confirmation).
+
+### print_connectors
+
+Purpose: the per-branch local connector registrations that print the queue (FR-PRN-005, Story CFMD-444, CFMD-447). A connector key is returned once at creation and stored only as a SHA-256 hash; the raw key, the hash, and any prefix of either are never logged, audited, or returned again. A key authenticates only its own branch.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_print_connectors`.
+- `branch_id uuid NOT NULL` — `fk_print_connectors_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_print_connectors_branch_id`.
+- `name text NOT NULL` — `ck_print_connectors_name CHECK (char_length(name) BETWEEN 1 AND 64 AND name !~ '[[:cntrl:]]')`; operator-facing label for the machine.
+- `key_hash text NOT NULL` — `ck_print_connectors_key_hash CHECK (char_length(key_hash) = 64)`; `uq_print_connectors_key_hash` is unique because the hash is the credential lookup key. Only the hash is stored; the key exists in the creation response only.
+- `status text NOT NULL` — `ck_print_connectors_status CHECK (status IN ('Active', 'Revoked'))`; a Revoked connector is refused exactly like an unknown key.
+- `last_seen_at timestamptz NULL` — the last successful authenticated claim; a request that is refused never updates it.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_print_connectors_created_by` / `fk_print_connectors_updated_by` with ON DELETE RESTRICT and its own index.
 
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
@@ -963,7 +985,7 @@ Purpose: the per-branch print queue created by business events (FR-PRN-004, Stor
 - Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
-- Printing beyond the registry, routes, and queue — connectors and drivers (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, and `print_jobs` schemas are defined above.
+- Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
 - Inventory — items, batches, movements, and alerts (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out).
 - Reporting and analytics — read-model queries over the later operational tables (FR-ANL-001 through FR-ANL-004; revenue definitions TBD-16).
 - AI insights — insight structures and their persistence (FR-AI-001, FR-AI-002; provider decisions TBD-22).
