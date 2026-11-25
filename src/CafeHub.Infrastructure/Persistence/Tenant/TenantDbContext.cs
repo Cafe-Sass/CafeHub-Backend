@@ -51,6 +51,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<PrintConnector> PrintConnectors => Set<PrintConnector>();
 
+        public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
