@@ -4,6 +4,9 @@ namespace CafeHub.Application.Inventory
 {
     public static class InventoryBatchErrors
     {
+        public const string InvalidExpiryRangeCode = "Inventory.InvalidExpiryRange";
+        public const string InvalidExpiryRangeMessage = "The expiry range start must not be after its end.";
+
         public static Error BranchNotFound() =>
             Error.NotFound("Inventory.BranchNotFound", "The branch was not found.");
 
@@ -21,5 +24,8 @@ namespace CafeHub.Application.Inventory
         public static Error ExpiryBeforeReceived() =>
             Error.Validation(
                 "Inventory.ExpiryBeforeReceived", "The expiry date must not be before the received date.");
+
+        public static Error InvalidExpiryRange() =>
+            Error.Validation(InvalidExpiryRangeCode, InvalidExpiryRangeMessage);
     }
 }

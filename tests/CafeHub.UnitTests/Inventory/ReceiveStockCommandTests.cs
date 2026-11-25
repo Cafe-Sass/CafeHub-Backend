@@ -176,6 +176,10 @@ namespace CafeHub.UnitTests.Inventory
                     branchId, itemId, receivedQuantity, receivedDate, expiryDate, idempotencyKey, actorUserId);
                 return Task.FromResult(Result.Success(Response));
             }
+
+            public Task<Result<InventoryBatchListPage>> ListAsync(
+                InventoryBatchListRequest request, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The command tests do not list batches.");
         }
 
         private sealed record ReceiveCall(

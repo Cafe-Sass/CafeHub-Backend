@@ -175,6 +175,13 @@ namespace CafeHub.UnitTests.Inventory
                 CancellationToken cancellationToken) =>
                 Task.FromResult(Result.Success(Response));
 
+            public Task<InventoryItemResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The command tests do not read items.");
+
+            public Task<InventoryItemListPage> ListAsync(
+                InventoryItemListRequest request, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The command tests do not list items.");
+
             internal sealed record CreateCall(
                 string Name,
                 InventoryUnit Unit,

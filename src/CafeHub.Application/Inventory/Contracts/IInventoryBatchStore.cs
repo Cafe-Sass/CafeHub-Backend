@@ -14,5 +14,8 @@ namespace CafeHub.Application.Inventory.Contracts
             string idempotencyKey,
             Guid actorUserId,
             CancellationToken cancellationToken);
+
+        Task<Result<InventoryBatchListPage>> ListAsync(
+            InventoryBatchListRequest request, CancellationToken cancellationToken);
     }
 }
