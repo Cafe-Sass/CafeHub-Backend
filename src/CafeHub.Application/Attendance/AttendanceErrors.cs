@@ -20,6 +20,15 @@ namespace CafeHub.Application.Attendance
         public static Error BranchNotFound() =>
             Error.NotFound("Attendance.BranchNotFound", "The branch was not found.");
 
+        public static Error BranchRequired() =>
+            Error.Validation("Attendance.BranchRequired", "The branch id is required.");
+
+        public static Error InvalidToken() =>
+            Error.Validation("Attendance.InvalidToken", "The attendance token is not valid.");
+
+        public static Error InvalidDateRange() =>
+            Error.Validation("Attendance.InvalidDateRange", "The date range is invalid.");
+
         public static Error ConcurrencyConflict() =>
             Error.Conflict(
                 "Attendance.ConcurrencyConflict",
