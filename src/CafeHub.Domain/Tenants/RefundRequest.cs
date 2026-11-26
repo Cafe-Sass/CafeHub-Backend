@@ -57,8 +57,6 @@ namespace CafeHub.Domain.Tenants
 
         public Guid? UpdatedBy { get; private set; }
 
-        public uint Version { get; private set; }
-
         public IReadOnlyList<RefundRequestAttachment> Attachments => attachments;
 
         public IReadOnlyList<RefundRequestEvent> Events => events;
