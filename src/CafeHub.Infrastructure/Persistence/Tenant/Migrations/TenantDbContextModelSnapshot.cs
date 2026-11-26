@@ -2954,6 +2954,266 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_user_id");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bill_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<decimal>("ClaimedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("claimed_amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("text")
+                        .HasColumnName("details");
+
+                    b.Property<string>("GuestDisplayName")
+                        .HasColumnType("text")
+                        .HasColumnName("guest_display_name");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("PublicReference")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("public_reference");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("resolution_note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refund_requests");
+
+                    b.HasIndex("AssignedUserId")
+                        .HasDatabaseName("ix_refund_requests_assigned_user_id");
+
+                    b.HasIndex("BillId")
+                        .HasDatabaseName("ix_refund_requests_bill_id");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_refund_requests_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_refund_requests_created_by");
+
+                    b.HasIndex("DecidedByUserId")
+                        .HasDatabaseName("ix_refund_requests_decided_by_user_id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_refund_requests_order_id");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_refund_requests_payment_id");
+
+                    b.HasIndex("PublicReference")
+                        .IsUnique()
+                        .HasDatabaseName("uq_refund_requests_public_reference");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_refund_requests_updated_by");
+
+                    b.HasIndex("BranchId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_refund_requests_branch_idempotency_key");
+
+                    b.ToTable("refund_requests", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refund_requests_claimed_amount", "claimed_amount > 0");
+
+                            t.HasCheckConstraint("ck_refund_requests_decision_pair", "((status IN ('Approved', 'Rejected') AND resolution_note IS NOT NULL AND char_length(btrim(resolution_note)) > 0 AND decided_by_user_id IS NOT NULL AND decided_at IS NOT NULL) OR (status IN ('Open', 'InReview') AND resolution_note IS NULL AND decided_by_user_id IS NULL AND decided_at IS NULL))");
+
+                            t.HasCheckConstraint("ck_refund_requests_details_length", "details IS NULL OR char_length(details) <= 2000");
+
+                            t.HasCheckConstraint("ck_refund_requests_idempotency_key_format", "char_length(idempotency_key) BETWEEN 8 AND 64 AND idempotency_key ~ '^[A-Za-z0-9_-]+$'");
+
+                            t.HasCheckConstraint("ck_refund_requests_public_reference_format", "char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$'");
+
+                            t.HasCheckConstraint("ck_refund_requests_reason_length", "char_length(btrim(reason)) BETWEEN 3 AND 256");
+
+                            t.HasCheckConstraint("ck_refund_requests_status", "status IN ('Open', 'InReview', 'Approved', 'Rejected')");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequestAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("MediaKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("media_key");
+
+                    b.Property<Guid>("RefundRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_request_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refund_request_attachments");
+
+                    b.HasIndex("RefundRequestId")
+                        .HasDatabaseName("ix_refund_request_attachments_refund_request_id");
+
+                    b.ToTable("refund_request_attachments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refund_request_attachments_content_type", "content_type IN ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')");
+
+                            t.HasCheckConstraint("ck_refund_request_attachments_media_key_length", "char_length(media_key) BETWEEN 1 AND 512");
+
+                            t.HasCheckConstraint("ck_refund_request_attachments_sha256", "sha256 ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_refund_request_attachments_size", "size_bytes > 0");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequestEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("FromStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("from_status");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("RefundRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_request_id");
+
+                    b.Property<string>("ToStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refund_request_events");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_refund_request_events_actor_user_id");
+
+                    b.HasIndex("RefundRequestId")
+                        .HasDatabaseName("ix_refund_request_events_refund_request_id");
+
+                    b.ToTable("refund_request_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refund_request_events_actor_kind", "actor_kind IN ('Guest', 'Staff')");
+
+                            t.HasCheckConstraint("ck_refund_request_events_actor_pair", "((actor_kind = 'Guest' AND actor_user_id IS NULL) OR (actor_kind = 'Staff' AND actor_user_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_refund_request_events_from_status", "from_status IS NULL OR from_status IN ('Open', 'InReview', 'Approved', 'Rejected')");
+
+                            t.HasCheckConstraint("ck_refund_request_events_kind", "kind IN ('Submitted', 'Assigned', 'StatusChanged')");
+
+                            t.HasCheckConstraint("ck_refund_request_events_to_status", "to_status IS NULL OR to_status IN ('Open', 'InReview', 'Approved', 'Rejected')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Station", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4771,6 +5031,86 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasConstraintName("fk_receipt_payments_receipt_id");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequest", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_requests_assigned_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Bill", null)
+                        .WithMany()
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_requests_bill_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_requests_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_requests_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_requests_decided_by_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_requests_order_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_requests_payment_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_requests_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequestAttachment", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.RefundRequest", null)
+                        .WithMany("Attachments")
+                        .HasForeignKey("RefundRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_request_attachments_refund_request_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequestEvent", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_refund_request_events_actor_user_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.RefundRequest", null)
+                        .WithMany("Events")
+                        .HasForeignKey("RefundRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_refund_request_events_refund_request_id");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Station", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.Branch", null)
@@ -5031,6 +5371,13 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.RefundRequest", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Events");
                 });
 #pragma warning restore 612, 618
         }
