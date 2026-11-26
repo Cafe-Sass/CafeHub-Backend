@@ -4,6 +4,7 @@ using CafeHub.Application.Attendance.Commands;
 using CafeHub.Application.Attendance.DTOs;
 using CafeHub.Application.Attendance.Queries;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Pagination;
 using CafeHub.Domain.Tenants;
 using CafeHub.WebApi.Authorization;
 using CafeHub.WebApi.Controllers;
@@ -140,6 +141,68 @@ namespace CafeHub.UnitTests.Attendance
                 Assert.True(TenantPermissions.IsStaffGrant(permission));
                 Assert.False(TenantPermissions.IsOwnerOnly(permission));
             }
+        }
+
+        [Fact]
+        public void Scan_IsASignedInTenantUserPostOnTheScanRoute()
+        {
+            var action = Action(nameof(TenantAttendanceController.Scan));
+
+            Assert.Equal("scan", action.GetCustomAttribute<HttpPostAttribute>()!.Template);
+            Assert.Equal(
+                TenantPolicies.TenantUser,
+                Assert.IsType<TenantAuthorizeAttribute>(
+                    action.GetCustomAttribute<TenantAuthorizeAttribute>()).Policy);
+            Assert.NotNull(action.GetParameters().Single(parameter => parameter.Name == "request"));
+        }
+
+        [Fact]
+        public void History_IsAViewProtectedGetOnTheAttendanceRoute()
+        {
+            var action = Action(nameof(TenantAttendanceController.History));
+
+            var get = action.GetCustomAttribute<HttpGetAttribute>();
+            Assert.NotNull(get);
+            Assert.Null(get!.Template);
+            Assert.Equal(
+                TenantPermissions.AttendanceView,
+                Assert.IsType<TenantAuthorizeAttribute>(
+                    action.GetCustomAttribute<TenantAuthorizeAttribute>()).Policy);
+        }
+
+        [Fact]
+        public async Task Scan_SendsTheTokenCommandAndReturnsTheOutcome()
+        {
+            var response = new AttendanceScanResponse(
+                Guid.CreateVersion7(), AttendanceScanResponse.CheckedIn, BranchId, Now);
+            var sender = new RecordingSender { Response = Result.Success(response) };
+            var controller = CreateController(sender);
+
+            var actionResult = await controller.Scan(
+                new AttendanceScanRequest(new string('a', AttendanceQrSession.TokenLength)),
+                CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Same(response, okResult.Value);
+            Assert.Equal(
+                new string('a', AttendanceQrSession.TokenLength),
+                Assert.IsType<ScanAttendanceCommand>(sender.LastRequest).Token);
+        }
+
+        [Fact]
+        public async Task History_ForwardsTheQueryAndReturnsThePage()
+        {
+            var page = OffsetPage<AttendanceHistoryItem>.Create(
+                Array.Empty<AttendanceHistoryItem>(), 1, 20, 0);
+            var sender = new RecordingSender { Response = Result.Success(page) };
+            var controller = CreateController(sender);
+            var query = new GetAttendanceHistoryQuery { BranchId = BranchId };
+
+            var actionResult = await controller.History(query, CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Same(page, okResult.Value);
+            Assert.Same(query, sender.LastRequest);
         }
 
         private static MethodInfo Action(string name) =>
