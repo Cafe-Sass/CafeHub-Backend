@@ -17,6 +17,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
     {
         private static readonly Guid SubscriptionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         private static readonly Guid TenantId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        private static readonly Guid OtherTenantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
         private static readonly Guid OnboardingRequestId = Guid.Parse("33333333-3333-3333-3333-333333333333");
         private static readonly DateTimeOffset Now = new(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
 
@@ -28,7 +29,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             var request = context.PendingRequest();
 
             var result = await handler.Handle(
-                new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
+                new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.True(result.IsSuccess, result.Error?.Code);
             Assert.Equal("Completed", result.Value.Status);
@@ -59,8 +60,8 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             var handler = context.ApproveHandler();
             var request = context.PendingRequest();
 
-            var first = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
-            var second = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
+            var first = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
+            var second = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.True(first.IsSuccess, first.Error?.Code);
             Assert.True(second.IsSuccess, second.Error?.Code);
@@ -78,8 +79,8 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             var handler = context.ApproveHandler();
             var request = context.PendingRequest();
 
-            var first = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
-            var second = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
+            var first = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
+            var second = await handler.Handle(new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.Equal(SubscriptionErrors.RenewalChargeFailed(), first.Error);
             Assert.Equal(SubscriptionErrors.RenewalChargeFailed(), second.Error);
@@ -106,7 +107,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             context.Store.Requests.Add(request);
 
             var result = await handler.Handle(
-                new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
+                new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.Equal(SubscriptionErrors.RenewalExpired(), result.Error);
             Assert.Equal(RenewalRequestStatus.Expired, request.Status);
@@ -122,12 +123,45 @@ namespace CafeHub.UnitTests.Subscriptions.Application
 
             var result = await new DeclineRenewalRequestCommandHandler(
                     context.Store, context.UnitOfWork, context.Audit, context.Clock)
-                .Handle(new DeclineRenewalRequestCommand(request.Id, "owner-1"), default);
+                .Handle(new DeclineRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.True(result.IsSuccess, result.Error?.Code);
             Assert.Equal(RenewalRequestStatus.Declined, request.Status);
             Assert.Empty(context.Gateway.Charges);
             Assert.Equal("subscription.renewal.declined.succeeded", Assert.Single(context.Audit.Entries).Action);
+        }
+
+        [Fact]
+        public async Task AnOwnerCannotApproveAnotherTenantsRenewal()
+        {
+            var context = new RenewalContext();
+            var request = context.PendingRequest();
+
+            var result = await context.ApproveHandler().Handle(
+                new ApproveRenewalRequestCommand(request.Id, OtherTenantId, "owner-1"), default);
+
+            Assert.Equal(SubscriptionErrors.RenewalRequestNotFound(), result.Error);
+            Assert.Equal(RenewalRequestStatus.Pending, request.Status);
+            Assert.Empty(context.Gateway.Charges);
+            Assert.Empty(context.Audit.Entries);
+            Assert.Equal(0, context.UnitOfWork.CommitCount);
+        }
+
+        [Fact]
+        public async Task AnOwnerCannotDeclineAnotherTenantsRenewal()
+        {
+            var context = new RenewalContext();
+            var request = context.PendingRequest();
+
+            var result = await new DeclineRenewalRequestCommandHandler(
+                    context.Store, context.UnitOfWork, context.Audit, context.Clock)
+                .Handle(new DeclineRenewalRequestCommand(request.Id, OtherTenantId, "owner-1"), default);
+
+            Assert.Equal(SubscriptionErrors.RenewalRequestNotFound(), result.Error);
+            Assert.Equal(RenewalRequestStatus.Pending, request.Status);
+            Assert.Empty(context.Gateway.Charges);
+            Assert.Empty(context.Audit.Entries);
+            Assert.Equal(0, context.UnitOfWork.CommitCount);
         }
 
         [Fact]
@@ -144,7 +178,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             Assert.Equal("eur", changed.Value.ProposedCurrencyCode);
 
             var approved = await context.ApproveHandler()
-                .Handle(new ApproveRenewalRequestCommand(request.Id, "owner-1"), default);
+                .Handle(new ApproveRenewalRequestCommand(request.Id, TenantId, "owner-1"), default);
 
             Assert.True(approved.IsSuccess, approved.Error?.Code);
             Assert.Equal(99.00m, context.Gateway.Charges[0].Amount);
@@ -157,7 +191,6 @@ namespace CafeHub.UnitTests.Subscriptions.Application
         public async Task CreatingARequestSnapshotsThePlanAndSendsTheNotice()
         {
             var context = new RenewalContext();
-            context.Subscription.LinkToTenant(TenantId, Now);
             context.Onboarding.Request = OnboardingRequest.CreateForPublicRegistration(
                 OnboardingRequestId,
                 context.PlanVersion.Id,
@@ -191,15 +224,15 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             Assert.False(new CreateRenewalRequestCommandValidator()
                 .Validate(new CreateRenewalRequestCommand(Guid.Empty, null, null)).IsValid);
             Assert.False(new ApproveRenewalRequestCommandValidator()
-                .Validate(new ApproveRenewalRequestCommand(Guid.Empty, null)).IsValid);
+                .Validate(new ApproveRenewalRequestCommand(Guid.Empty, Guid.Empty, null)).IsValid);
             Assert.False(new DeclineRenewalRequestCommandValidator()
-                .Validate(new DeclineRenewalRequestCommand(Guid.Empty, null)).IsValid);
+                .Validate(new DeclineRenewalRequestCommand(Guid.Empty, Guid.Empty, null)).IsValid);
             Assert.False(new ExpireRenewalRequestCommandValidator()
                 .Validate(new ExpireRenewalRequestCommand(Guid.Empty)).IsValid);
             Assert.False(new ChangeRenewalPlanCommandValidator()
                 .Validate(new ChangeRenewalPlanCommand(SubscriptionId, Guid.Empty, null)).IsValid);
             Assert.True(new ApproveRenewalRequestCommandValidator()
-                .Validate(new ApproveRenewalRequestCommand(Guid.CreateVersion7(), "owner-1")).IsValid);
+                .Validate(new ApproveRenewalRequestCommand(Guid.CreateVersion7(), TenantId, "owner-1")).IsValid);
         }
 
         private sealed class RenewalContext
@@ -208,6 +241,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             {
                 Subscription = Subscription.Create(
                     SubscriptionId, OnboardingRequestId, null, SubscriptionStatus.Suspended, Now);
+                Subscription.LinkToTenant(TenantId, Now);
                 Store = new FakeStore(Subscription);
                 PlanVersion = AddPlanVersion(49.99m, "usd", BillingPeriod.Monthly);
             }
@@ -283,7 +317,7 @@ namespace CafeHub.UnitTests.Subscriptions.Application
                 new(Store, Creator(), UnitOfWork, Audit);
 
             public ChangeRenewalPlanCommandHandler ChangePlanHandler() =>
-                new(Store, Creator(), UnitOfWork, Audit, Clock);
+                new(Store, new SubscriptionNextPlanService(Store, Creator(), Clock), UnitOfWork, Audit);
 
             public ApproveRenewalRequestCommandHandler ApproveHandler() =>
                 new(Store, PaymentTransactions, Gateway, UnitOfWork, Audit, Clock);
@@ -304,6 +338,11 @@ namespace CafeHub.UnitTests.Subscriptions.Application
             public Task<Subscription?> FindSubscriptionAsync(
                 Guid subscriptionId, CancellationToken cancellationToken) =>
                 Task.FromResult<Subscription?>(Subscription.Id == subscriptionId ? Subscription : null);
+
+            public Task<Subscription?> FindSubscriptionByTenantAsync(
+                Guid tenantId, CancellationToken cancellationToken) =>
+                Task.FromResult<Subscription?>(
+                    Subscription.TenantId == tenantId ? Subscription : null);
 
             public Task<SubscriptionRenewalRequest?> FindRequestAsync(
                 Guid renewalRequestId, CancellationToken cancellationToken) =>

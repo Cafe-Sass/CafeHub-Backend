@@ -227,6 +227,8 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
             services.AddScoped<ISubscriptionLifecycleStore, SubscriptionLifecycleStore>();
             services.AddScoped<ISubscriptionRenewalStore, SubscriptionRenewalStore>();
+            services.AddScoped<ISubscriptionQueryStore, SubscriptionQueryStore>();
+            services.AddScoped<SubscriptionNextPlanService>();
             services.AddScoped<SubscriptionRenewalCreator>();
             services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();
             services.AddScoped<IProvisioningJobClaimer, ProvisioningJobClaimer>();

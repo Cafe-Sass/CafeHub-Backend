@@ -124,6 +124,13 @@ All endpoint rows and all configuration rows are traceable to a file and line in
 | POST | `t/{slug}/api/v1/connector/attendance/events` | Device key (`X-Connector-Key`) | Post 1-100 device events and receive per-event outcomes; the key fixes the branch | TenantAttendanceConnectorController.cs |
 | GET | `t/{slug}/api/v1/attendance/unmatched` | `attendance.manage` | List one branch's unmatched device events | TenantAttendanceController.cs |
 | POST | `t/{slug}/api/v1/attendance/unmatched/reprocess` | `attendance.manage` | Reprocess unmatched events after mapping and audit the counts | TenantAttendanceController.cs |
+| GET | `t/{slug}/api/v1/subscription` | `subscription.manage` (Owner) | Read the tenant lifecycle and subscription states, plan, and latest period | TenantSubscriptionController.cs |
+| GET | `t/{slug}/api/v1/subscription/history` | `subscription.manage` (Owner) | Page the tenant's append-only subscription history newest first | TenantSubscriptionController.cs |
+| POST | `t/{slug}/api/v1/subscription/renewal/{renewalId:guid}/approve` | `subscription.manage` (Owner) | Explicitly approve a pending renewal; charges once and extends the period | TenantSubscriptionController.cs |
+| POST | `t/{slug}/api/v1/subscription/renewal/{renewalId:guid}/decline` | `subscription.manage` (Owner) | Decline a pending renewal without charging | TenantSubscriptionController.cs |
+| PUT | `t/{slug}/api/v1/subscription/next-plan` | `subscription.manage` (Owner) | Choose the plan version applied at the next renewal | TenantSubscriptionController.cs |
+| GET | `api/v1/admin/tenants/{tenantId:guid}/subscription` | `SuperAdmin` | Inspect tenant lifecycle and subscription state, plan, and latest period | AdminTenantSubscriptionController.cs |
+| GET | `api/v1/admin/tenants/{tenantId:guid}/subscription/history` | `SuperAdmin` | Page any tenant's subscription history | AdminTenantSubscriptionController.cs |
 | POST | `t/{slug}/api/v1/me/password` | `TenantUser` | Staff member changes their own password (revokes tokens) | TenantMeController.cs:40 |
 | GET | `health/live` | Anonymous | Liveness probe; no dependency checks | Health check middleware (Program.cs:62) |
 | GET | `health/ready` | Anonymous | Readiness probe; Master database connectivity | Health check middleware (Program.cs:68) |
@@ -201,7 +208,7 @@ Device attendance registers a fingerprint device per branch and maps its user co
 | `TenantUser` | `CafeHub.WebApi.Authorization.TenantPolicies` | Authenticated tenant user (owner or staff) |
 | `TenantOwner` | `CafeHub.WebApi.Authorization.TenantPolicies` | Tenant owner only |
 | `staff.read`, `staff.manage`, `branches.read`, `bills.view`, `bills.close`, `payments.cash.confirm`, `payments.settings.manage`, `payments.online.review`, `tables.manage`, `stations.manage`, `menu.manage`, `guests.mute`, `guests.mute.audit`, `wifi.manage`, `printers.manage`, `inventory.manage`, `inventory.move`, `inventory.receive`, `inventory.view`, `attendance.manage`, `attendance.qr.manage`, `attendance.view` | Tenant permission policy | Owner, or staff with the exact grant and an active assigned branch |
-| `roles.manage`, `cafe-profile.manage`, `branches.manage` | Tenant permission policy | Reserved for the Owner. These catalog codes are excluded from staff grants and effective permissions. |
+| `roles.manage`, `cafe-profile.manage`, `branches.manage`, `subscription.manage` | Tenant permission policy | Reserved for the Owner. These catalog codes are excluded from staff grants and effective permissions. |
 
 Connector print routes are rate limited per presented key (120 requests per 60 seconds) by their authorization filter; this is neither an authorization policy nor an endpoint rate-limit policy name.
 

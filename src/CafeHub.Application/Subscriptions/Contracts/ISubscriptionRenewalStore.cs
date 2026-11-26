@@ -7,6 +7,10 @@ namespace CafeHub.Application.Subscriptions.Contracts
     {
         Task<Subscription?> FindSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken);
 
+        Task<Subscription?> FindSubscriptionByTenantAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken);
+
         Task<SubscriptionRenewalRequest?> FindRequestAsync(
             Guid renewalRequestId,
             CancellationToken cancellationToken);

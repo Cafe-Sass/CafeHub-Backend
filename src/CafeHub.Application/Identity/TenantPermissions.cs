@@ -34,11 +34,13 @@ namespace CafeHub.Application.Identity
         public const string WifiManage = "wifi.manage";
         public const string WifiLookup = "wifi.lookup";
         public const string PrintersManage = "printers.manage";
+        public const string SubscriptionManage = "subscription.manage";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { AttendanceManage, AttendanceQrManage, AttendanceView, BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage, WifiLookup, WifiManage });
+            new[] { AttendanceManage, AttendanceQrManage, AttendanceView, BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RolesManage, StaffManage, StaffRead, StationsManage, SubscriptionManage, TablesManage, WifiLookup, WifiManage });
 
-        public static bool IsOwnerOnly(string? code) => code is RolesManage or BranchesManage or CafeProfileManage;
+        public static bool IsOwnerOnly(string? code) =>
+            code is RolesManage or BranchesManage or CafeProfileManage or SubscriptionManage;
 
         public static bool IsStaffGrant(string? code) =>
             !IsOwnerOnly(code) && All.Contains(code, StringComparer.Ordinal);
