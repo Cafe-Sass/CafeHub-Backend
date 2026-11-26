@@ -1092,6 +1092,24 @@ Purpose: one rotating attendance QR token for one branch (FR-ATT-002, FR-ATT-003
 - `valid_from timestamptz NOT NULL`, `valid_to timestamptz NOT NULL` — `ck_attendance_qr_sessions_window CHECK (valid_to > valid_from)`. The window is fixed at creation; a session is never extended.
 - `created_at timestamptz NOT NULL` and `created_by uuid NOT NULL FK tenant_users.id`, the actor foreign key named `fk_attendance_qr_sessions_created_by` with ON DELETE RESTRICT and its own index. Rows are never updated or deleted by the application.
 
+### attendance_records
+
+Purpose: one staff attendance entry per check-in with its pairing check-out (FR-ATT-003, FR-ATT-004, Story CFMD-456, CFMD-458). A scan of a valid branch session creates a check-in when the staff member has no open record and closes the open record otherwise. Identity always comes from the account, never from the token, and a check-in belongs to the session's branch. Replays are refused twice over: `uq_attendance_records_staff_check_in_session` and `uq_attendance_records_staff_check_out_session` keep one use of a session per staff member and direction, and `uq_attendance_records_open_staff` keeps at most one open record per staff member. `Qr` is the only source this story writes; `Device` is reserved for device ingestion.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_attendance_records`.
+- `branch_id uuid NOT NULL` — the branch whose QR session was scanned; `fk_attendance_records_branch_id` to `branches.id` (ON DELETE RESTRICT).
+- `staff_id uuid NOT NULL` — the signed-in account that scanned; `fk_attendance_records_staff_id` to `tenant_users.id` (ON DELETE RESTRICT).
+- `check_in_at timestamptz NOT NULL` — the server time of the check-in.
+- `check_out_at timestamptz NULL` — null while the record is open; `ck_attendance_records_window CHECK (check_out_at IS NULL OR check_out_at > check_in_at)`.
+- `check_in_session_id uuid NOT NULL` — the scanned session of the check-in; `fk_attendance_records_check_in_session_id` to `attendance_qr_sessions.id` (ON DELETE RESTRICT).
+- `check_out_session_id uuid NULL` — the later scanned session of the check-out, never the check-in session; `fk_attendance_records_check_out_session_id` to `attendance_qr_sessions.id` (ON DELETE RESTRICT).
+- `source text NOT NULL DEFAULT 'Qr'` — `ck_attendance_records_source CHECK (source IN ('Qr', 'Device'))`.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`.
+- `uq_attendance_records_staff_check_in_session` on `(staff_id, check_in_session_id)` is unique, so a staff member never checks in twice with one session.
+- `uq_attendance_records_staff_check_out_session` on `(staff_id, check_out_session_id)` is unique for rows where `check_out_session_id IS NOT NULL`, so one session never checks out the same staff member twice.
+- `uq_attendance_records_open_staff` on `(staff_id)` is unique for rows where `check_out_at IS NULL`, so a staff member never has two open records.
+- `ix_attendance_records_branch_check_in_at` on `(branch_id, check_in_at)` serves the branch-scoped history; `ix_attendance_records_staff_check_in_at` on `(staff_id, check_in_at)` serves the staff filter and the open-record lookup.
+
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
@@ -1099,7 +1117,7 @@ Purpose: one rotating attendance QR token for one branch (FR-ATT-002, FR-ATT-003
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
 - Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
-- Attendance beyond the mode and the QR sessions — check-in and check-out records and device ingestion (FR-ATT-001 through FR-ATT-004); the `attendance_settings` and `attendance_qr_sessions` schemas are defined above.
+- Attendance beyond the settings, the QR sessions, and the check-in/check-out records — device ingestion and attendance reporting (FR-ATT-001 through FR-ATT-004); the `attendance_settings`, `attendance_qr_sessions`, and `attendance_records` schemas are defined above.
 - Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
 - Inventory beyond the item catalog, its receipts, their movements, and their alerts — stock counts and scheduled alert evaluation (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out, and stock-driven menu availability stays unbuilt); the `inventory_items`, `inventory_batches`, `stock_movements`, and `inventory_alerts` schemas are defined above.
 - Reporting and analytics — read-model queries over the later operational tables (FR-ANL-001 through FR-ANL-004; revenue definitions TBD-16).
