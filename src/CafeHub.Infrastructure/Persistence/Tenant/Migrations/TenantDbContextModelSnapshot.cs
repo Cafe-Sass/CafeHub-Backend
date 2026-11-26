@@ -22,6 +22,108 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.Property<DateTimeOffset>("ValidFrom")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateTimeOffset>("ValidTo")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_qr_sessions");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_attendance_qr_sessions_created_by");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_qr_sessions_token");
+
+                    b.HasIndex("BranchId", "ValidTo")
+                        .HasDatabaseName("ix_attendance_qr_sessions_branch_valid_to");
+
+                    b.ToTable("attendance_qr_sessions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_qr_sessions_token", "token ~ '^[A-Za-z0-9_-]{43}$'");
+
+                            t.HasCheckConstraint("ck_attendance_qr_sessions_window", "valid_to > valid_from");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Off")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_settings");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_attendance_settings_created_by");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_attendance_settings_updated_by");
+
+                    b.ToTable("attendance_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_settings_mode", "mode IN ('Off', 'Qr', 'Device')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3427,6 +3529,38 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                             t.HasCheckConstraint("ck_wifi_vouchers_status", "status IN ('Available', 'Assigned', 'Void')");
                         });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_qr_sessions_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_qr_sessions_created_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceSettings", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_settings_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_settings_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Bill", b =>
