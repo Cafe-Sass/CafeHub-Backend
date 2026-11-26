@@ -15,6 +15,13 @@ namespace CafeHub.Infrastructure.Persistence.Master.Subscriptions
                 subscription => subscription.Id == subscriptionId,
                 cancellationToken);
 
+        public Task<Subscription?> FindSubscriptionByTenantAsync(
+            Guid tenantId,
+            CancellationToken cancellationToken) =>
+            context.Subscriptions.FirstOrDefaultAsync(
+                subscription => subscription.TenantId == tenantId,
+                cancellationToken);
+
         public Task<SubscriptionRenewalRequest?> FindRequestAsync(
             Guid renewalRequestId,
             CancellationToken cancellationToken) =>

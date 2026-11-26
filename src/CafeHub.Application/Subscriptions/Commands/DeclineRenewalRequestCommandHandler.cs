@@ -32,6 +32,14 @@ namespace CafeHub.Application.Subscriptions.Commands
                     SubscriptionErrors.RenewalRequestNotFound());
             }
 
+            var subscription = await store.FindSubscriptionAsync(
+                request.SubscriptionId, cancellationToken);
+            if (subscription is null || subscription.TenantId != command.TenantKey)
+            {
+                return Result.Failure<SubscriptionRenewalResponse>(
+                    SubscriptionErrors.RenewalRequestNotFound());
+            }
+
             if (request.Status == RenewalRequestStatus.Declined)
             {
                 return Result.Success(SubscriptionRenewalResponse.From(request));

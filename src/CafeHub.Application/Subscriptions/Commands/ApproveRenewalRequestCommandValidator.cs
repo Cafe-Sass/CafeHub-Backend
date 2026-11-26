@@ -11,6 +11,8 @@ namespace CafeHub.Application.Subscriptions.Commands
         {
             RuleFor(command => command.RenewalRequestId).NotEmpty()
                 .WithMessage("The renewal request id is required.");
+            RuleFor(command => command.TenantKey).NotEmpty()
+                .WithMessage("The tenant id is required.");
             RuleFor(command => command.ActorReference)
                 .Must(reference => reference is null
                     || (reference.Trim().Length is >= 1 and <= MaximumActorReferenceLength

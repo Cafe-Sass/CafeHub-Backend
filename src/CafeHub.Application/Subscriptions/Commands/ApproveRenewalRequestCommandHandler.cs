@@ -45,6 +45,12 @@ namespace CafeHub.Application.Subscriptions.Commands
                 return Result.Failure<SubscriptionRenewalResponse>(SubscriptionErrors.NotFound());
             }
 
+            if (subscription.TenantId != command.TenantKey)
+            {
+                return Result.Failure<SubscriptionRenewalResponse>(
+                    SubscriptionErrors.RenewalRequestNotFound());
+            }
+
             if (request.Status == RenewalRequestStatus.Completed)
             {
                 var completedPeriod = await store.FindPeriodByRenewalRequestAsync(
