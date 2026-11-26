@@ -1056,6 +1056,22 @@ Purpose: one signed change applied to a branch stock batch (FR-INV-003, FR-INV-0
 - `idempotency_key text NOT NULL` — `ck_stock_movements_idempotency_key_length CHECK (char_length(idempotency_key) BETWEEN 8 AND 64)`; `uq_stock_movements_branch_key_batch` on `(branch_id, idempotency_key, batch_id)` makes a retried command return the stored rows instead of applying the stock twice, while one command that spans several batches keeps one row per batch under the same key.
 - `created_at timestamptz NOT NULL` — the movement time. `created_by uuid NULL FK tenant_users.id` is the actor, named `fk_stock_movements_created_by` with ON DELETE RESTRICT and its own index. Rows are never updated, so the table carries no `updated_at`, `updated_by`, or `xmin`.
 
+### inventory_alerts
+
+Purpose: one open or resolved stock condition at one branch (FR-INV-005, FR-INV-006, Story CFMD-452, CFMD-455). A low-stock alert is raised by the check that runs after a receipt or a movement; near-expiry and expired alerts are raised by the check that runs when the alert list or the stock overview is read. An unchanged condition never raises a second open alert, a cleared condition resolves the existing row, and resolved rows are kept so the history of a condition survives. Automatic menu availability from stock is not built and `out_of_stock` and `expired` stay reserved (FR-MENU-004 boundary); the notification provider and channel stay open (TBD-09), so the row records only whether its single send succeeded.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_inventory_alerts`.
+- `item_id uuid NOT NULL` — `fk_inventory_alerts_item_id` to `inventory_items.id` (ON DELETE RESTRICT); `ix_inventory_alerts_item_id`.
+- `branch_id uuid NOT NULL` — `fk_inventory_alerts_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_inventory_alerts_branch_id`.
+- `batch_id uuid NULL` — `fk_inventory_alerts_batch_id` to `inventory_batches.id` (ON DELETE RESTRICT); `ix_inventory_alerts_batch_id`. It names the batch for `NearExpiry` and `Expired` and stays NULL for the item-wide `LowStock` alert.
+- `kind text NOT NULL` — `ck_inventory_alerts_kind CHECK (kind IN ('LowStock', 'NearExpiry', 'Expired'))`.
+- `state text NOT NULL` — `ck_inventory_alerts_state CHECK (state IN ('Open', 'Resolved'))`.
+- `raised_at timestamptz NOT NULL` — when the condition was first observed; a repeated evaluation of the same open condition never changes it.
+- `resolved_at timestamptz NULL` — `ck_inventory_alerts_resolved CHECK ((state = 'Open' AND resolved_at IS NULL) OR (state = 'Resolved' AND resolved_at IS NOT NULL))` and `ck_inventory_alerts_resolved_not_before_raised CHECK (resolved_at IS NULL OR resolved_at >= raised_at)`.
+- `notified_at timestamptz NULL` — the one successful send of a raised alert through the notification boundary; it stays NULL when the send fails, so the alert is kept and marked unsent; `ck_inventory_alerts_notified_not_before_raised CHECK (notified_at IS NULL OR notified_at >= raised_at)`.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_inventory_alerts_created_by` / `fk_inventory_alerts_updated_by` with ON DELETE RESTRICT and its own index. Resolving an open row updates it in place, so a resolved alert keeps its replaceable snapshot but never changes its kind, batch, or raise time.
+- `uq_inventory_alerts_open_batch` on `(item_id, branch_id, kind, batch_id)` where `state = 'Open' AND batch_id IS NOT NULL` and `uq_inventory_alerts_open_item` on `(item_id, branch_id, kind)` where `state = 'Open' AND batch_id IS NULL` raise the open-condition rule in the database. Two partial indexes are required because PostgreSQL treats NULL values as distinct in a unique index, so one index over the nullable `batch_id` would not stop a second open item-wide alert.
+
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
@@ -1065,7 +1081,7 @@ Purpose: one signed change applied to a branch stock batch (FR-INV-003, FR-INV-0
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
 - Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
 - Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
-- Inventory beyond the item catalog, its receipts, and their movements — stock counts and alerts (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out); the `inventory_items`, `inventory_batches`, and `stock_movements` schemas are defined above.
+- Inventory beyond the item catalog, its receipts, their movements, and their alerts — stock counts and scheduled alert evaluation (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out, and stock-driven menu availability stays unbuilt); the `inventory_items`, `inventory_batches`, `stock_movements`, and `inventory_alerts` schemas are defined above.
 - Reporting and analytics — read-model queries over the later operational tables (FR-ANL-001 through FR-ANL-004; revenue definitions TBD-16).
 - AI insights — insight structures and their persistence (FR-AI-001, FR-AI-002; provider decisions TBD-22).
 - Notifications — tenant-borne event delivery and its traceable attempts (FR-NOT-001, FR-NOT-002; TBD-09).

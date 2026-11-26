@@ -54,6 +54,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "inventory_items",
             "inventory_batches",
             "stock_movements",
+            "inventory_alerts",
         ];
 
         [Fact]
@@ -63,7 +64,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                 .GetTypes()
                 .Where(t => t.Namespace == "CafeHub.Domain.Tenants" && t.IsClass && !t.IsAbstract && !t.IsEnum)
                 .Where(t => !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
-                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun) and not nameof(PrinterProfileDefinition))
+                .Where(t => t.Name is not nameof(Tenant) and not nameof(TenantDatabase) and not nameof(TenantSchemaUpgradeRun) and not nameof(PrinterProfileDefinition) and not nameof(InventoryAlertCondition) and not nameof(InventoryAlertPlan))
                 .ToList();
 
             var entityNames = entityTypes
@@ -121,6 +122,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "inventory_items" => nameof(InventoryItem),
                     "inventory_batches" => nameof(InventoryBatch),
                     "stock_movements" => nameof(StockMovement),
+                    "inventory_alerts" => nameof(InventoryAlert),
                     _ => throw new InvalidOperationException($"Unknown ERD table: {table}"),
                 })
                 .OrderBy(n => n)

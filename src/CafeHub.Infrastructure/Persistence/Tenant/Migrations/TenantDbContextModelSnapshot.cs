@@ -690,6 +690,106 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("guest_mutes", (string)null);
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.InventoryAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("NotifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("notified_at");
+
+                    b.Property<DateTimeOffset>("RaisedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("raised_at");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventory_alerts");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_inventory_alerts_batch_id");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_inventory_alerts_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_inventory_alerts_created_by");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_inventory_alerts_item_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_inventory_alerts_updated_by");
+
+                    b.HasIndex("ItemId", "BranchId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inventory_alerts_open_item")
+                        .HasFilter("state = 'Open' AND batch_id IS NULL");
+
+                    b.HasIndex("ItemId", "BranchId", "Kind", "BatchId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_inventory_alerts_open_batch")
+                        .HasFilter("state = 'Open' AND batch_id IS NOT NULL");
+
+                    b.ToTable("inventory_alerts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_inventory_alerts_batch", "((kind = 'LowStock' AND batch_id IS NULL) OR (kind IN ('NearExpiry', 'Expired') AND batch_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_inventory_alerts_kind", "kind IN ('LowStock', 'NearExpiry', 'Expired')");
+
+                            t.HasCheckConstraint("ck_inventory_alerts_notified_not_before_raised", "notified_at IS NULL OR notified_at >= raised_at");
+
+                            t.HasCheckConstraint("ck_inventory_alerts_resolved", "((state = 'Open' AND resolved_at IS NULL) OR (state = 'Resolved' AND resolved_at IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_inventory_alerts_resolved_not_before_raised", "resolved_at IS NULL OR resolved_at >= raised_at");
+
+                            t.HasCheckConstraint("ck_inventory_alerts_state", "state IN ('Open', 'Resolved')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.InventoryBatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3543,6 +3643,41 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_guest_mutes_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.InventoryAlert", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.InventoryBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_inventory_alerts_batch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_alerts_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_inventory_alerts_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.InventoryItem", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_alerts_item_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_inventory_alerts_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.InventoryBatch", b =>

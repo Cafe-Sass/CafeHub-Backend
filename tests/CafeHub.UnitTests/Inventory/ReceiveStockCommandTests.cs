@@ -45,11 +45,13 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_ForwardsTheReceiptAndTheAuthenticatedActor()
         {
             var store = new FakeStore();
-            var handler = new ReceiveStockCommandHandler(store, User(), Context());
+            var evaluator = new FakeAlertEvaluator();
+            var handler = new ReceiveStockCommandHandler(store, evaluator, User(), Context());
 
             var result = await handler.Handle(Command(), default);
 
             Assert.Equal(Response, result.Value);
+            Assert.Equal((BranchId, ItemId), Assert.Single(evaluator.StockRequests));
             var call = Assert.IsType<ReceiveCall>(store.Received);
             Assert.Equal(BranchId, call.BranchId);
             Assert.Equal(ItemId, call.ItemId);
@@ -64,7 +66,7 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_ForAStaffMemberOfAnotherBranchReturnsTheUniformNotFound()
         {
             var store = new FakeStore();
-            var handler = new ReceiveStockCommandHandler(store, StaffUser(BranchId), Context());
+            var handler = new ReceiveStockCommandHandler(store, new FakeAlertEvaluator(), StaffUser(BranchId), Context());
 
             var result = await handler.Handle(Command(branchId: OtherBranchId), default);
 
@@ -76,7 +78,7 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_AllowsTheStaffMembersOwnBranch()
         {
             var store = new FakeStore();
-            var handler = new ReceiveStockCommandHandler(store, StaffUser(BranchId), Context());
+            var handler = new ReceiveStockCommandHandler(store, new FakeAlertEvaluator(), StaffUser(BranchId), Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -92,7 +94,7 @@ namespace CafeHub.UnitTests.Inventory
             {
                 AccountAccess = new TenantAccountAccess(true, "1", false),
             };
-            var handler = new ReceiveStockCommandHandler(store, user, Context());
+            var handler = new ReceiveStockCommandHandler(store, new FakeAlertEvaluator(), user, Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -105,7 +107,7 @@ namespace CafeHub.UnitTests.Inventory
         {
             var store = new FakeStore();
             var anonymous = new FakeTenantUser { UserId = Guid.Empty };
-            var handler = new ReceiveStockCommandHandler(store, anonymous, Context());
+            var handler = new ReceiveStockCommandHandler(store, new FakeAlertEvaluator(), anonymous, Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -184,6 +186,22 @@ namespace CafeHub.UnitTests.Inventory
             public Task<InventoryStockLevelPage> ListStockLevelsAsync(
                 InventoryStockLevelRequest request, CancellationToken cancellationToken) =>
                 throw new NotSupportedException("The command tests do not read stock levels.");
+        }
+
+        private sealed class FakeAlertEvaluator : IInventoryAlertEvaluator
+        {
+            public List<(Guid BranchId, Guid ItemId)> StockRequests { get; } = new();
+
+            public Task<Result> EvaluateStockAsync(
+                Guid branchId, Guid itemId, CancellationToken cancellationToken)
+            {
+                StockRequests.Add((branchId, itemId));
+                return Task.FromResult(Result.Success());
+            }
+
+            public Task<Result> EvaluateExpiryAsync(
+                Guid? branchId, Guid? itemId, CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
         }
 
         private sealed record ReceiveCall(

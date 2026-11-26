@@ -8,31 +8,30 @@ using CafeHub.Application.Tenancy;
 namespace CafeHub.Application.Inventory.Commands
 {
     public sealed class ReceiveStockCommandHandler(
-        IInventoryBatchStore store, ICurrentTenantUser currentUser, ITenantContextAccessor tenantContext)
+        IInventoryBatchStore store, IInventoryAlertEvaluator evaluator,
+        ICurrentTenantUser currentUser, ITenantContextAccessor tenantContext)
         : ICommandHandler<ReceiveStockCommand, InventoryBatchResponse>
     {
-        public Task<Result<InventoryBatchResponse>> Handle(
+        public async Task<Result<InventoryBatchResponse>> Handle(
             ReceiveStockCommand command, CancellationToken cancellationToken)
         {
             var scope = TenantBranchScope.Resolve(currentUser.AccountAccess);
             if (scope.IsFailure)
             {
-                return Task.FromResult(Result.Failure<InventoryBatchResponse>(scope.Error!));
+                return Result.Failure<InventoryBatchResponse>(scope.Error!);
             }
 
             if (scope.Value is { } scopedBranchId && scopedBranchId != command.BranchId)
             {
-                return Task.FromResult(
-                    Result.Failure<InventoryBatchResponse>(InventoryBatchErrors.BranchNotFound()));
+                return Result.Failure<InventoryBatchResponse>(InventoryBatchErrors.BranchNotFound());
             }
 
             if (!InventoryItemActor.TryGetId(currentUser, tenantContext, out var actorId))
             {
-                return Task.FromResult(
-                    Result.Failure<InventoryBatchResponse>(AuthErrors.CurrentTenantUserUnavailable()));
+                return Result.Failure<InventoryBatchResponse>(AuthErrors.CurrentTenantUserUnavailable());
             }
 
-            return store.ReceiveAsync(
+            var result = await store.ReceiveAsync(
                 command.BranchId,
                 command.ItemId,
                 command.ReceivedQuantity,
@@ -41,6 +40,16 @@ namespace CafeHub.Application.Inventory.Commands
                 command.IdempotencyKey!,
                 actorId,
                 cancellationToken);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            var evaluated = await evaluator.EvaluateStockAsync(
+                command.BranchId, command.ItemId, cancellationToken);
+            return evaluated.IsFailure
+                ? Result.Failure<InventoryBatchResponse>(evaluated.Error!)
+                : result;
         }
     }
 }

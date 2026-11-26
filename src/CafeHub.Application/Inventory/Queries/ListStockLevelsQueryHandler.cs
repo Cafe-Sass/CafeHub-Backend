@@ -8,7 +8,8 @@ using CafeHub.Application.Pagination;
 namespace CafeHub.Application.Inventory.Queries
 {
     public sealed class ListStockLevelsQueryHandler(
-        IInventoryBatchStore store, ICurrentTenantUser currentUser, PaginationOptions paginationOptions)
+        IInventoryBatchStore store, IInventoryAlertEvaluator evaluator,
+        ICurrentTenantUser currentUser, PaginationOptions paginationOptions)
         : IQueryHandler<ListStockLevelsQuery, OffsetPage<StockLevelResponse>>
     {
         public async Task<Result<OffsetPage<StockLevelResponse>>> Handle(
@@ -27,6 +28,13 @@ namespace CafeHub.Application.Inventory.Queries
                 && requestedBranchId != scopedBranchId)
             {
                 return Result.Failure<OffsetPage<StockLevelResponse>>(InventoryBatchErrors.BranchNotFound());
+            }
+
+            var evaluated = await evaluator.EvaluateExpiryAsync(
+                scope.Value ?? query.BranchId, query.ItemId, cancellationToken);
+            if (evaluated.IsFailure)
+            {
+                return Result.Failure<OffsetPage<StockLevelResponse>>(evaluated.Error!);
             }
 
             var pageSize = paginationOptions.ResolvePageSize(query.PageSize);

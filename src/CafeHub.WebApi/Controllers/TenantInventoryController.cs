@@ -198,6 +198,19 @@ namespace CafeHub.WebApi.Controllers
             return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
 
+        [HttpGet("alerts")]
+        [TenantAuthorize(TenantPermissions.InventoryView)]
+        [ProducesResponseType<OffsetPage<InventoryAlertResponse>>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        public async Task<ActionResult<OffsetPage<InventoryAlertResponse>>> Alerts(
+            [FromRoute] string slug,
+            [FromQuery] ListInventoryAlertsQuery request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(request, cancellationToken);
+            return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
         [HttpGet("movements")]
         [TenantAuthorize(TenantPermissions.InventoryView)]
         [ProducesResponseType<OffsetPage<StockMovementResponse>>(StatusCodes.Status200OK, "application/json")]

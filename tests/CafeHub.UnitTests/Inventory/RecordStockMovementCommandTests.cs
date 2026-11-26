@@ -55,11 +55,13 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_ForwardsTheMovementAndTheAuthenticatedActor()
         {
             var store = new FakeStore();
-            var handler = new RecordStockMovementCommandHandler(store, User(), Context());
+            var evaluator = new FakeAlertEvaluator();
+            var handler = new RecordStockMovementCommandHandler(store, evaluator, User(), Context());
 
             var result = await handler.Handle(Command(reason: "  spillage  "), default);
 
             Assert.Equal(new[] { Response }, result.Value);
+            Assert.Equal((BranchId, ItemId), Assert.Single(evaluator.StockRequests));
             var call = Assert.IsType<RecordCall>(store.Recorded);
             Assert.Equal(BranchId, call.BranchId);
             Assert.Equal(ItemId, call.ItemId);
@@ -75,7 +77,7 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_ForAStaffMemberOfAnotherBranchReturnsTheUniformNotFound()
         {
             var store = new FakeStore();
-            var handler = new RecordStockMovementCommandHandler(store, StaffUser(BranchId), Context());
+            var handler = new RecordStockMovementCommandHandler(store, new FakeAlertEvaluator(), StaffUser(BranchId), Context());
 
             var result = await handler.Handle(Command(branchId: OtherBranchId), default);
 
@@ -87,7 +89,7 @@ namespace CafeHub.UnitTests.Inventory
         public async Task Handler_AllowsTheStaffMembersOwnBranch()
         {
             var store = new FakeStore();
-            var handler = new RecordStockMovementCommandHandler(store, StaffUser(BranchId), Context());
+            var handler = new RecordStockMovementCommandHandler(store, new FakeAlertEvaluator(), StaffUser(BranchId), Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -103,7 +105,7 @@ namespace CafeHub.UnitTests.Inventory
             {
                 AccountAccess = new TenantAccountAccess(true, "1", false),
             };
-            var handler = new RecordStockMovementCommandHandler(store, user, Context());
+            var handler = new RecordStockMovementCommandHandler(store, new FakeAlertEvaluator(), user, Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -116,7 +118,7 @@ namespace CafeHub.UnitTests.Inventory
         {
             var store = new FakeStore();
             var anonymous = new FakeTenantUser { UserId = Guid.Empty };
-            var handler = new RecordStockMovementCommandHandler(store, anonymous, Context());
+            var handler = new RecordStockMovementCommandHandler(store, new FakeAlertEvaluator(), anonymous, Context());
 
             var result = await handler.Handle(Command(), default);
 
@@ -201,6 +203,22 @@ namespace CafeHub.UnitTests.Inventory
             public Task<StockMovementListPage> ListAsync(
                 StockMovementListRequest request, CancellationToken cancellationToken) =>
                 throw new NotSupportedException("The command tests do not list movements.");
+        }
+
+        private sealed class FakeAlertEvaluator : IInventoryAlertEvaluator
+        {
+            public List<(Guid BranchId, Guid ItemId)> StockRequests { get; } = new();
+
+            public Task<Result> EvaluateStockAsync(
+                Guid branchId, Guid itemId, CancellationToken cancellationToken)
+            {
+                StockRequests.Add((branchId, itemId));
+                return Task.FromResult(Result.Success());
+            }
+
+            public Task<Result> EvaluateExpiryAsync(
+                Guid? branchId, Guid? itemId, CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
         }
 
         private sealed record RecordCall(

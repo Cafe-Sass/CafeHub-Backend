@@ -70,6 +70,8 @@ namespace CafeHub.UnitTests.Inventory
                 .GetCustomAttribute<HttpGetAttribute>()!.Template);
             Assert.Equal("movements", Action(nameof(TenantInventoryController.ListMovements))
                 .GetCustomAttribute<HttpGetAttribute>()!.Template);
+            Assert.Equal("alerts", Action(nameof(TenantInventoryController.Alerts))
+                .GetCustomAttribute<HttpGetAttribute>()!.Template);
         }
 
         [Fact]
@@ -82,6 +84,7 @@ namespace CafeHub.UnitTests.Inventory
                 [nameof(TenantInventoryController.ListBatches)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.Stock)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.ListMovements)] = TenantPermissions.InventoryView,
+                [nameof(TenantInventoryController.Alerts)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.Create)] = TenantPermissions.InventoryManage,
                 [nameof(TenantInventoryController.Update)] = TenantPermissions.InventoryManage,
                 [nameof(TenantInventoryController.Deactivate)] = TenantPermissions.InventoryManage,
@@ -309,6 +312,37 @@ namespace CafeHub.UnitTests.Inventory
             var query = new ListStockLevelsQuery { BranchId = BranchId, Page = 1, PageSize = 20 };
 
             var actionResult = await controller.Stock("fixture-cafe", query, CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Same(page, okResult.Value);
+            Assert.Same(query, sender.LastRequest);
+        }
+
+        [Fact]
+        public async Task Alerts_SendsTheAlertQueryAndReturnsThePage()
+        {
+            var alert = new InventoryAlertResponse(
+                Guid.NewGuid(), BatchResponse.ItemId, "Coffee Beans", BranchId, null,
+                "LowStock", "Open", 1.5m, null,
+                new DateTimeOffset(2026, 11, 25, 9, 0, 0, TimeSpan.Zero), null, null);
+            var page = new OffsetPage<InventoryAlertResponse>
+            {
+                Items = new[] { alert },
+                Page = 1,
+                PageSize = 25,
+                TotalCount = 1,
+                HasNextPage = false,
+            };
+            var sender = new RecordingSender { Response = Result.Success(page) };
+            var controller = CreateController(sender);
+            var query = new ListInventoryAlertsQuery
+            {
+                Kind = InventoryAlertKind.NearExpiry,
+                State = InventoryAlertState.Open,
+                BranchId = BranchId,
+            };
+
+            var actionResult = await controller.Alerts("fixture-cafe", query, CancellationToken.None);
 
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
             Assert.Same(page, okResult.Value);
