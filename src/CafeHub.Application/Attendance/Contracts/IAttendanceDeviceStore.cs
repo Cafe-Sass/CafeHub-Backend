@@ -1,8 +1,16 @@
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Attendance.DTOs;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Attendance.Contracts
 {
+    public sealed record AttendanceDeviceAccess(
+        Guid Id,
+        Guid BranchId,
+        string Name,
+        string KeyHash,
+        AttendanceDeviceStatus Status);
+
     /// <summary>
     /// Persistence port for per-branch attendance devices and their staff code mappings. Only the device key
     /// hash is stored; creation, revocation, and mapping commit their change and one tenant audit entry
@@ -10,6 +18,10 @@ namespace CafeHub.Application.Attendance.Contracts
     /// </summary>
     public interface IAttendanceDeviceStore
     {
+        Task<AttendanceDeviceAccess?> FindByKeyHashAsync(
+            string keyHash,
+            CancellationToken cancellationToken);
+
         Task<Result<AttendanceDeviceResponse>> CreateAsync(
             Guid branchId,
             string name,

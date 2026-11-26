@@ -47,5 +47,17 @@ namespace CafeHub.Application.Attendance
             Error.Conflict(
                 "Attendance.DeviceCodeConflict",
                 "The device code conflicts with an existing device code mapping.");
+
+        public static Error DeviceUnauthorized() =>
+            Error.Unauthorized(
+                "Attendance.DeviceUnauthorized", "The attendance device key is not valid.");
+
+        public static Error DeviceModeNotEnabled() =>
+            Error.Conflict(
+                "Attendance.DeviceModeNotEnabled", "Attendance device events are accepted only in Device mode.");
+
+        public static Error DeviceEventConflict() =>
+            Error.Conflict(
+                "Attendance.DeviceEventConflict", "The device event conflicts with an existing event.");
     }
 }

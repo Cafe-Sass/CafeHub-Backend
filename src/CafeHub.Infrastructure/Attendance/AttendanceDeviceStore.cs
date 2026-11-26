@@ -19,6 +19,19 @@ namespace CafeHub.Infrastructure.Attendance
         private const string DeviceTargetType = "attendance_devices";
         private const string CodeTargetType = "attendance_device_codes";
 
+        public async Task<AttendanceDeviceAccess?> FindByKeyHashAsync(
+            string keyHash,
+            CancellationToken cancellationToken) =>
+            await context.AttendanceDevices.AsNoTracking()
+                .Where(device => device.KeyHash == keyHash)
+                .Select(device => new AttendanceDeviceAccess(
+                    device.Id,
+                    device.BranchId,
+                    device.Name,
+                    device.KeyHash,
+                    device.Status))
+                .FirstOrDefaultAsync(cancellationToken);
+
         public async Task<Result<AttendanceDeviceResponse>> CreateAsync(
             Guid branchId,
             string name,
