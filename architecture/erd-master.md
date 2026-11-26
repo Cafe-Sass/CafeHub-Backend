@@ -100,6 +100,14 @@ erDiagram
         uuid tenant_id FK
         text status
     }
+    subscription_history {
+        uuid id PK
+        uuid subscription_id FK
+        text from_status
+        text to_status
+        uuid plan_version_id FK
+        int period_number
+    }
     subscription_periods {
         uuid id PK
         uuid subscription_id FK
@@ -179,6 +187,8 @@ erDiagram
     onboarding_requests ||--o| tenants : "approval"
     onboarding_requests |o--o| subscriptions : "initial subscription"
     tenants |o--o| subscriptions : "tenant association"
+    subscriptions ||--o{ subscription_history : "lifecycle history"
+    plan_versions |o--o{ subscription_history : "recorded version"
     tenants ||--o| tenant_databases : "database reference"
     tenants ||--o| provisioning_jobs : "provisioning"
     plans ||--o{ plan_versions : "versions"
@@ -431,9 +441,24 @@ Purpose: the logical subscription of one cafe — exactly one row for the cafe's
 - `tenant_id uuid NULL FK tenants.id` with `uq_subscriptions_tenant_id` — set only after Admin approval created the tenant from the request and linking the subscription to it is an application-level update; nullable only for the pre-approval window and never reverting afterward.
 - `ck_subscriptions_owner` (Proposed): `CHECK (num_nonnulls(onboarding_request_id, tenant_id) = 1)` — every subscription is owned by exactly one of the two anchors, so the pre-approval phase stays honest (no invented tenant reference) and the post-approval phase stays anchored to the tenant. Both anchor FKs are unique, so a request or a tenant can never own two logical subscriptions. Integrity trade-off stated openly: the exactly-one rule is a CHECK over two nullable FKs rather than a single always-non-null column, because tenant creation legitimately happens only at Admin approval, after payment — supporting "subscription exists without a tenant" is the requirement, not an accident.
 - No `plan_version_id` on this table: the version applicable at any point in time is identified by the subscription's periods (`subscription_periods.plan_version_id`), so a catalog change can exist exactly once per period and a changed price can never silently drift into the logical row or the historical snapshots (FR-SUB-003).
-- `status text NOT NULL` — `ck_subscriptions_status` over the Proposed set `('Active', 'Suspended', 'Expired', 'Cancelled')`. A subscription row exists only from the initial succeeded payment onward, so there is no pre-payment label here: the request's own status carries the pre-payment and paid-awaiting-review states (FR-ONB-002, FR-ONB-003). Transitions are validated in application code; expiry/grace/suspension/reactivation remain undecided (PRD TBD-04); after a rejected paid request, the subscription's terminal transition (the `Cancelled` label is reserved for it) and any refund must follow the TBD-03/TBD-04 policies once they are approved, without inventing an outcome (FR-ONB-005).
+- `status text NOT NULL` — `ck_subscriptions_status` over the Proposed set `('Active', 'Suspended', 'Expired', 'Cancelled')`. A subscription row exists only from the initial succeeded payment onward, so there is no pre-payment label here: the request's own status carries the pre-payment and paid-awaiting-review states (FR-ONB-002, FR-ONB-003). The allowed transitions are table-driven in the domain (`Active ↔ Suspended`, `Active/Suspended/Expired → Cancelled`, `Active/Suspended → Expired`, `Expired/Suspended → Active` on renewal); a state change is written through `subscription_history` in the same transaction, and no tenant, onboarding, or provisioning column is touched by a subscription transition. Expiry/grace/suspension/reactivation policy remains undecided (PRD TBD-04); after a rejected paid request, the subscription's terminal transition (the `Cancelled` label is reserved for it) and any refund must follow the TBD-03/TBD-04 policies once they are approved, without inventing an outcome (FR-ONB-005).
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK platform_admins.id`, `updated_by uuid NULL FK platform_admins.id` (the row is system-created at payment success, so `created_by` is NULL there).
 - Renewal approval state is explicit in `subscription_renewal_requests` (FR-SUB-004), not inferred from transaction rows.
+
+### subscription_history
+
+Purpose: the append-only lifecycle trail of one subscription (FR-SUB-003, Story CFMD-462, CFMD-463). One row is written for the initial `Active` state and one for every accepted transition; a refused transition writes nothing. The trail records the from and to state with the applicable plan version, period number, actor, reason, and time, so the commercial history can be reconstructed without rewriting `subscriptions`. It is deliberately separate from the tenant lifecycle (`tenants.lifecycle_status`) and provisioning (`provisioning_jobs.status`): a subscription transition never changes either.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_subscription_history`.
+- `subscription_id uuid NOT NULL` — `fk_subscription_history_subscription_id` to `subscriptions.id` (ON DELETE RESTRICT); `ix_subscription_history_subscription_occurred_at` on `(subscription_id, occurred_at)` serves the history read.
+- `from_status text NULL` — `ck_subscription_history_from_status CHECK (from_status IS NULL OR from_status IN ('Active', 'Suspended', 'Expired', 'Cancelled'))`; NULL only on the initial row, otherwise the state before the transition.
+- `to_status text NOT NULL` — `ck_subscription_history_to_status CHECK (to_status IN ('Active', 'Suspended', 'Expired', 'Cancelled'))`; the state after the transition.
+- `plan_version_id uuid NULL` — `fk_subscription_history_plan_version_id` to `plan_versions.id` (ON DELETE RESTRICT) and its own index; the period's applicable version at the time of the transition, copied from the latest period and NULL before any period exists.
+- `period_number integer NULL` — `ck_subscription_history_period_number CHECK (period_number IS NULL OR period_number >= 1)`; the period the transition applies to.
+- `actor_platform_admin_id uuid NULL` — `fk_subscription_history_actor_platform_admin_id` to `platform_admins.id` (ON DELETE RESTRICT) and its own index; set for an administrator action and NULL for a system transition.
+- `actor_reference text NULL` — `ck_subscription_history_actor_reference CHECK (actor_reference IS NULL OR (char_length(actor_reference) BETWEEN 1 AND 256 AND actor_reference !~ '[[:cntrl:]]'))`; the owner principal recorded textually when the decision comes from the Tenant Application (cross-database FKs are forbidden).
+- `reason text NULL` — `ck_subscription_history_reason CHECK (reason IS NULL OR (char_length(reason) BETWEEN 1 AND 256 AND reason !~ '[[:cntrl:]]'))`; short operator-facing context, never a secret.
+- `occurred_at timestamptz NOT NULL` and `created_at timestamptz NOT NULL` (equal at write). Rows are never updated or deleted by the application; a refused transition leaves no row.
 
 ### subscription_periods
 
