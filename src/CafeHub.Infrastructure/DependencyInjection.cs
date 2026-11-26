@@ -1,6 +1,7 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Attendance;
 using CafeHub.Application.Attendance.Contracts;
+using CafeHub.Application.Subscriptions.Contracts;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Branches.Contracts;
@@ -223,6 +224,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
             services.AddScoped<ITenantStore, TenantStore>();
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+            services.AddScoped<ISubscriptionLifecycleStore, SubscriptionLifecycleStore>();
             services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();
             services.AddScoped<IProvisioningJobClaimer, ProvisioningJobClaimer>();
             services.AddScoped<IProvisioningJobAttemptStore, ProvisioningJobAttemptStore>();
