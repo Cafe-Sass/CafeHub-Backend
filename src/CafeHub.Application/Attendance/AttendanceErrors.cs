@@ -46,6 +46,6 @@ namespace CafeHub.Application.Attendance
         public static Error DeviceCodeConflict() =>
             Error.Conflict(
                 "Attendance.DeviceCodeConflict",
-                "The device code is already mapped to another staff member.");
+                "The device code conflicts with an existing device code mapping.");
     }
 }
