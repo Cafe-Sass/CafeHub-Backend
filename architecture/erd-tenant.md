@@ -1110,6 +1110,30 @@ Purpose: one staff attendance entry per check-in with its pairing check-out (FR-
 - `uq_attendance_records_open_staff` on `(staff_id)` is unique for rows where `check_out_at IS NULL`, so a staff member never has two open records.
 - `ix_attendance_records_branch_check_in_at` on `(branch_id, check_in_at)` serves the branch-scoped history; `ix_attendance_records_staff_check_in_at` on `(staff_id, check_in_at)` serves the staff filter and the open-record lookup.
 
+### attendance_devices
+
+Purpose: the per-branch fingerprint device registrations used by Device attendance (FR-ATT-004, Story CFMD-459, CFMD-460). A device key is returned once at creation and stored only as a SHA-256 hash; the raw key, the hash, and any prefix of either are never logged, audited, or returned again. A key authenticates only its own branch. The device protocols and connector software stay outside this API boundary.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_attendance_devices`.
+- `branch_id uuid NOT NULL` — `fk_attendance_devices_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_attendance_devices_branch_id`.
+- `name text NOT NULL` — `ck_attendance_devices_name CHECK (char_length(name) BETWEEN 1 AND 64 AND name !~ '[[:cntrl:]]')`; the operator-facing label for the device.
+- `key_hash text NOT NULL` — `ck_attendance_devices_key_hash CHECK (char_length(key_hash) = 64)`; `uq_attendance_devices_key_hash` is unique because the hash is the credential lookup key. Only the hash is stored; the key exists in the creation response only.
+- `status text NOT NULL` — `ck_attendance_devices_status CHECK (status IN ('Active', 'Revoked'))`; a Revoked device is refused exactly like an unknown key.
+- `last_seen_at timestamptz NULL` — the last successfully authenticated event post; a refused request never updates it.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_attendance_devices_created_by` / `fk_attendance_devices_updated_by` with ON DELETE RESTRICT and its own index.
+
+### attendance_device_codes
+
+Purpose: the per-branch mapping from a device's user code to exactly one staff account (FR-ATT-004, Story CFMD-459, CFMD-460). A code belongs to one staff member and a staff member has at most one code in a branch, so the branch and code pair and the branch and staff pair are both unique. A device event whose code has no row is kept unmatched for review instead of creating a record.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_attendance_device_codes`.
+- `branch_id uuid NOT NULL` — `fk_attendance_device_codes_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_attendance_device_codes_branch_id`.
+- `staff_id uuid NOT NULL` — `fk_attendance_device_codes_staff_id` to `tenant_users.id` (ON DELETE RESTRICT); `ix_attendance_device_codes_staff_id`.
+- `device_code text NOT NULL` — `ck_attendance_device_codes_value CHECK (char_length(device_code) BETWEEN 1 AND 64 AND device_code !~ '[[:cntrl:]]')`; the code the device sends for this staff member, stored as entered and never used as a credential by itself.
+- `uq_attendance_device_codes_branch_code` on `(branch_id, device_code)` is unique, so one code never maps to two staff members in the same branch.
+- `uq_attendance_device_codes_branch_staff` on `(branch_id, staff_id)` is unique, so a staff member never has two codes in the same branch.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_attendance_device_codes_created_by` / `fk_attendance_device_codes_updated_by` with ON DELETE RESTRICT and its own index.
+
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
@@ -1117,7 +1141,7 @@ Purpose: one staff attendance entry per check-in with its pairing check-out (FR-
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
 - Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
-- Attendance beyond the settings, the QR sessions, and the check-in/check-out records — device ingestion and attendance reporting (FR-ATT-001 through FR-ATT-004); the `attendance_settings`, `attendance_qr_sessions`, and `attendance_records` schemas are defined above.
+- Attendance beyond the settings, the QR sessions, the check-in/check-out records, and the registered devices — device event ingestion and attendance reporting (FR-ATT-001 through FR-ATT-004); the `attendance_settings`, `attendance_qr_sessions`, `attendance_records`, `attendance_devices`, and `attendance_device_codes` schemas are defined above.
 - Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
 - Inventory beyond the item catalog, its receipts, their movements, and their alerts — stock counts and scheduled alert evaluation (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out, and stock-driven menu availability stays unbuilt); the `inventory_items`, `inventory_batches`, `stock_movements`, and `inventory_alerts` schemas are defined above.
 - Reporting and analytics — read-model queries over the later operational tables (FR-ANL-001 through FR-ANL-004; revenue definitions TBD-16).
