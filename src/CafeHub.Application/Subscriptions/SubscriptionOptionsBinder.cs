@@ -17,6 +17,11 @@ namespace CafeHub.Application.Subscriptions
                 SubscriptionConfigurationKeys.SuspendedRetentionDaysKey,
                 value => options.SuspendedRetentionDays = value,
                 problems);
+            ReadInt(
+                section,
+                SubscriptionConfigurationKeys.RenewalRequestLifetimeDaysKey,
+                value => options.RenewalRequestLifetimeDays = value,
+                problems);
 
             problems.AddRange(options.Validate());
             if (problems.Count > 0)

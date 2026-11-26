@@ -7,6 +7,9 @@ namespace CafeHub.Application.Subscriptions
         public int SuspendedRetentionDays { get; set; } =
             SubscriptionConfigurationKeys.DefaultSuspendedRetentionDays;
 
+        public int RenewalRequestLifetimeDays { get; set; } =
+            SubscriptionConfigurationKeys.DefaultRenewalRequestLifetimeDays;
+
         public IReadOnlyList<string> Validate()
         {
             var problems = new List<string>();
@@ -20,6 +23,12 @@ namespace CafeHub.Application.Subscriptions
             {
                 problems.Add(
                     $"{SubscriptionConfigurationKeys.SuspendedRetentionDaysPath} must be zero or greater but was {SuspendedRetentionDays}.");
+            }
+
+            if (RenewalRequestLifetimeDays < 1)
+            {
+                problems.Add(
+                    $"{SubscriptionConfigurationKeys.RenewalRequestLifetimeDaysPath} must be at least 1 but was {RenewalRequestLifetimeDays}.");
             }
 
             return problems;

@@ -73,6 +73,11 @@ namespace CafeHub.UnitTests.Onboarding.Commands
                 return Task.FromResult(transactions.OrderByDescending(t => t.CreatedAt).FirstOrDefault(t => t.OnboardingRequestId == onboardingRequestId));
             }
 
+            public Task<PlatformPaymentTransaction?> FindByRenewalRequestIdAsync(Guid renewalRequestId, CancellationToken cancellationToken)
+            {
+                return Task.FromResult(transactions.OrderByDescending(t => t.CreatedAt).FirstOrDefault(t => t.RenewalRequestId == renewalRequestId));
+            }
+
             public Task AddAsync(PlatformPaymentTransaction transaction, CancellationToken cancellationToken)
             {
                 AddCallCount++;
