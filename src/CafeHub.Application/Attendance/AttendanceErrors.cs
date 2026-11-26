@@ -33,5 +33,19 @@ namespace CafeHub.Application.Attendance
             Error.Conflict(
                 "Attendance.ConcurrencyConflict",
                 "The attendance settings were modified. Retry the change.");
+
+        public static Error DeviceNotFound() =>
+            Error.NotFound("Attendance.DeviceNotFound", "The attendance device was not found.");
+
+        public static Error StaffNotFound() =>
+            Error.NotFound("Attendance.StaffNotFound", "The staff member was not found.");
+
+        public static Error DeviceCodeNotFound() =>
+            Error.NotFound("Attendance.DeviceCodeNotFound", "The device code mapping was not found.");
+
+        public static Error DeviceCodeConflict() =>
+            Error.Conflict(
+                "Attendance.DeviceCodeConflict",
+                "The device code conflicts with an existing device code mapping.");
     }
 }

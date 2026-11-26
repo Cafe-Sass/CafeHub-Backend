@@ -120,6 +120,18 @@ namespace CafeHub.Infrastructure.Audit
                     "ValidFrom",
                     "ValidTo",
                 },
+                ["attendance_devices"] = new(StringComparer.Ordinal)
+                {
+                    "Name",
+                    "Status",
+                    "BranchId",
+                },
+                ["attendance_device_codes"] = new(StringComparer.Ordinal)
+                {
+                    "BranchId",
+                    "StaffId",
+                    "DeviceCode",
+                },
                 ["wifi_settings"] = new(StringComparer.Ordinal)
                 {
                     "Policy",

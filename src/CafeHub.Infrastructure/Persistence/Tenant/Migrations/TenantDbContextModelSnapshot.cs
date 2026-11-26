@@ -22,6 +22,141 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("key_hash");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_devices");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_attendance_devices_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_attendance_devices_created_by");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_devices_key_hash");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_attendance_devices_updated_by");
+
+                    b.ToTable("attendance_devices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_devices_key_hash", "char_length(key_hash) = 64");
+
+                            t.HasCheckConstraint("ck_attendance_devices_name", "char_length(name) BETWEEN 1 AND 64 AND name !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_attendance_devices_status", "status IN ('Active', 'Revoked')");
+                        });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDeviceCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DeviceCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_code");
+
+                    b.Property<Guid>("StaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_device_codes");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_attendance_device_codes_branch_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_attendance_device_codes_created_by");
+
+                    b.HasIndex("StaffId")
+                        .HasDatabaseName("ix_attendance_device_codes_staff_id");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_attendance_device_codes_updated_by");
+
+                    b.HasIndex("BranchId", "DeviceCode")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_device_codes_branch_code");
+
+                    b.HasIndex("BranchId", "StaffId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_device_codes_branch_staff");
+
+                    b.ToTable("attendance_device_codes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_device_codes_value", "char_length(device_code) BETWEEN 1 AND 64 AND device_code !~ '[[:cntrl:]]'");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3611,6 +3746,57 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
 
                             t.HasCheckConstraint("ck_wifi_vouchers_status", "status IN ('Available', 'Assigned', 'Void')");
                         });
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDevice", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_devices_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_devices_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_devices_updated_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDeviceCode", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_device_codes_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_device_codes_created_by");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_device_codes_staff_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_device_codes_updated_by");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>

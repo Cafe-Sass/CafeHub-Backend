@@ -73,6 +73,8 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "attendance_settings",
             "attendance_qr_sessions",
             "attendance_records",
+            "attendance_devices",
+            "attendance_device_codes",
         ];
 
         [Fact]
@@ -188,6 +190,54 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Contains(
                 record.GetForeignKeys(),
                 key => key.GetConstraintName() == "fk_attendance_records_check_in_session_id");
+
+            var device = model.FindEntityType(typeof(AttendanceDevice));
+            Assert.NotNull(device);
+            Assert.Equal("attendance_devices", device.GetTableName());
+            Assert.Equal("pk_attendance_devices", device.FindPrimaryKey()!.GetName());
+            Assert.Equal(
+                "branch_id", device.FindProperty(nameof(AttendanceDevice.BranchId))!.GetColumnName());
+            Assert.Equal("name", device.FindProperty(nameof(AttendanceDevice.Name))!.GetColumnName());
+            Assert.Equal(
+                "key_hash", device.FindProperty(nameof(AttendanceDevice.KeyHash))!.GetColumnName());
+            Assert.Equal("status", device.FindProperty(nameof(AttendanceDevice.Status))!.GetColumnName());
+            Assert.Equal(
+                "last_seen_at", device.FindProperty(nameof(AttendanceDevice.LastSeenAt))!.GetColumnName());
+            Assert.Contains(
+                device.GetCheckConstraints(), check => check.Name == "ck_attendance_devices_name");
+            Assert.Contains(
+                device.GetCheckConstraints(), check => check.Name == "ck_attendance_devices_key_hash");
+            Assert.Contains(
+                device.GetCheckConstraints(), check => check.Name == "ck_attendance_devices_status");
+            Assert.True(device.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_devices_key_hash").IsUnique);
+            Assert.Contains(
+                device.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_devices_branch_id");
+            Assert.Contains(
+                device.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_devices_branch_id");
+
+            var deviceCode = model.FindEntityType(typeof(AttendanceDeviceCode));
+            Assert.NotNull(deviceCode);
+            Assert.Equal("attendance_device_codes", deviceCode.GetTableName());
+            Assert.Equal("pk_attendance_device_codes", deviceCode.FindPrimaryKey()!.GetName());
+            Assert.Equal(
+                "staff_id",
+                deviceCode.FindProperty(nameof(AttendanceDeviceCode.StaffId))!.GetColumnName());
+            Assert.Equal(
+                "device_code",
+                deviceCode.FindProperty(nameof(AttendanceDeviceCode.DeviceCode))!.GetColumnName());
+            Assert.Contains(
+                deviceCode.GetCheckConstraints(),
+                check => check.Name == "ck_attendance_device_codes_value");
+            Assert.True(deviceCode.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_device_codes_branch_code").IsUnique);
+            Assert.True(deviceCode.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_device_codes_branch_staff").IsUnique);
+            Assert.Contains(
+                deviceCode.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_device_codes_staff_id");
         }
 
         [Fact]
