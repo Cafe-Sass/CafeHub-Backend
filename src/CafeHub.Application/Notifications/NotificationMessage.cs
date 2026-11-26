@@ -81,5 +81,27 @@ namespace CafeHub.Application.Notifications
                     ["tenantSlug"] = tenantSlug,
                 });
         }
+
+        public static NotificationMessage RenewalRequested(
+            Guid tenantId,
+            string recipientEmail,
+            Guid renewalRequestId,
+            decimal amount,
+            string currencyCode,
+            DateTimeOffset expiresAt)
+        {
+            return new NotificationMessage(
+                NotificationKind.RenewalRequested,
+                tenantId,
+                recipientEmail,
+                NotificationTemplateKeys.RenewalRequested,
+                new Dictionary<string, string>
+                {
+                    ["renewalRequestId"] = renewalRequestId.ToString(),
+                    ["amount"] = amount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["currencyCode"] = currencyCode,
+                    ["expiresAt"] = expiresAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                });
+        }
     }
 }

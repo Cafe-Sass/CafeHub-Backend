@@ -250,6 +250,7 @@ Tenant policies read current grants from the tenant database. The grant query ve
 | `Orders` | `ResponseWindowSeconds` | Seconds a guest order stays open for staff decision (30 to 3600) | `300` | No |
 | `Subscription` | `GraceDays` | Days after a period ends before an Active subscription becomes Suspended (Proposed, pending owner confirmation; TBD-04) | `3` | No |
 | `Subscription` | `SuspendedRetentionDays` | Days a Suspended subscription is retained before it becomes Expired (Proposed, pending owner confirmation; TBD-04) | `90` | No |
+| `Subscription` | `RenewalRequestLifetimeDays` | Days an owner-approval renewal request stays Pending before it can be marked Expired (Proposed, pending owner confirmation; TBD-04) | `7` | No |
 | `Media` | `RootPath` | Absolute directory that holds uploaded files. Required. Must be outside the application content root and outside any `wwwroot` folder; startup validates it. | (unset) | No |
 | `Media` | `MaxBytes` | Maximum accepted upload size in bytes (1024 to 20971520) | `5242880` | No |
 | `Pagination` | `DefaultPageSize` | Default page size | `20` | No |

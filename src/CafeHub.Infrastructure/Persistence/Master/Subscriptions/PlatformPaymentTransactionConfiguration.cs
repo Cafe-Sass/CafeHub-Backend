@@ -45,6 +45,11 @@ namespace CafeHub.Infrastructure.Persistence.Master.Subscriptions
                 .HasForeignKey(transaction => transaction.OnboardingRequestId)
                 .HasConstraintName("fk_platform_payment_transactions_onboarding_request_id")
                 .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne<SubscriptionRenewalRequest>()
+                .WithMany()
+                .HasForeignKey(transaction => transaction.RenewalRequestId)
+                .HasConstraintName("fk_platform_payment_transactions_renewal_request_id")
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

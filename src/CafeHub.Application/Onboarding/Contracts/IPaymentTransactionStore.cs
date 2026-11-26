@@ -6,6 +6,7 @@ namespace CafeHub.Application.Onboarding.Contracts
     {
         Task<PlatformPaymentTransaction?> FindByIdempotencyKeyAsync(Guid onboardingRequestId, string idempotencyKey, CancellationToken cancellationToken);
         Task<PlatformPaymentTransaction?> FindByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken cancellationToken);
+        Task<PlatformPaymentTransaction?> FindByRenewalRequestIdAsync(Guid renewalRequestId, CancellationToken cancellationToken);
         Task<bool> KeyExistsAsync(string idempotencyKey, CancellationToken cancellationToken);
         Task AddAsync(PlatformPaymentTransaction transaction, CancellationToken cancellationToken);
     }

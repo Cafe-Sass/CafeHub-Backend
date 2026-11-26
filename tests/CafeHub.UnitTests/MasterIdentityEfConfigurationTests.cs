@@ -48,6 +48,7 @@ namespace CafeHub.UnitTests
                 "refresh_tokens",
                 "subscription_periods",
                 "subscription_history",
+                "subscription_renewal_requests",
                 "subscriptions",
                 "tenant_databases",
                 "tenant_schema_upgrade_runs",

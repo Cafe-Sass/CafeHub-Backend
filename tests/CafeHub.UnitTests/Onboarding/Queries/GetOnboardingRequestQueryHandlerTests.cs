@@ -27,6 +27,9 @@ namespace CafeHub.UnitTests.Onboarding.Queries
                 return Task.FromResult<PlatformPaymentTransaction?>(null);
             }
 
+            public Task<PlatformPaymentTransaction?> FindByRenewalRequestIdAsync(Guid renewalRequestId, CancellationToken cancellationToken) =>
+                Task.FromResult<PlatformPaymentTransaction?>(null);
+
             public Task<bool> KeyExistsAsync(string idempotencyKey, CancellationToken cancellationToken)
             {
                 return Task.FromResult(false);

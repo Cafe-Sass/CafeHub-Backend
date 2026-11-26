@@ -4,5 +4,6 @@ namespace CafeHub.Application.Notifications
     {
         TenantReady = 1,
         InventoryAlert = 2,
+        RenewalRequested = 3,
     }
 }

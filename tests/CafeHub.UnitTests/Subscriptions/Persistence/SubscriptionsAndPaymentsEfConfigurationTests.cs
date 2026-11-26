@@ -273,11 +273,61 @@ namespace CafeHub.UnitTests.Subscriptions.Persistence
         {
             var entity = FindEntity<PlatformPaymentTransaction>();
 
-            var requestFk = Assert.Single(entity.GetForeignKeys());
-            Assert.Equal("fk_platform_payment_transactions_onboarding_request_id", requestFk.GetConstraintName());
+            var foreignKeys = entity.GetForeignKeys()
+                .ToDictionary(fk => fk.GetConstraintName()!);
+            Assert.Equal(2, foreignKeys.Count);
+            var requestFk = foreignKeys["fk_platform_payment_transactions_onboarding_request_id"];
             Assert.Equal(typeof(OnboardingRequest), requestFk.PrincipalEntityType.ClrType);
             Assert.False(requestFk.IsRequired);
             Assert.Equal(DeleteBehavior.Restrict, requestFk.DeleteBehavior);
+            var renewalFk = foreignKeys["fk_platform_payment_transactions_renewal_request_id"];
+            Assert.Equal(typeof(SubscriptionRenewalRequest), renewalFk.PrincipalEntityType.ClrType);
+            Assert.False(renewalFk.IsRequired);
+            Assert.Equal(DeleteBehavior.Restrict, renewalFk.DeleteBehavior);
+        }
+
+        [Fact]
+        public void SubscriptionRenewalRequestsTable_MatchesTheErd()
+        {
+            var entity = FindEntity<SubscriptionRenewalRequest>();
+            Assert.Equal("subscription_renewal_requests", entity.GetTableName());
+            Assert.Equal("pk_subscription_renewal_requests", entity.FindPrimaryKey()!.GetName());
+        }
+
+        [Fact]
+        public void SubscriptionRenewalRequestsColumns_MatchTheErd()
+        {
+            var entity = FindEntity<SubscriptionRenewalRequest>();
+
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.Id), "id", typeof(Guid), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.SubscriptionId), "subscription_id", typeof(Guid), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.PlanVersionId), "plan_version_id", typeof(Guid), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.ProposedPrice), "proposed_price", typeof(decimal), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.ProposedCurrencyCode), "proposed_currency_code", typeof(string), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.Status), "status", typeof(RenewalRequestStatus), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.RequestedAt), "requested_at", typeof(DateTimeOffset), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.ExpiresAt), "expires_at", typeof(DateTimeOffset), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.DecidedAt), "decided_at", typeof(DateTimeOffset?), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionRenewalRequest.DecidedBy), "decided_by", typeof(string), nullable: true);
+        }
+
+        [Fact]
+        public void SubscriptionRenewalRequestsIndexesAndChecks_MatchTheErd()
+        {
+            var entity = FindEntity<SubscriptionRenewalRequest>();
+
+            var openIndex = FindIndex(entity, nameof(SubscriptionRenewalRequest.SubscriptionId));
+            Assert.True(openIndex.IsUnique);
+            Assert.Equal("uq_subscription_renewal_requests_open", openIndex.GetDatabaseName());
+            Assert.Equal("\"status\" IN ('Pending', 'Approved')", openIndex.GetFilter());
+
+            var checks = entity.GetCheckConstraints().ToDictionary(c => c.Name!, c => c.Sql);
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_status" && c.Value == "status IN ('Pending', 'Approved', 'Declined', 'Expired', 'Completed')");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_expiry" && c.Value == "expires_at > requested_at");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_decided" && c.Value == "(status = 'Pending') = (decided_at IS NULL)");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_price_non_negative" && c.Value == "proposed_price >= 0");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_currency_code_format" && c.Value == "proposed_currency_code ~ '^[a-z]{3}$'");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_renewal_requests_decided_by" && c.Value == "decided_by IS NULL OR char_length(decided_by) BETWEEN 1 AND 256");
         }
 
         [Fact]

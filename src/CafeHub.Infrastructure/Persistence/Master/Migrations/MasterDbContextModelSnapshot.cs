@@ -827,6 +827,96 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionRenewalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("decided_by");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("PlanVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_version_id");
+
+                    b.Property<string>("ProposedCurrencyCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("proposed_currency_code");
+
+                    b.Property<decimal>("ProposedPrice")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("proposed_price");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscription_renewal_requests");
+
+                    b.HasIndex("PlanVersionId")
+                        .HasDatabaseName("ix_subscription_renewal_requests_plan_version_id");
+
+                    b.HasIndex("SubscriptionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_subscription_renewal_requests_open")
+                        .HasFilter("\"status\" IN ('Pending', 'Approved')");
+
+                    b.HasIndex("SubscriptionId", "RequestedAt")
+                        .HasDatabaseName("ix_subscription_renewal_requests_subscription_requested_at");
+
+                    b.ToTable("subscription_renewal_requests", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_currency_code_format", "proposed_currency_code ~ '^[a-z]{3}$'");
+
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_decided", "(status = 'Pending') = (decided_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_decided_by", "decided_by IS NULL OR char_length(decided_by) BETWEEN 1 AND 256");
+
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_expiry", "expires_at > requested_at");
+
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_price_non_negative", "proposed_price >= 0");
+
+                            t.HasCheckConstraint("ck_subscription_renewal_requests_status", "status IN ('Pending', 'Approved', 'Declined', 'Expired', 'Completed')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1556,6 +1646,12 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .HasForeignKey("OnboardingRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_platform_payment_transactions_onboarding_request_id");
+
+                    b.HasOne("CafeHub.Domain.Subscriptions.SubscriptionRenewalRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RenewalRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_platform_payment_transactions_renewal_request_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Subscriptions.Subscription", b =>
@@ -1604,6 +1700,23 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_subscription_periods_subscription_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionRenewalRequest", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Plans.PlanVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PlanVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_renewal_requests_plan_version_id");
+
+                    b.HasOne("CafeHub.Domain.Subscriptions.Subscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_renewal_requests_subscription_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.Tenant", b =>
