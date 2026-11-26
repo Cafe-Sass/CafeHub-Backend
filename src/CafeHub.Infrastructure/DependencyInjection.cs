@@ -22,6 +22,7 @@ using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Subscriptions.Contracts;
 using CafeHub.Application.Tables.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Application.Upgrades;
@@ -223,6 +224,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
             services.AddScoped<ITenantStore, TenantStore>();
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+            services.AddScoped<ISubscriptionLifecycleStore, SubscriptionLifecycleStore>();
             services.AddScoped<IProvisioningJobStore, ProvisioningJobStore>();
             services.AddScoped<IProvisioningJobClaimer, ProvisioningJobClaimer>();
             services.AddScoped<IProvisioningJobAttemptStore, ProvisioningJobAttemptStore>();

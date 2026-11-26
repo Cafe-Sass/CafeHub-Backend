@@ -87,5 +87,21 @@ namespace CafeHub.Domain.Subscriptions
             UpdatedAt = now;
             UpdatedBy = null;
         }
+
+        public bool CanTransitionTo(SubscriptionStatus target) =>
+            SubscriptionLifecycle.IsAllowed(Status, target);
+
+        public bool TransitionTo(SubscriptionStatus target, DateTimeOffset now, Guid? actorId)
+        {
+            if (!CanTransitionTo(target))
+            {
+                return false;
+            }
+
+            Status = target;
+            UpdatedAt = now;
+            UpdatedBy = actorId;
+            return true;
+        }
     }
 }

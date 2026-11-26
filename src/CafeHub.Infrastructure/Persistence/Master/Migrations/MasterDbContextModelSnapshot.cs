@@ -663,6 +663,79 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorPlatformAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_platform_admin_id");
+
+                    b.Property<string>("ActorReference")
+                        .HasColumnType("text")
+                        .HasColumnName("actor_reference");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FromStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("from_status");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<int?>("PeriodNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("period_number");
+
+                    b.Property<Guid?>("PlanVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_version_id");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscription_history");
+
+                    b.HasIndex("ActorPlatformAdminId")
+                        .HasDatabaseName("ix_subscription_history_actor_platform_admin_id");
+
+                    b.HasIndex("PlanVersionId")
+                        .HasDatabaseName("ix_subscription_history_plan_version_id");
+
+                    b.HasIndex("SubscriptionId", "OccurredAt")
+                        .HasDatabaseName("ix_subscription_history_subscription_occurred_at");
+
+                    b.ToTable("subscription_history", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_history_actor_reference", "actor_reference IS NULL OR (char_length(actor_reference) BETWEEN 1 AND 256 AND actor_reference !~ '[[:cntrl:]]')");
+
+                            t.HasCheckConstraint("ck_subscription_history_from_status", "from_status IS NULL OR from_status IN ('Active', 'Suspended', 'Expired', 'Cancelled')");
+
+                            t.HasCheckConstraint("ck_subscription_history_period_number", "period_number IS NULL OR period_number >= 1");
+
+                            t.HasCheckConstraint("ck_subscription_history_reason", "reason IS NULL OR (char_length(reason) BETWEEN 1 AND 256 AND reason !~ '[[:cntrl:]]')");
+
+                            t.HasCheckConstraint("ck_subscription_history_to_status", "to_status IN ('Active', 'Suspended', 'Expired', 'Cancelled')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionPeriod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1492,6 +1565,28 @@ namespace CafeHub.Infrastructure.Persistence.Master.Migrations
                         .HasForeignKey("OnboardingRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_subscriptions_onboarding_request_id");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionHistory", b =>
+                {
+                    b.HasOne("CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorPlatformAdminId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_history_actor_platform_admin_id");
+
+                    b.HasOne("CafeHub.Domain.Plans.PlanVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PlanVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_subscription_history_plan_version_id");
+
+                    b.HasOne("CafeHub.Domain.Subscriptions.Subscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_history_subscription_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Subscriptions.SubscriptionPeriod", b =>

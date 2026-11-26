@@ -25,6 +25,7 @@ namespace CafeHub.Infrastructure.Persistence.Master
         public DbSet<OnboardingRequest> OnboardingRequests => Set<OnboardingRequest>();
         public DbSet<Subscription> Subscriptions => Set<Subscription>();
         public DbSet<SubscriptionPeriod> SubscriptionPeriods => Set<SubscriptionPeriod>();
+        public DbSet<SubscriptionHistory> SubscriptionHistory => Set<SubscriptionHistory>();
         public DbSet<PlatformPaymentTransaction> PlatformPaymentTransactions => Set<PlatformPaymentTransaction>();
         public DbSet<global::CafeHub.Domain.Tenants.Tenant> Tenants => Set<global::CafeHub.Domain.Tenants.Tenant>();
         public DbSet<global::CafeHub.Domain.Tenants.TenantDatabase> TenantDatabases => Set<global::CafeHub.Domain.Tenants.TenantDatabase>();
