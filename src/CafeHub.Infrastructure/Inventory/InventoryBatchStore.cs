@@ -229,6 +229,52 @@ namespace CafeHub.Infrastructure.Inventory
             return Result.Success(new InventoryBatchListPage(items, totalCount));
         }
 
+        public async Task<InventoryStockLevelPage> ListStockLevelsAsync(
+            InventoryStockLevelRequest request, CancellationToken cancellationToken)
+        {
+            var query = context.InventoryBatches.AsNoTracking();
+            if (request.BranchId is { } branchId)
+            {
+                query = query.Where(batch => batch.BranchId == branchId);
+            }
+
+            if (request.ItemId is { } itemId)
+            {
+                query = query.Where(batch => batch.ItemId == itemId);
+            }
+
+            var grouped = query
+                .GroupBy(batch => new { batch.ItemId, batch.BranchId })
+                .Select(group => new
+                {
+                    group.Key.ItemId,
+                    group.Key.BranchId,
+                    RemainingQuantity = group.Sum(batch => batch.RemainingQuantity),
+                    NearestExpiryDate = group.Min(batch =>
+                        batch.RemainingQuantity > 0m ? batch.ExpiryDate : null),
+                });
+
+            int? totalCount = null;
+            if (request.IncludeTotalCount)
+            {
+                totalCount = await grouped.CountAsync(cancellationToken);
+            }
+
+            var fetched = await grouped
+                .OrderBy(row => row.ItemId)
+                .ThenBy(row => row.BranchId)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            var items = fetched
+                .Select(row => new StockLevelResponse(
+                    row.ItemId, row.BranchId, row.RemainingQuantity, row.NearestExpiryDate))
+                .ToList();
+
+            return new InventoryStockLevelPage(items, totalCount);
+        }
+
         private Task<InventoryBatch?> FindByKeyAsync(
             Guid branchId, string idempotencyKey, CancellationToken cancellationToken) =>
             context.InventoryBatches.AsNoTracking()

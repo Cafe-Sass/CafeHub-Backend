@@ -180,6 +180,10 @@ namespace CafeHub.UnitTests.Inventory
             public Task<Result<InventoryBatchListPage>> ListAsync(
                 InventoryBatchListRequest request, CancellationToken cancellationToken) =>
                 throw new NotSupportedException("The command tests do not list batches.");
+
+            public Task<InventoryStockLevelPage> ListStockLevelsAsync(
+                InventoryStockLevelRequest request, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The command tests do not read stock levels.");
         }
 
         private sealed record ReceiveCall(
