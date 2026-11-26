@@ -60,6 +60,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "attendance_records",
             "attendance_devices",
             "attendance_device_codes",
+            "attendance_device_events",
         ];
 
         [Fact]
@@ -105,6 +106,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "attendance_records" => nameof(AttendanceRecord),
                     "attendance_devices" => nameof(AttendanceDevice),
                     "attendance_device_codes" => nameof(AttendanceDeviceCode),
+                    "attendance_device_events" => nameof(AttendanceDeviceEvent),
                     "tenant_audit_records" => nameof(TenantAuditRecord),
                     "refresh_tokens" => nameof(TenantRefreshToken),
                     "orders" => nameof(Order),

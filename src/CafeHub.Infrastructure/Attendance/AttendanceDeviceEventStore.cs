@@ -76,9 +76,27 @@ namespace CafeHub.Infrastructure.Attendance
                 record => (AttendanceRecord?)record);
 
             var outcomes = new AttendanceDeviceEventOutcome[inputs.Length];
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            var ordered = inputs
-                .Select((input, index) => (Input: input, Index: index))
+            var classified = AttendanceDeviceEventBatch.Classify(inputs, existing, now);
+            foreach (var item in classified)
+            {
+                var eventId = item.Input.EventId!.Trim();
+                if (item.IsDuplicate)
+                {
+                    outcomes[item.Index] = new AttendanceDeviceEventOutcome(
+                        eventId, AttendanceDeviceEventOutcomes.Duplicate, null, null);
+                }
+                else if (item.IsOutsideWindow)
+                {
+                    outcomes[item.Index] = new AttendanceDeviceEventOutcome(
+                        eventId,
+                        AttendanceDeviceEventOutcomes.Rejected,
+                        null,
+                        AttendanceDeviceEventReasons.OutsideWindow);
+                }
+            }
+
+            var ordered = classified
+                .Where(item => !item.IsDuplicate && !item.IsOutsideWindow)
                 .OrderBy(item => item.Input.OccurredAt)
                 .ThenBy(item => item.Index);
 
@@ -86,23 +104,6 @@ namespace CafeHub.Infrastructure.Attendance
             {
                 var input = item.Input;
                 var eventId = input.EventId!.Trim();
-                if (existing.Contains(eventId) || !seen.Add(eventId))
-                {
-                    outcomes[item.Index] = new AttendanceDeviceEventOutcome(
-                        eventId, AttendanceDeviceEventOutcomes.Duplicate, null, null);
-                    continue;
-                }
-
-                if (!AttendanceDeviceEventPolicy.IsWithinWindow(input.OccurredAt, now))
-                {
-                    outcomes[item.Index] = new AttendanceDeviceEventOutcome(
-                        eventId,
-                        AttendanceDeviceEventOutcomes.Rejected,
-                        null,
-                        AttendanceDeviceEventReasons.OutsideWindow);
-                    continue;
-                }
-
                 var code = input.Code!.Trim();
                 var deviceEvent = AttendanceDeviceEvent.Create(
                     Guid.CreateVersion7(),

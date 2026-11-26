@@ -49,11 +49,11 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .HasColumnName("updated_at").HasColumnType("timestamptz");
 
             builder.HasIndex(deviceEvent => new
-                {
-                    deviceEvent.DeviceId,
-                    deviceEvent.Status,
-                    deviceEvent.OccurredAt,
-                })
+            {
+                deviceEvent.DeviceId,
+                deviceEvent.Status,
+                deviceEvent.OccurredAt,
+            })
                 .HasDatabaseName("ix_attendance_device_events_device_status_occurred_at");
             builder.HasIndex(deviceEvent => new { deviceEvent.DeviceId, deviceEvent.DeviceEventId })
                 .HasDatabaseName("uq_attendance_device_events_device_event")

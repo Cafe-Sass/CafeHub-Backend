@@ -75,6 +75,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "attendance_records",
             "attendance_devices",
             "attendance_device_codes",
+            "attendance_device_events",
         ];
 
         [Fact]
@@ -166,6 +167,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Equal(
                 "check_in_session_id",
                 record.FindProperty(nameof(AttendanceRecord.CheckInSessionId))!.GetColumnName());
+            Assert.True(record.FindProperty(nameof(AttendanceRecord.CheckInSessionId))!.IsNullable);
             Assert.Equal(
                 "check_out_session_id",
                 record.FindProperty(nameof(AttendanceRecord.CheckOutSessionId))!.GetColumnName());
@@ -175,6 +177,9 @@ namespace CafeHub.UnitTests.Tenants.Persistence
                 record.GetCheckConstraints(), check => check.Name == "ck_attendance_records_window");
             Assert.Contains(
                 record.GetCheckConstraints(), check => check.Name == "ck_attendance_records_source");
+            Assert.Contains(
+                record.GetCheckConstraints(),
+                check => check.Name == "ck_attendance_records_source_shape");
             Assert.True(record.GetIndexes().Single(index =>
                 index.GetDatabaseName() == "uq_attendance_records_open_staff").IsUnique);
             Assert.True(record.GetIndexes().Single(index =>
@@ -238,6 +243,52 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Contains(
                 deviceCode.GetForeignKeys(),
                 key => key.GetConstraintName() == "fk_attendance_device_codes_staff_id");
+
+            var deviceEvent = model.FindEntityType(typeof(AttendanceDeviceEvent));
+            Assert.NotNull(deviceEvent);
+            Assert.Equal("attendance_device_events", deviceEvent.GetTableName());
+            Assert.Equal("pk_attendance_device_events", deviceEvent.FindPrimaryKey()!.GetName());
+            Assert.Equal(
+                "device_id",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.DeviceId))!.GetColumnName());
+            Assert.Equal(
+                "device_event_id",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.DeviceEventId))!.GetColumnName());
+            Assert.Equal(
+                "device_code",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.DeviceCode))!.GetColumnName());
+            Assert.Equal(
+                "occurred_at",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.OccurredAt))!.GetColumnName());
+            Assert.Equal(
+                "direction",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.Direction))!.GetColumnName());
+            Assert.Equal(
+                "status", deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.Status))!.GetColumnName());
+            Assert.Equal(
+                "record_id",
+                deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.RecordId))!.GetColumnName());
+            Assert.True(deviceEvent.FindProperty(nameof(AttendanceDeviceEvent.RecordId))!.IsNullable);
+            Assert.Contains(
+                deviceEvent.GetCheckConstraints(),
+                check => check.Name == "ck_attendance_device_events_event_id");
+            Assert.Contains(
+                deviceEvent.GetCheckConstraints(),
+                check => check.Name == "ck_attendance_device_events_direction");
+            Assert.Contains(
+                deviceEvent.GetCheckConstraints(),
+                check => check.Name == "ck_attendance_device_events_status");
+            Assert.True(deviceEvent.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_device_events_device_event").IsUnique);
+            Assert.Contains(
+                deviceEvent.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_device_events_record_id");
+            Assert.Contains(
+                deviceEvent.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_device_events_device_id");
+            Assert.Contains(
+                deviceEvent.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_device_events_record_id");
         }
 
         [Fact]

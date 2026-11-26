@@ -262,6 +262,13 @@ namespace CafeHub.UnitTests
                         Assert.True(connectorTemplates.TryGetValue(action.MethodInfo.Name, out var connectorTemplate));
                         Assert.Equal(connectorTemplate, action.AttributeRouteInfo?.Template);
                     }
+                    else if (action.ControllerTypeInfo.AsType() == typeof(TenantAttendanceConnectorController))
+                    {
+                        Assert.Equal(nameof(TenantAttendanceConnectorController.Events), action.MethodInfo.Name);
+                        Assert.Equal(
+                            "t/{slug}/api/v1/connector/attendance/events",
+                            action.AttributeRouteInfo?.Template);
+                    }
                     else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestWifiController))
                     {
                         var guestWifiTemplates = new Dictionary<string, string>
