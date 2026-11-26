@@ -1072,6 +1072,26 @@ Purpose: one open or resolved stock condition at one branch (FR-INV-005, FR-INV-
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_inventory_alerts_created_by` / `fk_inventory_alerts_updated_by` with ON DELETE RESTRICT and its own index. Resolving an open row updates it in place, so a resolved alert keeps its replaceable snapshot but never changes its kind, batch, or raise time.
 - `uq_inventory_alerts_open_batch` on `(item_id, branch_id, kind, batch_id)` where `state = 'Open' AND batch_id IS NOT NULL` and `uq_inventory_alerts_open_item` on `(item_id, branch_id, kind)` where `state = 'Open' AND batch_id IS NULL` raise the open-condition rule in the database. Two partial indexes are required because PostgreSQL treats NULL values as distinct in a unique index, so one index over the nullable `batch_id` would not stop a second open item-wide alert.
 
+### attendance_settings
+
+Purpose: the cafe-wide attendance mode (FR-ATT-001, FR-ATT-002, Story CFMD-456, CFMD-457). One row per tenant database, seeded as `Off` by the migration, so attendance stays disabled until a cafe opts in. `Qr` uses the rotating branch sessions defined under `attendance_qr_sessions` below, and `Device` is reserved for the device ingestion of the later task. Only a holder of `attendance.manage` changes the mode, and every change is audited with the changed field only.
+
+- `id uuid NOT NULL` — the single row's app-generated UUID; `pk_attendance_settings`.
+- `mode text NOT NULL DEFAULT 'Off'` — `ck_attendance_settings_mode CHECK (mode IN ('Off', 'Qr', 'Device'))`.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_attendance_settings_created_by` / `fk_attendance_settings_updated_by` with ON DELETE RESTRICT and its own index.
+- `xmin` row version — the settings change concurrency token.
+- `uq_attendance_settings_singleton` on `((true))` keeps the row single; it is a raw expression index written in the migration as `architecture/database-conventions.md` requires.
+
+### attendance_qr_sessions
+
+Purpose: one rotating attendance QR token for one branch (FR-ATT-002, FR-ATT-003, Story CFMD-456, CFMD-457). A holder of `attendance.qr.manage` issues the current token for their branch; a still-valid session is returned again instead of a new one, and a new token is issued only after the previous window closed. The token is 32 random bytes as 43 base64url characters, unique, tied to the branch, and valid for 10 minutes (Proposed, pending owner confirmation). It appears only in the issuing response and is never logged or audited; a later scan is checked server-side against the window.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_attendance_qr_sessions`.
+- `branch_id uuid NOT NULL` — `fk_attendance_qr_sessions_branch_id` to `branches.id` (ON DELETE RESTRICT); `ix_attendance_qr_sessions_branch_valid_to` on `(branch_id, valid_to)` finds the current or latest session of a branch.
+- `token text NOT NULL` — `ck_attendance_qr_sessions_token CHECK (token ~ '^[A-Za-z0-9_-]{43}$')`; `uq_attendance_qr_sessions_token` is unique so one token never belongs to two branches.
+- `valid_from timestamptz NOT NULL`, `valid_to timestamptz NOT NULL` — `ck_attendance_qr_sessions_window CHECK (valid_to > valid_from)`. The window is fixed at creation; a session is never extended.
+- `created_at timestamptz NOT NULL` and `created_by uuid NOT NULL FK tenant_users.id`, the actor foreign key named `fk_attendance_qr_sessions_created_by` with ON DELETE RESTRICT and its own index. Rows are never updated or deleted by the application.
+
 
 - Per-user branch limits (FR-IAM-002 configured branch restrictions) remain out of scope; station catalogs are defined under `stations` above.
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
@@ -1079,7 +1099,7 @@ Purpose: one open or resolved stock condition at one branch (FR-INV-005, FR-INV-
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
 - Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
-- Attendance — daily QR windows and check-in/check-out records (FR-ATT-001 through FR-ATT-004).
+- Attendance beyond the mode and the QR sessions — check-in and check-out records and device ingestion (FR-ATT-001 through FR-ATT-004); the `attendance_settings` and `attendance_qr_sessions` schemas are defined above.
 - Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
 - Inventory beyond the item catalog, its receipts, their movements, and their alerts — stock counts and scheduled alert evaluation (FR-INV-001 through FR-INV-007; rule 18 keeps automatic deduction out, and stock-driven menu availability stays unbuilt); the `inventory_items`, `inventory_batches`, `stock_movements`, and `inventory_alerts` schemas are defined above.
 - Reporting and analytics — read-model queries over the later operational tables (FR-ANL-001 through FR-ANL-004; revenue definitions TBD-16).
