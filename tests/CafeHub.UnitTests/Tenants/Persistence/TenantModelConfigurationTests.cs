@@ -69,6 +69,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "inventory_items",
             "inventory_batches",
             "stock_movements",
+            "inventory_alerts",
         ];
 
         [Fact]
@@ -1042,6 +1043,89 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             var xmin = entity.FindProperty("xmin");
             Assert.NotNull(xmin);
             Assert.True(xmin.IsConcurrencyToken);
+        }
+
+        [Fact]
+        public void InventoryAlertsTable_MatchesErd()
+        {
+            var model = CreateModel();
+            var entity = model.FindEntityType(typeof(InventoryAlert));
+            Assert.NotNull(entity);
+
+            Assert.Equal("inventory_alerts", entity.GetTableName());
+            Assert.Equal("pk_inventory_alerts", entity.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", Assert.Single(entity.FindPrimaryKey()!.Properties).GetColumnName());
+
+            Assert.Equal("item_id", entity.FindProperty(nameof(InventoryAlert.ItemId))!.GetColumnName());
+            Assert.Equal("branch_id", entity.FindProperty(nameof(InventoryAlert.BranchId))!.GetColumnName());
+            Assert.Equal("batch_id", entity.FindProperty(nameof(InventoryAlert.BatchId))!.GetColumnName());
+            Assert.Equal("kind", entity.FindProperty(nameof(InventoryAlert.Kind))!.GetColumnName());
+            Assert.Equal("state", entity.FindProperty(nameof(InventoryAlert.State))!.GetColumnName());
+            Assert.Equal("raised_at", entity.FindProperty(nameof(InventoryAlert.RaisedAt))!.GetColumnName());
+            Assert.Equal("resolved_at", entity.FindProperty(nameof(InventoryAlert.ResolvedAt))!.GetColumnName());
+            Assert.Equal("notified_at", entity.FindProperty(nameof(InventoryAlert.NotifiedAt))!.GetColumnName());
+            Assert.Equal("created_at", entity.FindProperty(nameof(InventoryAlert.CreatedAt))!.GetColumnName());
+            Assert.Equal("updated_at", entity.FindProperty(nameof(InventoryAlert.UpdatedAt))!.GetColumnName());
+
+            Assert.Equal("text", entity.FindProperty(nameof(InventoryAlert.Kind))!.GetColumnType());
+            Assert.Equal("text", entity.FindProperty(nameof(InventoryAlert.State))!.GetColumnType());
+            Assert.True(entity.FindProperty(nameof(InventoryAlert.BatchId))!.IsNullable);
+            Assert.True(entity.FindProperty(nameof(InventoryAlert.ResolvedAt))!.IsNullable);
+            Assert.True(entity.FindProperty(nameof(InventoryAlert.NotifiedAt))!.IsNullable);
+            Assert.False(entity.FindProperty(nameof(InventoryAlert.RaisedAt))!.IsNullable);
+
+            foreach (var check in new[]
+            {
+                "ck_inventory_alerts_kind",
+                "ck_inventory_alerts_state",
+                "ck_inventory_alerts_batch",
+                "ck_inventory_alerts_resolved",
+                "ck_inventory_alerts_resolved_not_before_raised",
+                "ck_inventory_alerts_notified_not_before_raised",
+            })
+            {
+                Assert.Contains(entity.GetCheckConstraints(), candidate => candidate.Name == check);
+            }
+
+            foreach (var index in new[]
+            {
+                "uq_inventory_alerts_open_batch",
+                "uq_inventory_alerts_open_item",
+                "ix_inventory_alerts_item_id",
+                "ix_inventory_alerts_branch_id",
+                "ix_inventory_alerts_batch_id",
+                "ix_inventory_alerts_created_by",
+                "ix_inventory_alerts_updated_by",
+            })
+            {
+                Assert.Contains(entity.GetIndexes(), candidate => candidate.GetDatabaseName() == index);
+            }
+
+            var openBatch = entity.GetIndexes()
+                .Single(candidate => candidate.GetDatabaseName() == "uq_inventory_alerts_open_batch");
+            Assert.True(openBatch.IsUnique);
+            Assert.Equal("state = 'Open' AND batch_id IS NOT NULL", openBatch.GetFilter());
+            var openItem = entity.GetIndexes()
+                .Single(candidate => candidate.GetDatabaseName() == "uq_inventory_alerts_open_item");
+            Assert.True(openItem.IsUnique);
+            Assert.Equal("state = 'Open' AND batch_id IS NULL", openItem.GetFilter());
+
+            Assert.Equal(
+                typeof(InventoryItem),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_alerts_item_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(Branch),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_alerts_branch_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(InventoryBatch),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_alerts_batch_id").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_alerts_created_by").PrincipalEntityType.ClrType);
+            Assert.Equal(
+                typeof(TenantUser),
+                entity.GetForeignKeys().Single(fk => fk.GetConstraintName() == "fk_inventory_alerts_updated_by").PrincipalEntityType.ClrType);
+            Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
         }
     }
 }

@@ -55,8 +55,10 @@ namespace CafeHub.UnitTests.Inventory
             {
                 Page = new InventoryStockLevelPage(new[] { StockLevel }, 1),
             };
+            var evaluator = new FakeAlertEvaluator();
             var handler = new ListStockLevelsQueryHandler(
                 store,
+                evaluator,
                 StaffUser(BranchId),
                 new PaginationOptions { DefaultPageSize = 15, MaxPageSize = 100 });
 
@@ -68,6 +70,7 @@ namespace CafeHub.UnitTests.Inventory
             Assert.Single(result.Value.Items);
             Assert.Equal(15, result.Value.PageSize);
             Assert.Equal(1, result.Value.TotalCount);
+            Assert.Equal((BranchId, ItemId), Assert.Single(evaluator.ExpiryRequests));
             var request = Assert.Single(store.Requests);
             Assert.Equal(BranchId, request.BranchId);
             Assert.Equal(ItemId, request.ItemId);
@@ -80,7 +83,7 @@ namespace CafeHub.UnitTests.Inventory
         {
             var store = new FakeBatchStore();
             var handler = new ListStockLevelsQueryHandler(
-                store, StaffUser(OtherBranchId), new PaginationOptions());
+                store, new FakeAlertEvaluator(), StaffUser(OtherBranchId), new PaginationOptions());
 
             var result = await handler.Handle(
                 new ListStockLevelsQuery { BranchId = BranchId }, default);
@@ -96,7 +99,8 @@ namespace CafeHub.UnitTests.Inventory
             {
                 Page = new InventoryStockLevelPage(new[] { StockLevel }, null),
             };
-            var handler = new ListStockLevelsQueryHandler(store, Owner(), new PaginationOptions());
+            var handler = new ListStockLevelsQueryHandler(
+                store, new FakeAlertEvaluator(), Owner(), new PaginationOptions());
 
             var result = await handler.Handle(
                 new ListStockLevelsQuery { BranchId = BranchId }, default);
@@ -323,6 +327,22 @@ namespace CafeHub.UnitTests.Inventory
             public Guid? BranchId { get; init; }
 
             public TenantAccountAccess? AccountAccess { get; init; } = new(false, "1", false);
+        }
+
+        private sealed class FakeAlertEvaluator : IInventoryAlertEvaluator
+        {
+            public List<(Guid? BranchId, Guid? ItemId)> ExpiryRequests { get; } = new();
+
+            public Task<Result> EvaluateStockAsync(
+                Guid branchId, Guid itemId, CancellationToken cancellationToken) =>
+                Task.FromResult(Result.Success());
+
+            public Task<Result> EvaluateExpiryAsync(
+                Guid? branchId, Guid? itemId, CancellationToken cancellationToken)
+            {
+                ExpiryRequests.Add((branchId, itemId));
+                return Task.FromResult(Result.Success());
+            }
         }
 
         private sealed class FakeBatchStore : IInventoryBatchStore
