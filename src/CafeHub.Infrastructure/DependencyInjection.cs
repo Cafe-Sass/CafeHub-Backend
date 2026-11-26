@@ -172,6 +172,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IAttendanceDeviceStore, AttendanceDeviceStore>();
             services.AddScoped<AttendanceDeviceAuthenticator>();
             services.AddScoped<IAttendanceDeviceEventStore, AttendanceDeviceEventStore>();
+            services.AddScoped<IAttendanceUnmatchedEventStore, AttendanceUnmatchedEventStore>();
             services.AddScoped<IProductCatalogSchema, ProductCatalogSchema>();
             services.AddScoped<IProductStationAssignmentStore, ProductStationAssignmentStore>();
             services.AddScoped<IBranchProductAvailabilityStore, BranchProductAvailabilityStore>();
