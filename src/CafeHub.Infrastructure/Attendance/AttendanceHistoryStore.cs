@@ -72,7 +72,7 @@ namespace CafeHub.Infrastructure.Attendance
             string BranchName,
             DateTimeOffset CheckInAt,
             DateTimeOffset? CheckOutAt,
-            Guid CheckInSessionId,
+            Guid? CheckInSessionId,
             Guid? CheckOutSessionId,
             AttendanceSource Source)
         {

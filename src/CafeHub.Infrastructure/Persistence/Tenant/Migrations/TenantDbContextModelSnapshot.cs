@@ -157,6 +157,80 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDeviceEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeviceCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_code");
+
+                    b.Property<string>("DeviceEventId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_event_id");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("Direction")
+                        .HasColumnType("text")
+                        .HasColumnName("direction");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid?>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_device_events");
+
+                    b.HasIndex("RecordId")
+                        .HasDatabaseName("ix_attendance_device_events_record_id");
+
+                    b.HasIndex("DeviceId", "DeviceEventId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_device_events_device_event");
+
+                    b.HasIndex("DeviceId", "Status", "OccurredAt")
+                        .HasDatabaseName("ix_attendance_device_events_device_status_occurred_at");
+
+                    b.ToTable("attendance_device_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_device_events_code", "char_length(device_code) BETWEEN 1 AND 64 AND device_code !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_attendance_device_events_direction", "direction IS NULL OR direction IN ('In', 'Out')");
+
+                            t.HasCheckConstraint("ck_attendance_device_events_event_id", "char_length(device_event_id) BETWEEN 1 AND 128 AND device_event_id !~ '[[:cntrl:]]'");
+
+                            t.HasCheckConstraint("ck_attendance_device_events_status", "status IN ('Processed', 'Unmatched')");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -223,7 +297,7 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("check_in_at");
 
-                    b.Property<Guid>("CheckInSessionId")
+                    b.Property<Guid?>("CheckInSessionId")
                         .HasColumnType("uuid")
                         .HasColumnName("check_in_session_id");
 
@@ -286,6 +360,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                     b.ToTable("attendance_records", null, t =>
                         {
                             t.HasCheckConstraint("ck_attendance_records_source", "source IN ('Qr', 'Device')");
+
+                            t.HasCheckConstraint("ck_attendance_records_source_shape", "(source = 'Qr' AND check_in_session_id IS NOT NULL) OR (source = 'Device' AND check_in_session_id IS NULL AND check_out_session_id IS NULL)");
 
                             t.HasCheckConstraint("ck_attendance_records_window", "check_out_at IS NULL OR check_out_at > check_in_at");
                         });
@@ -3799,6 +3875,22 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .HasConstraintName("fk_attendance_device_codes_updated_by");
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceDeviceEvent", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.AttendanceDevice", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_device_events_device_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.AttendanceRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_device_events_record_id");
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceQrSession", b =>
                 {
                     b.HasOne("CafeHub.Domain.Tenants.Branch", null)
@@ -3829,7 +3921,6 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .WithMany()
                         .HasForeignKey("CheckInSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_attendance_records_check_in_session_id");
 
                     b.HasOne("CafeHub.Domain.Tenants.AttendanceQrSession", null)

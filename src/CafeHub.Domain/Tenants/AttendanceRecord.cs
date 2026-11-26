@@ -16,7 +16,7 @@ namespace CafeHub.Domain.Tenants
 
         public DateTimeOffset? CheckOutAt { get; private set; }
 
-        public Guid CheckInSessionId { get; private set; }
+        public Guid? CheckInSessionId { get; private set; }
 
         public Guid? CheckOutSessionId { get; private set; }
 
@@ -76,7 +76,7 @@ namespace CafeHub.Domain.Tenants
 
         public bool CanCheckOutWith(Guid sessionId)
         {
-            if (!IsOpen)
+            if (!IsOpen || Source != AttendanceSource.Qr)
             {
                 return false;
             }
@@ -111,6 +111,57 @@ namespace CafeHub.Domain.Tenants
 
             CheckOutSessionId = sessionId;
             CheckOutAt = now;
+            UpdatedAt = now;
+        }
+
+        public static AttendanceRecord CheckInFromDevice(
+            Guid id,
+            Guid branchId,
+            Guid staffId,
+            DateTimeOffset occurredAt,
+            DateTimeOffset now)
+        {
+            if (id == Guid.Empty)
+            {
+                throw new ArgumentException("The attendance record id is required.", nameof(id));
+            }
+
+            if (branchId == Guid.Empty)
+            {
+                throw new ArgumentException("The branch id is required.", nameof(branchId));
+            }
+
+            if (staffId == Guid.Empty)
+            {
+                throw new ArgumentException("The staff id is required.", nameof(staffId));
+            }
+
+            return new AttendanceRecord
+            {
+                Id = id,
+                BranchId = branchId,
+                StaffId = staffId,
+                CheckInAt = occurredAt,
+                Source = AttendanceSource.Device,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
+        }
+
+        public void CheckOutFromDevice(DateTimeOffset occurredAt, DateTimeOffset now)
+        {
+            if (!IsOpen)
+            {
+                throw new InvalidOperationException("The attendance record is already closed.");
+            }
+
+            if (occurredAt <= CheckInAt)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(occurredAt), "The check-out time must be after the check-in time.");
+            }
+
+            CheckOutAt = occurredAt;
             UpdatedAt = now;
         }
     }

@@ -15,6 +15,9 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                     "check_out_at IS NULL OR check_out_at > check_in_at");
                 table.HasCheckConstraint(
                     "ck_attendance_records_source", "source IN ('Qr', 'Device')");
+                table.HasCheckConstraint(
+                    "ck_attendance_records_source_shape",
+                    "(source = 'Qr' AND check_in_session_id IS NOT NULL) OR (source = 'Device' AND check_in_session_id IS NULL AND check_out_session_id IS NULL)");
             });
 
             builder.HasKey(record => record.Id).HasName("pk_attendance_records");
