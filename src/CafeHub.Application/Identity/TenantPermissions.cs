@@ -3,6 +3,9 @@ namespace CafeHub.Application.Identity
     public static class TenantPermissions
     {
         public const string ClaimType = "cafehub.permission";
+        public const string AttendanceManage = "attendance.manage";
+        public const string AttendanceQrManage = "attendance.qr.manage";
+        public const string AttendanceView = "attendance.view";
         public const string StaffRead = "staff.read";
         public const string StationsManage = "stations.manage";
         public const string TablesManage = "tables.manage";
@@ -33,7 +36,7 @@ namespace CafeHub.Application.Identity
         public const string PrintersManage = "printers.manage";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage, WifiLookup, WifiManage });
+            new[] { AttendanceManage, AttendanceQrManage, AttendanceView, BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RolesManage, StaffManage, StaffRead, StationsManage, TablesManage, WifiLookup, WifiManage });
 
         public static bool IsOwnerOnly(string? code) => code is RolesManage or BranchesManage or CafeProfileManage;
 

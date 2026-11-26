@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Attendance.Contracts;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Branches.Contracts;
@@ -25,6 +26,7 @@ using CafeHub.Application.Tenancy;
 using CafeHub.Application.Upgrades;
 using CafeHub.Application.Upgrades.Contracts;
 using CafeHub.Application.Wifi.Contracts;
+using CafeHub.Infrastructure.Attendance;
 using CafeHub.Infrastructure.Audit;
 using CafeHub.Infrastructure.Authentication;
 using CafeHub.Infrastructure.Billing;
@@ -157,6 +159,13 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IStockMovementStore, StockMovementStore>();
             services.AddScoped<IInventoryAlertStore, InventoryAlertStore>();
             services.AddScoped<IInventoryAlertEvaluator, InventoryAlertEvaluator>();
+            services.AddScoped<AttendanceSettingsStore>();
+            services.AddScoped<IAttendanceSettingsReader>(provider =>
+                provider.GetRequiredService<AttendanceSettingsStore>());
+            services.AddScoped<IAttendanceSettingsWriter>(provider =>
+                provider.GetRequiredService<AttendanceSettingsStore>());
+            services.AddScoped<IAttendanceQrSessionStore, AttendanceQrSessionStore>();
+            services.AddScoped<IAttendanceQrTokenGenerator, AttendanceQrTokenGenerator>();
             services.AddScoped<IProductCatalogSchema, ProductCatalogSchema>();
             services.AddScoped<IProductStationAssignmentStore, ProductStationAssignmentStore>();
             services.AddScoped<IBranchProductAvailabilityStore, BranchProductAvailabilityStore>();

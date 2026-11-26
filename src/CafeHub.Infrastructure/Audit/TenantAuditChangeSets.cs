@@ -532,6 +532,17 @@ namespace CafeHub.Infrastructure.Audit
             });
         }
 
+        public static TenantAuditChanges AttendanceSettingsUpdate(
+            AttendanceSettings settings, AttendanceMode mode)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            return TenantAuditChanges.Update(new[]
+            {
+                new TenantAuditChanges.FieldChange(
+                    nameof(AttendanceSettings.Mode), settings.Mode.ToString(), mode.ToString()),
+            });
+        }
+
         public static TenantAuditChanges BillClose(Bill bill, decimal remainingAmount)
         {
             ArgumentNullException.ThrowIfNull(bill);
