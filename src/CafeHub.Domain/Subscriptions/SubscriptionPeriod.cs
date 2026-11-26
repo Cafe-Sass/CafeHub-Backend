@@ -118,5 +118,25 @@ namespace CafeHub.Domain.Subscriptions
             return currencyCode is { Length: 3 }
                 && currencyCode.All(character => char.IsBetween(character, 'a', 'z'));
         }
+
+        public bool End(DateTimeOffset endsAt, DateTimeOffset now, Guid? actorId)
+        {
+            if (PeriodStatus != SubscriptionPeriodStatus.Active)
+            {
+                return false;
+            }
+
+            if (endsAt <= StartsAt)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(endsAt), "The period end must be after its start.");
+            }
+
+            PeriodStatus = SubscriptionPeriodStatus.Ended;
+            EndsAt = endsAt;
+            UpdatedAt = now;
+            UpdatedBy = actorId;
+            return true;
+        }
     }
 }
