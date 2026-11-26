@@ -59,6 +59,10 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<InventoryAlert> InventoryAlerts => Set<InventoryAlert>();
 
+        public DbSet<AttendanceSettings> AttendanceSettings => Set<AttendanceSettings>();
+
+        public DbSet<AttendanceQrSession> AttendanceQrSessions => Set<AttendanceQrSession>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

@@ -110,6 +110,16 @@ namespace CafeHub.Infrastructure.Audit
                     "PaymentAddress",
                     "DisplayName",
                 },
+                ["attendance_settings"] = new(StringComparer.Ordinal)
+                {
+                    "Mode",
+                },
+                ["attendance_qr_sessions"] = new(StringComparer.Ordinal)
+                {
+                    "BranchId",
+                    "ValidFrom",
+                    "ValidTo",
+                },
                 ["wifi_settings"] = new(StringComparer.Ordinal)
                 {
                     "Policy",

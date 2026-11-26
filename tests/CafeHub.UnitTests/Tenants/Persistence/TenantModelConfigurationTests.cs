@@ -70,6 +70,8 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "inventory_batches",
             "stock_movements",
             "inventory_alerts",
+            "attendance_settings",
+            "attendance_qr_sessions",
         ];
 
         [Fact]
@@ -89,6 +91,63 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.DoesNotContain(tableNames, t => t.StartsWith("subscription_"));
             Assert.DoesNotContain(tableNames, t => t.StartsWith("plan_"));
             Assert.DoesNotContain(tableNames, t => t.StartsWith("provisioning_"));
+        }
+
+        [Fact]
+        public void AttendanceTables_MatchErd()
+        {
+            var model = CreateModel();
+
+            var settings = model.FindEntityType(typeof(AttendanceSettings));
+            Assert.NotNull(settings);
+            Assert.Equal("attendance_settings", settings.GetTableName());
+            Assert.Equal("pk_attendance_settings", settings.FindPrimaryKey()!.GetName());
+            Assert.Equal("id", settings.FindPrimaryKey()!.Properties.Single().GetColumnName());
+            Assert.Equal("mode", settings.FindProperty(nameof(AttendanceSettings.Mode))!.GetColumnName());
+            Assert.True(settings.FindProperty("xmin")!.IsConcurrencyToken);
+            Assert.Contains(
+                settings.GetCheckConstraints(), check => check.Name == "ck_attendance_settings_mode");
+            Assert.Contains(
+                settings.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_settings_created_by");
+            Assert.Contains(
+                settings.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_settings_updated_by");
+            Assert.Contains(
+                settings.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_settings_created_by");
+            Assert.Contains(
+                settings.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_settings_updated_by");
+
+            var session = model.FindEntityType(typeof(AttendanceQrSession));
+            Assert.NotNull(session);
+            Assert.Equal("attendance_qr_sessions", session.GetTableName());
+            Assert.Equal("pk_attendance_qr_sessions", session.FindPrimaryKey()!.GetName());
+            Assert.Equal(
+                "branch_id", session.FindProperty(nameof(AttendanceQrSession.BranchId))!.GetColumnName());
+            Assert.Equal(
+                "token", session.FindProperty(nameof(AttendanceQrSession.Token))!.GetColumnName());
+            Assert.Equal(
+                "valid_from", session.FindProperty(nameof(AttendanceQrSession.ValidFrom))!.GetColumnName());
+            Assert.Equal(
+                "valid_to", session.FindProperty(nameof(AttendanceQrSession.ValidTo))!.GetColumnName());
+            Assert.Equal(
+                "created_by", session.FindProperty(nameof(AttendanceQrSession.CreatedBy))!.GetColumnName());
+            Assert.Contains(
+                session.GetCheckConstraints(), check => check.Name == "ck_attendance_qr_sessions_token");
+            Assert.Contains(
+                session.GetCheckConstraints(), check => check.Name == "ck_attendance_qr_sessions_window");
+            var tokenIndex = Assert.Single(
+                session.GetIndexes(),
+                index => index.GetDatabaseName() == "uq_attendance_qr_sessions_token");
+            Assert.True(tokenIndex.IsUnique);
+            Assert.Contains(
+                session.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_qr_sessions_branch_valid_to");
+            Assert.Contains(
+                session.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_qr_sessions_branch_id");
         }
 
         [Fact]
