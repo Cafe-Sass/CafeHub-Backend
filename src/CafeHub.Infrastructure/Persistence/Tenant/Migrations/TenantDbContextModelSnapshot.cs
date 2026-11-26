@@ -74,6 +74,88 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CheckInAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("check_in_at");
+
+                    b.Property<Guid>("CheckInSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("check_in_session_id");
+
+                    b.Property<DateTimeOffset?>("CheckOutAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("check_out_at");
+
+                    b.Property<Guid?>("CheckOutSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("check_out_session_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Qr")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("StaffId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance_records");
+
+                    b.HasIndex("CheckInSessionId")
+                        .HasDatabaseName("ix_attendance_records_check_in_session_id");
+
+                    b.HasIndex("CheckOutSessionId")
+                        .HasDatabaseName("ix_attendance_records_check_out_session_id");
+
+                    b.HasIndex("StaffId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_records_open_staff")
+                        .HasFilter("check_out_at IS NULL");
+
+                    b.HasIndex("BranchId", "CheckInAt")
+                        .HasDatabaseName("ix_attendance_records_branch_check_in_at");
+
+                    b.HasIndex("StaffId", "CheckInAt")
+                        .HasDatabaseName("ix_attendance_records_staff_check_in_at");
+
+                    b.HasIndex("StaffId", "CheckInSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_records_staff_check_in_session");
+
+                    b.HasIndex("StaffId", "CheckOutSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_attendance_records_staff_check_out_session")
+                        .HasFilter("check_out_session_id IS NOT NULL");
+
+                    b.ToTable("attendance_records", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_attendance_records_source", "source IN ('Qr', 'Device')");
+
+                            t.HasCheckConstraint("ck_attendance_records_window", "check_out_at IS NULL OR check_out_at > check_in_at");
+                        });
+                });
+
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3546,6 +3628,36 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_attendance_qr_sessions_created_by");
+                });
+
+            modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceRecord", b =>
+                {
+                    b.HasOne("CafeHub.Domain.Tenants.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_records_branch_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.AttendanceQrSession", null)
+                        .WithMany()
+                        .HasForeignKey("CheckInSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_records_check_in_session_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.AttendanceQrSession", null)
+                        .WithMany()
+                        .HasForeignKey("CheckOutSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_attendance_records_check_out_session_id");
+
+                    b.HasOne("CafeHub.Domain.Tenants.TenantUser", null)
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_records_staff_id");
                 });
 
             modelBuilder.Entity("CafeHub.Domain.Tenants.AttendanceSettings", b =>

@@ -57,6 +57,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
             "inventory_alerts",
             "attendance_settings",
             "attendance_qr_sessions",
+            "attendance_records",
         ];
 
         [Fact]
@@ -99,6 +100,7 @@ namespace CafeHub.UnitTests.Tenants.Domain
                     "cafe_payment_settings" => nameof(CafePaymentSettings),
                     "attendance_settings" => nameof(AttendanceSettings),
                     "attendance_qr_sessions" => nameof(AttendanceQrSession),
+                    "attendance_records" => nameof(AttendanceRecord),
                     "tenant_audit_records" => nameof(TenantAuditRecord),
                     "refresh_tokens" => nameof(TenantRefreshToken),
                     "orders" => nameof(Order),

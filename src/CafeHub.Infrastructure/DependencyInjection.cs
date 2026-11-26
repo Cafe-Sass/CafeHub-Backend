@@ -166,6 +166,8 @@ namespace CafeHub.Infrastructure
                 provider.GetRequiredService<AttendanceSettingsStore>());
             services.AddScoped<IAttendanceQrSessionStore, AttendanceQrSessionStore>();
             services.AddScoped<IAttendanceQrTokenGenerator, AttendanceQrTokenGenerator>();
+            services.AddScoped<IAttendanceRecordStore, AttendanceRecordStore>();
+            services.AddScoped<IAttendanceHistoryStore, AttendanceHistoryStore>();
             services.AddScoped<IProductCatalogSchema, ProductCatalogSchema>();
             services.AddScoped<IProductStationAssignmentStore, ProductStationAssignmentStore>();
             services.AddScoped<IBranchProductAvailabilityStore, BranchProductAvailabilityStore>();

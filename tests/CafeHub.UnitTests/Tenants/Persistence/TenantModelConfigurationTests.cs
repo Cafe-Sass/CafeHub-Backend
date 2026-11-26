@@ -72,6 +72,7 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             "inventory_alerts",
             "attendance_settings",
             "attendance_qr_sessions",
+            "attendance_records",
         ];
 
         [Fact]
@@ -148,6 +149,45 @@ namespace CafeHub.UnitTests.Tenants.Persistence
             Assert.Contains(
                 session.GetForeignKeys(),
                 key => key.GetConstraintName() == "fk_attendance_qr_sessions_branch_id");
+
+            var record = model.FindEntityType(typeof(AttendanceRecord));
+            Assert.NotNull(record);
+            Assert.Equal("attendance_records", record.GetTableName());
+            Assert.Equal("pk_attendance_records", record.FindPrimaryKey()!.GetName());
+            Assert.Equal(
+                "staff_id", record.FindProperty(nameof(AttendanceRecord.StaffId))!.GetColumnName());
+            Assert.Equal(
+                "check_in_at", record.FindProperty(nameof(AttendanceRecord.CheckInAt))!.GetColumnName());
+            var checkOutAt = record.FindProperty(nameof(AttendanceRecord.CheckOutAt))!;
+            Assert.Equal("check_out_at", checkOutAt.GetColumnName());
+            Assert.True(checkOutAt.IsNullable);
+            Assert.Equal(
+                "check_in_session_id",
+                record.FindProperty(nameof(AttendanceRecord.CheckInSessionId))!.GetColumnName());
+            Assert.Equal(
+                "check_out_session_id",
+                record.FindProperty(nameof(AttendanceRecord.CheckOutSessionId))!.GetColumnName());
+            Assert.Equal(
+                "source", record.FindProperty(nameof(AttendanceRecord.Source))!.GetColumnName());
+            Assert.Contains(
+                record.GetCheckConstraints(), check => check.Name == "ck_attendance_records_window");
+            Assert.Contains(
+                record.GetCheckConstraints(), check => check.Name == "ck_attendance_records_source");
+            Assert.True(record.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_records_open_staff").IsUnique);
+            Assert.True(record.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_records_staff_check_in_session").IsUnique);
+            Assert.True(record.GetIndexes().Single(index =>
+                index.GetDatabaseName() == "uq_attendance_records_staff_check_out_session").IsUnique);
+            Assert.Contains(
+                record.GetIndexes(),
+                index => index.GetDatabaseName() == "ix_attendance_records_branch_check_in_at");
+            Assert.Contains(
+                record.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_records_staff_id");
+            Assert.Contains(
+                record.GetForeignKeys(),
+                key => key.GetConstraintName() == "fk_attendance_records_check_in_session_id");
         }
 
         [Fact]
