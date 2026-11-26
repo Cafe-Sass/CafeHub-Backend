@@ -8,33 +8,32 @@ using CafeHub.Application.Tenancy;
 namespace CafeHub.Application.Inventory.Commands
 {
     public sealed class RecordStockMovementCommandHandler(
-        IStockMovementStore store, ICurrentTenantUser currentUser, ITenantContextAccessor tenantContext)
+        IStockMovementStore store, IInventoryAlertEvaluator evaluator,
+        ICurrentTenantUser currentUser, ITenantContextAccessor tenantContext)
         : ICommandHandler<RecordStockMovementCommand, IReadOnlyList<StockMovementResponse>>
     {
-        public Task<Result<IReadOnlyList<StockMovementResponse>>> Handle(
+        public async Task<Result<IReadOnlyList<StockMovementResponse>>> Handle(
             RecordStockMovementCommand command, CancellationToken cancellationToken)
         {
             var scope = TenantBranchScope.Resolve(currentUser.AccountAccess);
             if (scope.IsFailure)
             {
-                return Task.FromResult(
-                    Result.Failure<IReadOnlyList<StockMovementResponse>>(scope.Error!));
+                return Result.Failure<IReadOnlyList<StockMovementResponse>>(scope.Error!);
             }
 
             if (scope.Value is { } scopedBranchId && scopedBranchId != command.BranchId)
             {
-                return Task.FromResult(
-                    Result.Failure<IReadOnlyList<StockMovementResponse>>(InventoryBatchErrors.BranchNotFound()));
+                return Result.Failure<IReadOnlyList<StockMovementResponse>>(
+                    InventoryBatchErrors.BranchNotFound());
             }
 
             if (!InventoryItemActor.TryGetId(currentUser, tenantContext, out var actorId))
             {
-                return Task.FromResult(
-                    Result.Failure<IReadOnlyList<StockMovementResponse>>(
-                        AuthErrors.CurrentTenantUserUnavailable()));
+                return Result.Failure<IReadOnlyList<StockMovementResponse>>(
+                    AuthErrors.CurrentTenantUserUnavailable());
             }
 
-            return store.RecordAsync(
+            var result = await store.RecordAsync(
                 command.BranchId,
                 command.ItemId,
                 command.BatchId,
@@ -44,6 +43,16 @@ namespace CafeHub.Application.Inventory.Commands
                 command.IdempotencyKey!,
                 actorId,
                 cancellationToken);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            var evaluated = await evaluator.EvaluateStockAsync(
+                command.BranchId, command.ItemId, cancellationToken);
+            return evaluated.IsFailure
+                ? Result.Failure<IReadOnlyList<StockMovementResponse>>(evaluated.Error!)
+                : result;
         }
     }
 }
