@@ -132,6 +132,13 @@ namespace CafeHub.Infrastructure.Audit
                     "StaffId",
                     "DeviceCode",
                 },
+                ["attendance_device_events"] = new(StringComparer.Ordinal)
+                {
+                    "Processed",
+                    "Unmatched",
+                    "Rejected",
+                    "BranchId",
+                },
                 ["wifi_settings"] = new(StringComparer.Ordinal)
                 {
                     "Policy",

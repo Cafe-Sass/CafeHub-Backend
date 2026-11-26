@@ -109,5 +109,41 @@ namespace CafeHub.WebApi.Controllers
                 ? Ok(result.Value)
                 : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
+
+        [HttpGet("unmatched")]
+        [TenantAuthorize(TenantPermissions.AttendanceManage)]
+        [ProducesResponseType<IReadOnlyList<AttendanceUnmatchedEventResponse>>(
+            StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        public async Task<ActionResult<IReadOnlyList<AttendanceUnmatchedEventResponse>>> Unmatched(
+            [FromQuery] Guid? branchId,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new GetUnmatchedAttendanceDeviceEventsQuery(branchId), cancellationToken);
+
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("unmatched/reprocess")]
+        [TenantAuthorize(TenantPermissions.AttendanceManage)]
+        [ProducesResponseType<AttendanceDeviceReprocessResponse>(
+            StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+        public async Task<ActionResult<AttendanceDeviceReprocessResponse>> ReprocessUnmatched(
+            [FromBody] AttendanceDeviceScopeRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new ReprocessUnmatchedAttendanceDeviceEventsCommand(request.BranchId),
+                cancellationToken);
+
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
     }
 }

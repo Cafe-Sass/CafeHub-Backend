@@ -8,7 +8,7 @@ namespace CafeHub.Application.Attendance.DTOs
         string BranchName,
         DateTimeOffset CheckInAt,
         DateTimeOffset? CheckOutAt,
-        Guid CheckInSessionId,
+        Guid? CheckInSessionId,
         Guid? CheckOutSessionId,
         string Source);
 }

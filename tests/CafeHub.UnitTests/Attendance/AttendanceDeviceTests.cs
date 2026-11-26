@@ -326,6 +326,11 @@ namespace CafeHub.UnitTests.Attendance
 
             public Guid? LastListBranchId { get; private set; }
 
+            public Task<AttendanceDeviceAccess?> FindByKeyHashAsync(
+                string keyHash,
+                CancellationToken cancellationToken) =>
+                Task.FromResult<AttendanceDeviceAccess?>(null);
+
             public Task<Result<AttendanceDeviceResponse>> CreateAsync(
                 Guid branchId,
                 string name,

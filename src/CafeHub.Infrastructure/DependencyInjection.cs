@@ -1,4 +1,5 @@
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Attendance;
 using CafeHub.Application.Attendance.Contracts;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Billing.Contracts;
@@ -169,6 +170,9 @@ namespace CafeHub.Infrastructure
             services.AddScoped<IAttendanceRecordStore, AttendanceRecordStore>();
             services.AddScoped<IAttendanceHistoryStore, AttendanceHistoryStore>();
             services.AddScoped<IAttendanceDeviceStore, AttendanceDeviceStore>();
+            services.AddScoped<AttendanceDeviceAuthenticator>();
+            services.AddScoped<IAttendanceDeviceEventStore, AttendanceDeviceEventStore>();
+            services.AddScoped<IAttendanceUnmatchedEventStore, AttendanceUnmatchedEventStore>();
             services.AddScoped<IProductCatalogSchema, ProductCatalogSchema>();
             services.AddScoped<IProductStationAssignmentStore, ProductStationAssignmentStore>();
             services.AddScoped<IBranchProductAvailabilityStore, BranchProductAvailabilityStore>();

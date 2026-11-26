@@ -69,6 +69,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<AttendanceDeviceCode> AttendanceDeviceCodes => Set<AttendanceDeviceCode>();
 
+        public DbSet<AttendanceDeviceEvent> AttendanceDeviceEvents => Set<AttendanceDeviceEvent>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
