@@ -1,7 +1,6 @@
 using CafeHub.Application.Abstractions.Persistence;
 using CafeHub.Application.Attendance;
 using CafeHub.Application.Attendance.Contracts;
-using CafeHub.Application.Subscriptions.Contracts;
 using CafeHub.Application.Audit;
 using CafeHub.Application.Billing.Contracts;
 using CafeHub.Application.Branches.Contracts;
@@ -23,6 +22,7 @@ using CafeHub.Application.Provisioning;
 using CafeHub.Application.Provisioning.Contracts;
 using CafeHub.Application.Staff.Contracts;
 using CafeHub.Application.Stations.Contracts;
+using CafeHub.Application.Subscriptions.Contracts;
 using CafeHub.Application.Tables.Contracts;
 using CafeHub.Application.Tenancy;
 using CafeHub.Application.Upgrades;

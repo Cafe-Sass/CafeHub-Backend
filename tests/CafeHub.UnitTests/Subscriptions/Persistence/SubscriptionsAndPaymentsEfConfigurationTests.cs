@@ -281,6 +281,76 @@ namespace CafeHub.UnitTests.Subscriptions.Persistence
         }
 
         [Fact]
+        public void SubscriptionHistoryTable_MatchesTheErd()
+        {
+            var entity = FindEntity<SubscriptionHistory>();
+
+            Assert.Equal("subscription_history", entity.GetTableName());
+            Assert.Equal("pk_subscription_history", entity.FindPrimaryKey()!.GetName());
+        }
+
+        [Fact]
+        public void SubscriptionHistoryColumns_MatchTheErd()
+        {
+            var entity = FindEntity<SubscriptionHistory>();
+
+            AssertColumn(entity, nameof(SubscriptionHistory.Id), "id", typeof(Guid), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionHistory.SubscriptionId), "subscription_id", typeof(Guid), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionHistory.FromStatus), "from_status", typeof(SubscriptionStatus?), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.ToStatus), "to_status", typeof(SubscriptionStatus), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionHistory.PlanVersionId), "plan_version_id", typeof(Guid?), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.PeriodNumber), "period_number", typeof(int?), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.ActorPlatformAdminId), "actor_platform_admin_id", typeof(Guid?), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.ActorReference), "actor_reference", typeof(string), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.Reason), "reason", typeof(string), nullable: true);
+            AssertColumn(entity, nameof(SubscriptionHistory.OccurredAt), "occurred_at", typeof(DateTimeOffset), nullable: false);
+            AssertColumn(entity, nameof(SubscriptionHistory.CreatedAt), "created_at", typeof(DateTimeOffset), nullable: false);
+        }
+
+        [Fact]
+        public void SubscriptionHistoryCheckConstraints_MatchTheErd()
+        {
+            var entity = FindEntity<SubscriptionHistory>();
+            var checks = entity.GetCheckConstraints().ToDictionary(c => c.Name!, c => c.Sql);
+
+            Assert.Contains(checks, c => c.Key == "ck_subscription_history_from_status" && c.Value == "from_status IS NULL OR from_status IN ('Active', 'Suspended', 'Expired', 'Cancelled')");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_history_to_status" && c.Value == "to_status IN ('Active', 'Suspended', 'Expired', 'Cancelled')");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_history_period_number" && c.Value == "period_number IS NULL OR period_number >= 1");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_history_actor_reference");
+            Assert.Contains(checks, c => c.Key == "ck_subscription_history_reason");
+        }
+
+        [Fact]
+        public void SubscriptionHistoryIndexesAndForeignKeys_MatchTheErd()
+        {
+            var entity = FindEntity<SubscriptionHistory>();
+
+            Assert.Equal(
+                "ix_subscription_history_subscription_occurred_at",
+                FindIndex(
+                    entity,
+                    nameof(SubscriptionHistory.SubscriptionId),
+                    nameof(SubscriptionHistory.OccurredAt)).GetDatabaseName());
+            Assert.Equal(
+                "ix_subscription_history_plan_version_id",
+                FindIndex(entity, nameof(SubscriptionHistory.PlanVersionId)).GetDatabaseName());
+            Assert.Equal(
+                "ix_subscription_history_actor_platform_admin_id",
+                FindIndex(entity, nameof(SubscriptionHistory.ActorPlatformAdminId)).GetDatabaseName());
+
+            var foreignKeys = entity.GetForeignKeys().ToDictionary(fk => fk.GetConstraintName()!);
+            Assert.Equal(typeof(Subscription), foreignKeys["fk_subscription_history_subscription_id"].PrincipalEntityType.ClrType);
+            Assert.True(foreignKeys["fk_subscription_history_subscription_id"].IsRequired);
+            Assert.Equal(typeof(PlanVersion), foreignKeys["fk_subscription_history_plan_version_id"].PrincipalEntityType.ClrType);
+            Assert.False(foreignKeys["fk_subscription_history_plan_version_id"].IsRequired);
+            Assert.Equal(
+                typeof(CafeHub.Infrastructure.Persistence.Master.Identity.PlatformAdminUser),
+                foreignKeys["fk_subscription_history_actor_platform_admin_id"].PrincipalEntityType.ClrType);
+            Assert.False(foreignKeys["fk_subscription_history_actor_platform_admin_id"].IsRequired);
+            Assert.All(foreignKeys.Values, fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+        }
+
+        [Fact]
         public void PaymentModel_HasNoCardRelatedColumns()
         {
             var entity = FindEntity<PlatformPaymentTransaction>();

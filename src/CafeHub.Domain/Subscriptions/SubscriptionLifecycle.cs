@@ -34,15 +34,5 @@ namespace CafeHub.Domain.Subscriptions
 
             return AllowedTransitions[from].Contains(to);
         }
-
-        public static IReadOnlySet<SubscriptionStatus> AllowedTargets(SubscriptionStatus from)
-        {
-            if (!Enum.IsDefined(from))
-            {
-                return new HashSet<SubscriptionStatus>();
-            }
-
-            return AllowedTransitions[from];
-        }
     }
 }

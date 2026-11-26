@@ -47,6 +47,7 @@ namespace CafeHub.UnitTests
                 "platform_payment_transactions",
                 "refresh_tokens",
                 "subscription_periods",
+                "subscription_history",
                 "subscriptions",
                 "tenant_databases",
                 "tenant_schema_upgrade_runs",
