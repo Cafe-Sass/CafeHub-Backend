@@ -66,6 +66,10 @@ namespace CafeHub.UnitTests.Inventory
                 .GetCustomAttribute<HttpPostAttribute>()!.Template);
             Assert.Equal("branches/{branchId:guid}/batches", Action(nameof(TenantInventoryController.ListBatches))
                 .GetCustomAttribute<HttpGetAttribute>()!.Template);
+            Assert.Equal("stock", Action(nameof(TenantInventoryController.Stock))
+                .GetCustomAttribute<HttpGetAttribute>()!.Template);
+            Assert.Equal("movements", Action(nameof(TenantInventoryController.ListMovements))
+                .GetCustomAttribute<HttpGetAttribute>()!.Template);
         }
 
         [Fact]
@@ -76,6 +80,8 @@ namespace CafeHub.UnitTests.Inventory
                 [nameof(TenantInventoryController.List)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.Get)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.ListBatches)] = TenantPermissions.InventoryView,
+                [nameof(TenantInventoryController.Stock)] = TenantPermissions.InventoryView,
+                [nameof(TenantInventoryController.ListMovements)] = TenantPermissions.InventoryView,
                 [nameof(TenantInventoryController.Create)] = TenantPermissions.InventoryManage,
                 [nameof(TenantInventoryController.Update)] = TenantPermissions.InventoryManage,
                 [nameof(TenantInventoryController.Deactivate)] = TenantPermissions.InventoryManage,
@@ -285,6 +291,60 @@ namespace CafeHub.UnitTests.Inventory
             Assert.Equal(new DateOnly(2026, 12, 1), query.ExpiryFrom);
             Assert.Equal(2, query.Page);
             Assert.Equal(10, query.PageSize);
+        }
+
+        [Fact]
+        public async Task Stock_SendsTheStockQueryAndReturnsThePage()
+        {
+            var page = new OffsetPage<StockLevelResponse>
+            {
+                Items = new[] { new StockLevelResponse(BatchResponse.ItemId, BranchId, 2.5m, ReceivedDate) },
+                Page = 1,
+                PageSize = 20,
+                TotalCount = 1,
+                HasNextPage = false,
+            };
+            var sender = new RecordingSender { Response = Result.Success(page) };
+            var controller = CreateController(sender);
+            var query = new ListStockLevelsQuery { BranchId = BranchId, Page = 1, PageSize = 20 };
+
+            var actionResult = await controller.Stock("fixture-cafe", query, CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Same(page, okResult.Value);
+            Assert.Same(query, sender.LastRequest);
+        }
+
+        [Fact]
+        public async Task ListMovements_SendsTheMovementQueryAndReturnsThePage()
+        {
+            var movement = new StockMovementResponse(
+                Guid.NewGuid(), BatchResponse.ItemId, BranchId, BatchResponse.Id,
+                "Consume", -1m, "usage", new DateTimeOffset(2026, 11, 25, 9, 0, 0, TimeSpan.Zero),
+                Guid.NewGuid());
+            var page = new OffsetPage<StockMovementResponse>
+            {
+                Items = new[] { movement },
+                Page = 2,
+                PageSize = 10,
+                TotalCount = null,
+                HasNextPage = false,
+            };
+            var sender = new RecordingSender { Response = Result.Success(page) };
+            var controller = CreateController(sender);
+            var query = new ListStockMovementsQuery
+            {
+                BranchId = BranchId,
+                ItemId = movement.ItemId,
+                Type = StockMovementType.Waste,
+                CreatedFrom = ReceivedDate,
+            };
+
+            var actionResult = await controller.ListMovements("fixture-cafe", query, CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Same(page, okResult.Value);
+            Assert.Same(query, sender.LastRequest);
         }
 
         private sealed class RecordingSender : ISender
