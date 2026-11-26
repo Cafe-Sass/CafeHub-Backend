@@ -275,6 +275,10 @@ namespace CafeHub.UnitTests.Inventory
                 Requests.Add(request);
                 return Task.FromResult(Page);
             }
+
+            public Task<InventoryStockLevelPage> ListStockLevelsAsync(
+                InventoryStockLevelRequest request, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The item query tests do not read stock levels.");
         }
     }
 }

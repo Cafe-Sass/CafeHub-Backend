@@ -4,6 +4,9 @@ namespace CafeHub.Application.Inventory
 {
     public static class StockMovementErrors
     {
+        public const string InvalidTypeFilterCode = "Inventory.InvalidMovementTypeFilter";
+        public const string InvalidDateRangeCode = "Inventory.InvalidMovementDateRange";
+
         public static Error InvalidType() =>
             Error.Validation(
                 "Inventory.InvalidMovementType",
@@ -20,6 +23,14 @@ namespace CafeHub.Application.Inventory
         public static Error BatchNotAllowed() =>
             Error.Validation(
                 "Inventory.BatchNotAllowed", "Consume and waste allocate their batches automatically.");
+
+        public static Error InvalidTypeFilter() =>
+            Error.Validation(
+                InvalidTypeFilterCode, "The movement type filter is not defined.");
+
+        public static Error InvalidDateRange() =>
+            Error.Validation(
+                InvalidDateRangeCode, "The movement date range is invalid.");
 
         public static Error BatchNotFound() =>
             Error.NotFound("Inventory.BatchNotFound", "The inventory batch was not found.");

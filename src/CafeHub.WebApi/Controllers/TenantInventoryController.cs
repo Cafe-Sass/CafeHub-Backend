@@ -184,5 +184,31 @@ namespace CafeHub.WebApi.Controllers
             var result = await sender.Send(request with { BranchId = branchId }, cancellationToken);
             return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
+
+        [HttpGet("stock")]
+        [TenantAuthorize(TenantPermissions.InventoryView)]
+        [ProducesResponseType<OffsetPage<StockLevelResponse>>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        public async Task<ActionResult<OffsetPage<StockLevelResponse>>> Stock(
+            [FromRoute] string slug,
+            [FromQuery] ListStockLevelsQuery request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(request, cancellationToken);
+            return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpGet("movements")]
+        [TenantAuthorize(TenantPermissions.InventoryView)]
+        [ProducesResponseType<OffsetPage<StockMovementResponse>>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+        public async Task<ActionResult<OffsetPage<StockMovementResponse>>> ListMovements(
+            [FromRoute] string slug,
+            [FromQuery] ListStockMovementsQuery request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(request, cancellationToken);
+            return result.IsSuccess ? Ok(result.Value) : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
     }
 }

@@ -178,6 +178,56 @@ namespace CafeHub.Infrastructure.Inventory
                 movements.Select(StockMovementResponse.From).ToList());
         }
 
+        public async Task<StockMovementListPage> ListAsync(
+            StockMovementListRequest request, CancellationToken cancellationToken)
+        {
+            var query = context.StockMovements.AsNoTracking();
+            if (request.BranchId is { } branchId)
+            {
+                query = query.Where(movement => movement.BranchId == branchId);
+            }
+
+            if (request.ItemId is { } itemId)
+            {
+                query = query.Where(movement => movement.ItemId == itemId);
+            }
+
+            if (request.Type is { } type)
+            {
+                query = query.Where(movement => movement.Type == type);
+            }
+
+            if (request.CreatedFrom is { } createdFrom)
+            {
+                var from = new DateTimeOffset(createdFrom.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+                query = query.Where(movement => movement.CreatedAt >= from);
+            }
+
+            if (request.CreatedTo is { } createdTo)
+            {
+                var toExclusive = new DateTimeOffset(
+                    createdTo.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+                query = query.Where(movement => movement.CreatedAt < toExclusive);
+            }
+
+            int? totalCount = null;
+            if (request.IncludeTotalCount)
+            {
+                totalCount = await query.CountAsync(cancellationToken);
+            }
+
+            var fetched = await query
+                .OrderByDescending(movement => movement.CreatedAt)
+                .ThenByDescending(movement => movement.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .ToListAsync(cancellationToken);
+
+            return new StockMovementListPage(
+                fetched.Select(StockMovementResponse.From).ToList(),
+                totalCount);
+        }
+
         private async Task<Result<StockMovement>> ApplyAdjustmentAsync(
             Guid branchId,
             Guid itemId,

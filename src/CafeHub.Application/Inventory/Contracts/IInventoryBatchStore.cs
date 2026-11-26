@@ -17,5 +17,8 @@ namespace CafeHub.Application.Inventory.Contracts
 
         Task<Result<InventoryBatchListPage>> ListAsync(
             InventoryBatchListRequest request, CancellationToken cancellationToken);
+
+        Task<InventoryStockLevelPage> ListStockLevelsAsync(
+            InventoryStockLevelRequest request, CancellationToken cancellationToken);
     }
 }

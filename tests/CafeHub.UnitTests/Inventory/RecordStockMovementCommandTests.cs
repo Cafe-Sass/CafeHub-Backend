@@ -197,6 +197,10 @@ namespace CafeHub.UnitTests.Inventory
                 return Task.FromResult(Result.Success<IReadOnlyList<StockMovementResponse>>(
                     new[] { Response }));
             }
+
+            public Task<StockMovementListPage> ListAsync(
+                StockMovementListRequest request, CancellationToken cancellationToken) =>
+                throw new NotSupportedException("The command tests do not list movements.");
         }
 
         private sealed record RecordCall(
