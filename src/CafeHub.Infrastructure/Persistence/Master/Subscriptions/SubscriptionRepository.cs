@@ -22,6 +22,17 @@ namespace CafeHub.Infrastructure.Persistence.Master.Subscriptions
         {
             context.Subscriptions.Add(subscription);
             context.SubscriptionPeriods.Add(initialPeriod);
+            context.SubscriptionHistory.Add(SubscriptionHistory.Create(
+                Guid.CreateVersion7(),
+                subscription.Id,
+                null,
+                subscription.Status,
+                initialPeriod.PlanVersionId,
+                initialPeriod.PeriodNumber,
+                null,
+                null,
+                null,
+                initialPeriod.CreatedAt));
             return Task.CompletedTask;
         }
     }
