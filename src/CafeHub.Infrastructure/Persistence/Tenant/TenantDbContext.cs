@@ -57,6 +57,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant
 
         public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
+        public DbSet<InventoryAlert> InventoryAlerts => Set<InventoryAlert>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
