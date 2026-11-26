@@ -51,11 +51,21 @@ namespace CafeHub.UnitTests
             var ownerOnly = await authorization.AuthorizeAsync(Principal(TenantId), AccessContext(new(false, null, false)), TenantPolicies.TenantOwner);
             var staffUser = await authorization.AuthorizeAsync(Principal(TenantId, "Staff"), TenantPolicies.TenantUser);
             var staffOwner = await authorization.AuthorizeAsync(Principal(TenantId, TenantRoles.Owner), AccessContext(new(true, null, true)), TenantPolicies.TenantOwner);
+            var subscriptionOwner = await authorization.AuthorizeAsync(
+                Principal(TenantId, TenantRoles.Owner),
+                AccessContext(new(false, null, false)),
+                TenantPermissions.SubscriptionManage);
+            var subscriptionStaff = await authorization.AuthorizeAsync(
+                Principal(TenantId, TenantRoles.Owner),
+                AccessContext(new(true, "staff", true)),
+                TenantPermissions.SubscriptionManage);
 
             Assert.True(ownerUser.Succeeded);
             Assert.True(ownerOnly.Succeeded);
             Assert.True(staffUser.Succeeded);
             Assert.False(staffOwner.Succeeded);
+            Assert.True(subscriptionOwner.Succeeded);
+            Assert.False(subscriptionStaff.Succeeded);
         }
 
         [Theory]
@@ -85,7 +95,7 @@ namespace CafeHub.UnitTests
             Assert.True((await authorization.AuthorizeAsync(principal, context, TenantPermissions.StaffManage)).Succeeded);
             Assert.Equal(((TenantAccountAccess)context.Items[typeof(TenantAccountAccess)]!).BranchId, permissions.ExpectedBranchId);
             Assert.False((await authorization.AuthorizeAsync(principal, context, TenantPermissions.StaffRead)).Succeeded);
-            foreach (var policy in new[] { TenantPermissions.RolesManage, TenantPermissions.BranchesManage, TenantPermissions.CafeProfileManage, TenantPolicies.TenantOwner })
+            foreach (var policy in new[] { TenantPermissions.RolesManage, TenantPermissions.BranchesManage, TenantPermissions.CafeProfileManage, TenantPermissions.SubscriptionManage, TenantPolicies.TenantOwner })
             {
                 Assert.False((await authorization.AuthorizeAsync(principal, context, policy)).Succeeded);
             }
@@ -180,8 +190,11 @@ namespace CafeHub.UnitTests
             using var scope = provider.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IAuthorizationService>();
             var identity = new ClaimsIdentity([new Claim(ClaimTypes.Role, "SuperAdmin")], "platform");
+            var superAdmin = new ClaimsPrincipal(identity);
 
-            Assert.True((await service.AuthorizeAsync(new ClaimsPrincipal(identity), PlatformAuthorizationPolicies.SuperAdmin)).Succeeded);
+            Assert.True((await service.AuthorizeAsync(superAdmin, PlatformAuthorizationPolicies.SuperAdmin)).Succeeded);
+            Assert.False((await service.AuthorizeAsync(new ClaimsPrincipal(new ClaimsIdentity()), PlatformAuthorizationPolicies.SuperAdmin)).Succeeded);
+            Assert.False((await service.AuthorizeAsync(Principal(TenantId, TenantRoles.Owner), PlatformAuthorizationPolicies.SuperAdmin)).Succeeded);
         }
 
         [Fact]
