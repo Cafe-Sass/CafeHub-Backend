@@ -72,6 +72,7 @@ namespace CafeHub.WebApi
 
             services.AddSingleton<ConnectorRateLimiter>();
             services.AddScoped<ConnectorKeyAuthorizationFilter>();
+            services.AddScoped<AttendanceDeviceKeyAuthorizationFilter>();
 
             return services;
         }
