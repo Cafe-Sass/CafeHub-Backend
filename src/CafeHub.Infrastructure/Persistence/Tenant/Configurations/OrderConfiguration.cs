@@ -77,6 +77,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .IsUnique();
             builder.HasIndex(order => new { order.BranchId, order.Status, order.SubmittedAt })
                 .HasDatabaseName("ix_orders_branch_id_status_submitted_at");
+            builder.HasIndex(order => new { order.BranchId, order.Status, order.RespondedAt })
+                .HasDatabaseName("ix_orders_branch_id_status_responded_at");
             builder.HasIndex(order => order.TableId).HasDatabaseName("ix_orders_table_id");
             builder.HasIndex(order => order.PlacedByUserId).HasDatabaseName("ix_orders_placed_by_user_id");
             builder.HasIndex(order => order.RespondedByUserId).HasDatabaseName("ix_orders_responded_by_user_id");
