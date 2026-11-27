@@ -50,6 +50,20 @@ namespace CafeHub.UnitTests.Dashboard
         }
 
         [Fact]
+        public void AcceptedOrdersInRange_IncludeAutomaticallyAcceptedWifiOrdersBySubmissionTime()
+        {
+            var inside = NewOrder(BranchA, 5m, From.AddDays(2), OrderServiceType.WifiOnly);
+            inside.AcceptAutomatically(From.AddDays(2));
+            var atTo = NewOrder(BranchA, 7m, To, OrderServiceType.WifiOnly);
+            atTo.AcceptAutomatically(To);
+            var orders = new[] { inside, atTo }.AsQueryable();
+
+            var selected = orders.WhereAcceptedInRange(new DashboardRevenueRequest(null, From, To)).ToList();
+
+            Assert.Equal(new[] { inside.Id }, selected.Select(order => order.Id).ToArray());
+        }
+
+        [Fact]
         public void ConfirmedPaymentsInRange_ExcludePendingReviewRejectedAndOutOfRange()
         {
             var cash = ConfirmedCashPayment(15.5m, From.AddDays(2));
