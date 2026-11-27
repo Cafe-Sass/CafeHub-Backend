@@ -53,7 +53,17 @@ namespace CafeHub.Application.Dashboard.Queries
 
             return Result.Success(new DashboardRevenueResponse(
                 DashboardMetricCatalog.All,
-                new DashboardRevenueMetrics(snapshot.Sales, snapshot.Collected, snapshot.Orders)));
+                new DashboardRevenueMetrics(
+                    snapshot.Sales,
+                    snapshot.Collected,
+                    snapshot.Orders,
+                    ResolveAverageOrderValue(snapshot),
+                    new DashboardPaymentSplit(snapshot.CashCollected, snapshot.OnlineCollected))));
         }
+
+        private static decimal? ResolveAverageOrderValue(DashboardRevenueSnapshot snapshot) =>
+            snapshot.NonWifiOrders == 0
+                ? null
+                : decimal.Round(snapshot.Sales / snapshot.NonWifiOrders, 2);
     }
 }

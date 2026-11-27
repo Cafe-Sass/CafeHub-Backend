@@ -1,5 +1,6 @@
 using CafeHub.Application.Dashboard;
 using CafeHub.Application.Dashboard.Contracts;
+using CafeHub.Domain.Tenants;
 using CafeHub.Infrastructure.Persistence.Tenant;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,8 @@ namespace CafeHub.Infrastructure.Dashboard
                 {
                     Sales = group.Sum(order => order.TotalAmount),
                     Orders = group.Count(),
+                    NonWifiOrders = group.Sum(
+                        order => order.ServiceType == OrderServiceType.WifiOnly ? 0 : 1),
                 })
                 .SingleOrDefaultAsync(cancellationToken);
 
@@ -30,12 +33,18 @@ namespace CafeHub.Infrastructure.Dashboard
                     bill => bill.Id == payment.BillId && bill.BranchId == branchId));
             }
 
-            var collected = await payments.SumAsync(payment => (decimal?)payment.Amount, cancellationToken) ?? 0m;
+            var methodTotals = await payments
+                .GroupBy(payment => payment.Method)
+                .Select(group => new { Method = group.Key, Amount = group.Sum(payment => payment.Amount) })
+                .ToListAsync(cancellationToken);
 
             return new DashboardRevenueSnapshot(
                 orderTotals?.Sales ?? 0m,
-                collected,
-                orderTotals?.Orders ?? 0);
+                methodTotals.Sum(row => row.Amount),
+                orderTotals?.Orders ?? 0,
+                orderTotals?.NonWifiOrders ?? 0,
+                methodTotals.Where(row => row.Method == PaymentMethod.Cash).Sum(row => row.Amount),
+                methodTotals.Where(row => row.Method == PaymentMethod.Online).Sum(row => row.Amount));
         }
     }
 }

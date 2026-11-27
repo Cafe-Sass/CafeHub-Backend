@@ -8,7 +8,10 @@ namespace CafeHub.Application.Dashboard.Contracts
     public sealed record DashboardRevenueSnapshot(
         decimal Sales,
         decimal Collected,
-        int Orders);
+        int Orders,
+        int NonWifiOrders,
+        decimal CashCollected,
+        decimal OnlineCollected);
 
     public interface IDashboardRevenueStore
     {

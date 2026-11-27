@@ -31,5 +31,12 @@ namespace CafeHub.Application.Dashboard
                 && payment.ConfirmedAt >= request.From
                 && payment.ConfirmedAt < request.To);
         }
+
+        public static IQueryable<Order> WhereBillableOrders(this IQueryable<Order> orders)
+        {
+            ArgumentNullException.ThrowIfNull(orders);
+
+            return orders.Where(order => order.ServiceType != OrderServiceType.WifiOnly);
+        }
     }
 }
