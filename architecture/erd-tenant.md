@@ -2,7 +2,7 @@
 
 Entity-relationship design for the per-cafe Tenant database at the baseline scope of `CFMD-254` (owner decision, 2026-10-21): owner and staff identity, the cafe profile, branches, and tenant audit. Modules outside this scope are designed later with their own stories (see `Explicitly out of scope (later stories)` below).
 
-The Tenant model contains 46 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), the money record of its payments (`payments`), the digital receipt snapshot (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`), the cafe WiFi policy with its per-branch network details, paid packages, per-branch WiFi QR, and imported voucher pool (`wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, `wifi_vouchers`), the per-branch printer registry with its document routes (`printers`, `print_routes`), the print job queue (`print_jobs`), the per-branch connector registrations (`print_connectors`), the cafe-wide inventory item catalog (`inventory_items`), the per-branch stock batches received against those items (`inventory_batches`), and the append-only signed stock movements applied to those batches (`stock_movements`).
+The Tenant model contains 49 tables, including `menu_categories` for the cafe-wide menu hierarchy, the product catalog (`products`, `product_sizes`, `product_addons`, `product_tags`), per-branch product availability (`branch_product_availability`), the cafe currency used by menu prices, the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`), the missed-response record (`order_response_misses`, `order_response_miss_holders`), the guest device mutes (`guest_mutes`), the per-table settlement bill (`bills`), the money record of its payments (`payments`), cafe payment refund requests and their attachments and events (`refund_requests`, `refund_request_attachments`, `refund_request_events`), the digital receipt snapshot (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`), the cafe WiFi policy with its per-branch network details, paid packages, per-branch WiFi QR, and imported voucher pool (`wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, `wifi_vouchers`), the per-branch printer registry with its document routes (`printers`, `print_routes`), the print job queue (`print_jobs`), the per-branch connector registrations (`print_connectors`), the cafe-wide inventory item catalog (`inventory_items`), the per-branch stock batches received against those items (`inventory_batches`), and the append-only signed stock movements applied to those batches (`stock_movements`).
 
 Derived from the decisions recorded in `architecture/database-conventions.md`, `architecture/database-schema-decisions.md`, `architecture/architecture-decisions.md`, and `architecture/erd-master.md`, cited through PRD requirement identifiers (the PRD v1.1 text stays untracked). Every naming, type, and deletion rule here follows `architecture/database-conventions.md`: logical deletion (PRD section 9, rule 23), no tenant discriminator column (one database per cafe), UUIDv7 keys, snake_case naming, `timestamptz` UTC timestamps, and text + CHECK status labels. Items marked **Proposed** await owner confirmation. This amendment adds the product schema and the cafe currency used by menu prices; the order schema (`orders`, `order_items`, `order_item_addons`, `order_number_counters`) is added by the same amendment for Story CFMD-404; later entities and migrations consume this ERD through their own stories. The bill schema (`bills` and the nullable `orders.bill_id`) is added by the amendment for Story CFMD-425 (CFMD-426). The payment schema (`payments`) is added by the amendment for Story CFMD-425 (CFMD-427). The receipt schema (`receipts`, `receipt_lines`, `receipt_payments`, `receipt_number_counters`) is added by the amendment for Story CFMD-433 (CFMD-434). The WiFi settings schema (`wifi_settings`, `branch_wifi_networks`) is added by the amendment for Story CFMD-436 (CFMD-437). The paid WiFi package schema (`wifi_packages`) is added by the same story (CFMD-438). The branch WiFi QR (`branch_wifi_qr`) is added by the same story (CFMD-439). The WiFi voucher pool (`wifi_vouchers`) is added by Story CFMD-440 (CFMD-441). The WiFi package order lines and the WiFi-only order shape are added by the same story (CFMD-442). Voucher assignment, the released code on guest status and receipt lines (`receipt_lines.wifi_code`), and the issued lookup are added by the same story (CFMD-443). The printer registry and its document routes (`printers`, `print_routes`) are added by Story CFMD-444 (CFMD-445). The print job queue (`print_jobs`) is added by the same story (CFMD-446). The connector registrations (`print_connectors`) are added by the same story (CFMD-447). The inventory item catalog (`inventory_items`) is added by Story CFMD-448 (CFMD-449). The per-branch stock batch schema (`inventory_batches`) is added by the same story (CFMD-450). The stock movement schema (`stock_movements`) is added by Story CFMD-452 (CFMD-453).
 
@@ -212,6 +212,43 @@ erDiagram
         timestamptz lifted_at
         uuid lifted_by_user_id FK
     }
+    refund_requests {
+        uuid id PK
+        uuid bill_id FK
+        uuid payment_id FK
+        uuid order_id FK
+        uuid branch_id FK
+        text public_reference UK
+        text idempotency_key UK
+        text status
+        text reason
+        text details
+        numeric claimed_amount
+        uuid assigned_user_id FK
+        text resolution_note
+        uuid decided_by_user_id FK
+        timestamptz decided_at
+    }
+    refund_request_attachments {
+        uuid id PK
+        uuid refund_request_id FK
+        text media_key
+        text content_type
+        bigint size_bytes
+        text sha256
+        timestamptz created_at
+    }
+    refund_request_events {
+        uuid id PK
+        uuid refund_request_id FK
+        text kind
+        text from_status
+        text to_status
+        text actor_kind
+        uuid actor_user_id FK
+        text note
+        timestamptz occurred_at
+    }
     receipts {
         uuid id PK
         uuid bill_id FK, UK
@@ -403,6 +440,15 @@ erDiagram
     bills ||--o{ payments : "payments"
     orders |o--o{ payments : "named settlement"
     tenant_users |o--o{ payments : "confirmed by"
+    bills ||--o{ refund_requests : "refund requests"
+    payments ||--o{ refund_requests : "refund requests"
+    orders |o--o{ refund_requests : "optional order"
+    branches ||--o{ refund_requests : "scope"
+    tenant_users |o--o{ refund_requests : "assigned staff"
+    tenant_users |o--o{ refund_requests : "decision and audit actors"
+    refund_requests ||--o{ refund_request_attachments : "evidence"
+    refund_requests ||--o{ refund_request_events : "events"
+    tenant_users |o--o{ refund_request_events : "staff actor"
     bills |o--o| receipts : "receipt"
     branches ||--o{ receipts : "receipts"
     receipts ||--o{ receipt_lines : "lines"
@@ -837,6 +883,52 @@ Purpose: the money record of one confirmed or pending payment against a bill (FR
 - `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, `updated_by uuid NULL FK tenant_users.id`, each actor foreign key named `fk_payments_created_by` / `fk_payments_updated_by` with ON DELETE RESTRICT and its own index.
 - Payment rows are never physically deleted; settlement history is immutable financial history.
 
+### refund_requests
+
+Purpose: a cafe's request record for a guest asking the cafe to consider returning part or all of a confirmed bill payment. Approval records only the cafe's agreement; no payment provider is called and no payment, bill, order, or receipt is changed (CFMD-466). Refund money movement and chargeback behavior remain TBD-02, TBD-05, and TBD-06.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_refund_requests`.
+- `bill_id uuid NOT NULL` — `fk_refund_requests_bill_id` references `bills.id` (ON DELETE RESTRICT); `ix_refund_requests_bill_id`.
+- `payment_id uuid NOT NULL` — `fk_refund_requests_payment_id` references `payments.id` (ON DELETE RESTRICT); `ix_refund_requests_payment_id`. The domain requires that the payment is Confirmed and belongs to `bill_id`; existing payment and bill tables are unchanged.
+- `order_id uuid NULL` — `fk_refund_requests_order_id` references `orders.id` (ON DELETE RESTRICT); `ix_refund_requests_order_id`. It is copied from the selected payment's optional order.
+- `branch_id uuid NOT NULL` — `fk_refund_requests_branch_id` references `branches.id` (ON DELETE RESTRICT); `ix_refund_requests_branch_id`. It is copied from the bill and is used for staff scope checks.
+- `public_reference text NOT NULL` — `ck_refund_requests_public_reference_format CHECK (char_length(public_reference) = 22 AND public_reference ~ '^[A-Za-z0-9_-]{22}$')`; 16 random bytes encoded base64url, unique through `uq_refund_requests_public_reference`.
+- `idempotency_key text NOT NULL` — `ck_refund_requests_idempotency_key_format CHECK (char_length(idempotency_key) BETWEEN 8 AND 64 AND idempotency_key ~ '^[A-Za-z0-9_-]+$')`; `uq_refund_requests_branch_idempotency_key` on `(branch_id, idempotency_key)` makes a replay within the bill's branch unique.
+- `status text NOT NULL` — `ck_refund_requests_status` over `('Open', 'InReview', 'Approved', 'Rejected')`.
+- `reason text NOT NULL` — `ck_refund_requests_reason_length CHECK (char_length(btrim(reason)) BETWEEN 3 AND 256)`.
+- `details text NULL` — `ck_refund_requests_details_length CHECK (details IS NULL OR char_length(details) <= 2000)`.
+- `claimed_amount numeric(12,2) NOT NULL` — `ck_refund_requests_claimed_amount CHECK (claimed_amount > 0)`; the domain also rejects an amount greater than the payment's amount less refunds already Approved for it.
+- `guest_display_name text NULL` — the only optional guest contact-like field stored by the request.
+- `assigned_user_id uuid NULL` — `fk_refund_requests_assigned_user_id` references `tenant_users.id` (ON DELETE RESTRICT); `ix_refund_requests_assigned_user_id`.
+- `resolution_note text NULL`, `decided_by_user_id uuid NULL`, and `decided_at timestamptz NULL` — `fk_refund_requests_decided_by_user_id` references `tenant_users.id` (ON DELETE RESTRICT); `ix_refund_requests_decided_by_user_id`. `ck_refund_requests_decision_pair` requires all three to be populated with a nonblank note for Approved/Rejected, and NULL for Open/InReview.
+- `created_at timestamptz NOT NULL`, `updated_at timestamptz NOT NULL`, `created_by uuid NULL FK tenant_users.id`, and `updated_by uuid NULL FK tenant_users.id`, named `fk_refund_requests_created_by` and `fk_refund_requests_updated_by` with ON DELETE RESTRICT and indexes `ix_refund_requests_created_by` and `ix_refund_requests_updated_by`.
+- `xmin` row version — the aggregate concurrency token.
+
+### refund_request_attachments
+
+Purpose: metadata connecting a request to validated evidence in the tenant media store. Binary content stays in media storage; only its scoped key and validation metadata are stored here.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_refund_request_attachments`.
+- `refund_request_id uuid NOT NULL` — `fk_refund_request_attachments_refund_request_id` references `refund_requests.id` (ON DELETE RESTRICT); `ix_refund_request_attachments_refund_request_id`.
+- `media_key text NOT NULL` — `ck_refund_request_attachments_media_key_length CHECK (char_length(media_key) BETWEEN 1 AND 512)`; this is the tenant-scoped media key, never the file contents.
+- `content_type text NOT NULL` — `ck_refund_request_attachments_content_type` over `('image/jpeg', 'image/png', 'image/webp', 'application/pdf')`, matching `MediaPurpose.RefundEvidence`.
+- `size_bytes bigint NOT NULL` — `ck_refund_request_attachments_size CHECK (size_bytes > 0)`.
+- `sha256 text NOT NULL` — `ck_refund_request_attachments_sha256 CHECK (sha256 ~ '^[0-9a-f]{64}$')`.
+- `created_at timestamptz NOT NULL` — time the validated media was attached.
+
+### refund_request_events
+
+Purpose: append-only request lifecycle and staff-action history. Notes are the event/resolution note only; request details and file keys are not audit snapshots.
+
+- `id uuid NOT NULL` — app-generated UUIDv7; `pk_refund_request_events`.
+- `refund_request_id uuid NOT NULL` — `fk_refund_request_events_refund_request_id` references `refund_requests.id` (ON DELETE RESTRICT); `ix_refund_request_events_refund_request_id`.
+- `kind text NOT NULL` — `ck_refund_request_events_kind` over `('Submitted', 'Assigned', 'StatusChanged')`.
+- `from_status text NULL` and `to_status text NULL` — `ck_refund_request_events_from_status` and `ck_refund_request_events_to_status` each allow only `('Open', 'InReview', 'Approved', 'Rejected')` when present.
+- `actor_kind text NOT NULL` — `ck_refund_request_events_actor_kind` over `('Guest', 'Staff')`; `ck_refund_request_events_actor_pair` requires `actor_user_id` NULL for Guest and non-NULL for Staff.
+- `actor_user_id uuid NULL` — `fk_refund_request_events_actor_user_id` references `tenant_users.id` (ON DELETE RESTRICT); `ix_refund_request_events_actor_user_id`.
+- `note text NULL` — optional event note; never contains request details or file metadata.
+- `occurred_at timestamptz NOT NULL` — event time from `TimeProvider`.
+
 ### receipts
 
 Purpose: the immutable digital receipt created exactly once when a bill becomes fully paid (FR-REC-001, Story CFMD-433, CFMD-434). It is a convenience record of what was bought and paid and is never presented as tax-compliance proof (FR-REC-002). A bill force-closed while money is still owed has no receipt. The receipt and its lines and payment snapshots are append-only: application workflows never update or delete them after insertion, so a later product price or order change cannot rewrite history.
@@ -1153,7 +1245,7 @@ Purpose: one received fingerprint event (FR-ATT-004, Story CFMD-459, CFMD-461). 
 - Cafe tables and QR codes — the `branch_tables` schema and QR column are defined above; the customer table QR journeys and reprint flows remain later work (FR-CAF-004).
 - Product images, OCR-assisted import, and promotional banners (FR-MENU-002 through FR-MENU-006); the product catalog and per-branch availability schemas are defined above.
 - Ordering beyond the schema — guest status reads, captain (assisted) ordering, staff accept/reject handling, expiry of unanswered orders, and guest device mutes shipped with their own stories (FR-ORD-001 through FR-ORD-010), and the `orders`, `order_items`, `order_item_addons`, `order_number_counters`, `order_response_misses`, `order_response_miss_holders`, and `guest_mutes` schemas are defined above. Customer identity stays absent by design (FR-IAM-004; guest data minimization TBD-10); blocking by IP address is not modeled (FR-ORD-010).
-- Online payments, receipts, and refunds — the online provider flows and refund handling; the `payments` schema, its staff review, and the receipt schema are defined above (FR-PAY-001 through FR-PAY-006, FR-REC-001, FR-REC-002; provider decisions TBD-02, TBD-05; refund handling TBD-06).
+- Online payment provider settlement and refund money movement — cafe refund requests are recorded separately in `refund_requests`, `refund_request_attachments`, and `refund_request_events`; approval records the cafe's decision and does not change payments, bills, orders, or receipts. Provider settlement and chargeback behavior remains TBD-02, TBD-05, and TBD-06.
 - Paid WiFi purchases and redemption — package order lines, voucher assignment and release, issued lookup, and router/captive-portal integration (FR-WIFI-004 through FR-WIFI-006; TBD-07, TBD-08); the `wifi_settings`, `branch_wifi_networks`, `wifi_packages`, `branch_wifi_qr`, and `wifi_vouchers` schemas are defined above.
 - Attendance beyond the settings, the QR sessions, the check-in/check-out records, the registered devices, and the received device events — attendance reporting and payroll exports (FR-ATT-001 through FR-ATT-004); the `attendance_settings`, `attendance_qr_sessions`, `attendance_records`, `attendance_devices`, `attendance_device_codes`, and `attendance_device_events` schemas are defined above.
 - Printing beyond the registry, routes, queue, and connector API — the Windows and Android connector applications and the printer drivers themselves (FR-PRN-001 through FR-PRN-005; the PRD marks the hardware/protocol matrix TBD-13); the `printers`, `print_routes`, `print_jobs`, and `print_connectors` schemas and the connector HTTP API are defined above and in `architecture/api-and-configuration-reference.md`.
