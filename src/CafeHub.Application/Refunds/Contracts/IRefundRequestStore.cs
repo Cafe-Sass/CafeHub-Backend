@@ -23,5 +23,29 @@ namespace CafeHub.Application.Refunds.Contracts
         Task<Result<RefundRequestInsertResult>> AddAsync(
             RefundRequest request,
             CancellationToken cancellationToken);
+
+        Task<RefundRequestListPage> ListAsync(
+            RefundRequestListRequest request,
+            CancellationToken cancellationToken);
+
+        Task<RefundRequest?> FindAsync(
+            Guid? branchId,
+            Guid refundRequestId,
+            CancellationToken cancellationToken);
+
+        Task<RefundRequestAttachment?> FindAttachmentAsync(
+            Guid? branchId,
+            Guid refundRequestId,
+            Guid attachmentId,
+            CancellationToken cancellationToken);
+
+        Task<bool> IsAssignableStaffAsync(
+            Guid branchId,
+            Guid userId,
+            CancellationToken cancellationToken);
+
+        Task<Result> SaveAsync(
+            RefundRequest request,
+            CancellationToken cancellationToken);
     }
 }
