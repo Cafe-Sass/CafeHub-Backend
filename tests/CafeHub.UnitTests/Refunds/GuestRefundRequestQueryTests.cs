@@ -123,6 +123,30 @@ namespace CafeHub.UnitTests.Refunds
             public Task<Result<RefundRequestInsertResult>> AddAsync(
                 RefundRequest request,
                 CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<RefundRequestListPage> ListAsync(
+                RefundRequestListRequest request,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<RefundRequest?> FindAsync(
+                Guid? branchId,
+                Guid refundRequestId,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<RefundRequestAttachment?> FindAttachmentAsync(
+                Guid? branchId,
+                Guid refundRequestId,
+                Guid attachmentId,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<bool> IsAssignableStaffAsync(
+                Guid branchId,
+                Guid userId,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<Result> SaveAsync(
+                RefundRequest request,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
         }
     }
 }

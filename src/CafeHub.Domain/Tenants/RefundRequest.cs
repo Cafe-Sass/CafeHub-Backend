@@ -163,6 +163,32 @@ namespace CafeHub.Domain.Tenants
             return true;
         }
 
+        public void Assign(
+            Guid eventId,
+            Guid assignedUserId,
+            Guid actorUserId,
+            DateTimeOffset now)
+        {
+            if (eventId == Guid.Empty || assignedUserId == Guid.Empty || actorUserId == Guid.Empty)
+            {
+                throw new ArgumentException("The assignment identifiers are required.");
+            }
+
+            AssignedUserId = assignedUserId;
+            UpdatedAt = now;
+            UpdatedBy = actorUserId;
+            events.Add(RefundRequestEvent.Create(
+                eventId,
+                Id,
+                RefundRequestEventKind.Assigned,
+                null,
+                null,
+                RefundRequestActorKind.Staff,
+                actorUserId,
+                null,
+                now));
+        }
+
         public bool TransitionTo(
             Guid eventId,
             RefundRequestStatus target,

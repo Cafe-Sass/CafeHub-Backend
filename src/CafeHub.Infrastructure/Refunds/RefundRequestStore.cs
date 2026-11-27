@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Idempotency;
+using CafeHub.Application.Refunds;
 using CafeHub.Application.Refunds.Contracts;
 using CafeHub.Application.Refunds.DTOs;
 using CafeHub.Domain.Tenants;
@@ -152,6 +153,124 @@ namespace CafeHub.Infrastructure.Refunds
                 }
 
                 return Result.Success(new RefundRequestInsertResult(existing, true));
+            }
+        }
+
+        public async Task<RefundRequestListPage> ListAsync(
+            RefundRequestListRequest request,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            var requests = context.RefundRequests.AsNoTracking();
+            if (request.BranchId is { } branchId)
+            {
+                requests = requests.Where(candidate => candidate.BranchId == branchId);
+            }
+
+            if (request.Status is { } status)
+            {
+                requests = requests.Where(candidate => candidate.Status == status);
+            }
+
+            if (request.AssignedUserId is { } assignedUserId)
+            {
+                requests = requests.Where(candidate => candidate.AssignedUserId == assignedUserId);
+            }
+
+            if (request.BillId is { } billId)
+            {
+                requests = requests.Where(candidate => candidate.BillId == billId);
+            }
+
+            int? totalCount = request.IncludeTotalCount
+                ? await requests.CountAsync(cancellationToken)
+                : null;
+
+            var rows = await requests
+                .OrderByDescending(candidate => candidate.CreatedAt)
+                .ThenByDescending(candidate => candidate.Id)
+                .Skip((request.Page - 1) * request.PageSize)
+                .Take(request.PageSize + 1)
+                .Select(candidate => new RefundRequestListItem(
+                    candidate.Id,
+                    candidate.BillId,
+                    candidate.PaymentId,
+                    candidate.BranchId,
+                    candidate.PublicReference,
+                    candidate.Status.ToString(),
+                    candidate.Reason,
+                    candidate.ClaimedAmount,
+                    candidate.GuestDisplayName,
+                    candidate.AssignedUserId,
+                    candidate.CreatedAt,
+                    candidate.UpdatedAt))
+                .ToListAsync(cancellationToken);
+
+            return new RefundRequestListPage(rows, totalCount);
+        }
+
+        public async Task<RefundRequest?> FindAsync(
+            Guid? branchId,
+            Guid refundRequestId,
+            CancellationToken cancellationToken)
+        {
+            IQueryable<RefundRequest> requests = context.RefundRequests
+                .Include(request => request.Events)
+                .Include(request => request.Attachments)
+                .Where(request => request.Id == refundRequestId);
+            if (branchId is { } branch)
+            {
+                requests = requests.Where(request => request.BranchId == branch);
+            }
+
+            return await requests.SingleOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<RefundRequestAttachment?> FindAttachmentAsync(
+            Guid? branchId,
+            Guid refundRequestId,
+            Guid attachmentId,
+            CancellationToken cancellationToken)
+        {
+            var requests = context.RefundRequests.AsNoTracking()
+                .Where(request => request.Id == refundRequestId);
+            if (branchId is { } branch)
+            {
+                requests = requests.Where(request => request.BranchId == branch);
+            }
+
+            return await requests
+                .SelectMany(request => request.Attachments)
+                .SingleOrDefaultAsync(attachment => attachment.Id == attachmentId, cancellationToken);
+        }
+
+        public async Task<bool> IsAssignableStaffAsync(
+            Guid branchId,
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var user = await context.TenantUsers.AsNoTracking()
+                .Where(candidate => candidate.Id == userId && candidate.DeletedAt == null)
+                .Select(candidate => new { candidate.UserKind, candidate.BranchId })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return user is not null
+                && RefundRequestAssignment.IsAllowed(user.UserKind, user.BranchId, branchId);
+        }
+
+        public async Task<Result> SaveAsync(RefundRequest request, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+                return Result.Success();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result.Failure(RefundRequestErrors.ConcurrencyConflict());
             }
         }
 
