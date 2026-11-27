@@ -8,7 +8,7 @@ namespace CafeHub.Application.Dashboard
                 new DashboardMetricDefinition(
                     DashboardMetricKeys.Sales,
                     "Sales",
-                    "Sum of Accepted order totals, selected by acceptance time (responded_at), inside the cafe-local range.",
+                    "Sum of Accepted order totals, selected by acceptance time (responded_at, or submitted_at for an automatically accepted WiFi-only order), inside the cafe-local range.",
                     new[] { "Accepted orders", "menu order totals", "WiFi package totals" },
                     new[] { "Pending, Rejected, and Expired orders", "refunds" }),
                 new DashboardMetricDefinition(
@@ -20,7 +20,7 @@ namespace CafeHub.Application.Dashboard
                 new DashboardMetricDefinition(
                     DashboardMetricKeys.Orders,
                     "Orders",
-                    "Count of Accepted orders, selected by acceptance time (responded_at), inside the cafe-local range.",
+                    "Count of Accepted orders, selected by acceptance time (responded_at, or submitted_at for an automatically accepted WiFi-only order), inside the cafe-local range.",
                     new[] { "Accepted orders, menu and WiFi" },
                     new[] { "Pending, Rejected, and Expired orders" }),
                 new DashboardMetricDefinition(
@@ -35,6 +35,18 @@ namespace CafeHub.Application.Dashboard
                     "Confirmed payment amounts grouped by method (Cash and Online), selected by confirmation time (confirmed_at), inside the cafe-local range.",
                     new[] { "Confirmed Cash and Online payments" },
                     new[] { "PendingReview and Rejected payments", "refunds" }),
+                new DashboardMetricDefinition(
+                    DashboardMetricKeys.BestSellers,
+                    "Best sellers",
+                    "Top 20 menu products from Accepted orders, ranked by total quantity and by line sales, with ties broken by product name then product id.",
+                    new[] { "Accepted orders", "order item name, quantity, and line total snapshots" },
+                    new[] { "Pending, Rejected, and Expired orders", "WiFi package lines", "the live product catalog name" }),
+                new DashboardMetricDefinition(
+                    DashboardMetricKeys.PeakHours,
+                    "Peak hours",
+                    "Count of Accepted orders for each cafe-local hour of acceptance, with all 24 hours returned.",
+                    new[] { "Accepted orders", "cafe-local hour of acceptance" },
+                    new[] { "Pending, Rejected, and Expired orders" }),
             });
     }
 }

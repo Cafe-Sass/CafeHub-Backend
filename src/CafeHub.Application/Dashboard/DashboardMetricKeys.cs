@@ -7,8 +7,19 @@ namespace CafeHub.Application.Dashboard
         public const string Orders = "orders";
         public const string AverageOrderValue = "averageOrderValue";
         public const string PaymentSplit = "paymentSplit";
+        public const string BestSellers = "bestSellers";
+        public const string PeakHours = "peakHours";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { Sales, Collected, Orders, AverageOrderValue, PaymentSplit });
+            new[]
+            {
+                Sales,
+                Collected,
+                Orders,
+                AverageOrderValue,
+                PaymentSplit,
+                BestSellers,
+                PeakHours,
+            });
     }
 }
