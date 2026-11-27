@@ -10,10 +10,23 @@ namespace CafeHub.Application.Dashboard.DTOs
         int Hour,
         int Orders);
 
+    public sealed record DashboardWifiAttachRate(
+        decimal? Rate,
+        string? Reason);
+
+    public sealed record DashboardNearExpiryItem(
+        Guid ItemId,
+        string ItemName,
+        Guid BranchId,
+        Guid BatchId,
+        DateOnly ExpiryDate);
+
     public sealed record DashboardSalesInsightsMetrics(
         IReadOnlyList<DashboardBestSeller> BestSellersByQuantity,
         IReadOnlyList<DashboardBestSeller> BestSellersBySales,
-        IReadOnlyList<DashboardPeakHour> PeakHours);
+        IReadOnlyList<DashboardPeakHour> PeakHours,
+        DashboardWifiAttachRate WifiAttachRate,
+        IReadOnlyList<DashboardNearExpiryItem> NearExpiryItems);
 
     public sealed record DashboardSalesInsightsResponse(
         IReadOnlyList<DashboardMetricDefinition> MetricDefinitions,

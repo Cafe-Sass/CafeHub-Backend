@@ -1,11 +1,18 @@
 using CafeHub.Application.Dashboard.Contracts;
 using CafeHub.Application.Dashboard.DTOs;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.Application.Dashboard
 {
     public static class DashboardInsightsRules
     {
         public const int MaximumBestSellers = 20;
+
+        public const string WifiPolicyFreeReason =
+            "The WiFi attach rate is available only while the cafe WiFi policy is Paid.";
+
+        public const string NoDineInOrdersReason =
+            "There were no Accepted dine-in orders in the range.";
 
         public static IReadOnlyList<DashboardBestSeller> RankBestSellersByQuantity(
             IEnumerable<DashboardProductSalesRow> rows) =>
@@ -41,6 +48,26 @@ namespace CafeHub.Application.Dashboard
             return Enumerable.Range(0, 24)
                 .Select(hour => new DashboardPeakHour(hour, counts[hour]))
                 .ToList();
+        }
+
+        public static DashboardWifiAttachRate ResolveWifiAttachRate(
+            WifiPolicy policy,
+            int dineInOrders,
+            int dineInOrdersWithWifiPackage)
+        {
+            if (policy != WifiPolicy.Paid)
+            {
+                return new DashboardWifiAttachRate(null, WifiPolicyFreeReason);
+            }
+
+            if (dineInOrders == 0)
+            {
+                return new DashboardWifiAttachRate(null, NoDineInOrdersReason);
+            }
+
+            return new DashboardWifiAttachRate(
+                decimal.Round((decimal)dineInOrdersWithWifiPackage / dineInOrders, 4),
+                null);
         }
 
         private static IEnumerable<DashboardBestSeller> Merge(IEnumerable<DashboardProductSalesRow> rows)

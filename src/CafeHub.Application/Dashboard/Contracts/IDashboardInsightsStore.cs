@@ -11,9 +11,19 @@ namespace CafeHub.Application.Dashboard.Contracts
         int Quantity,
         decimal Sales);
 
+    public sealed record DashboardNearExpiryRow(
+        Guid ItemId,
+        string ItemName,
+        Guid BranchId,
+        Guid BatchId,
+        DateOnly ExpiryDate);
+
     public sealed record DashboardInsightsSnapshot(
         IReadOnlyList<DashboardProductSalesRow> ProductSales,
-        IReadOnlyList<DateTimeOffset> AcceptedOrderTimes);
+        IReadOnlyList<DateTimeOffset> AcceptedOrderTimes,
+        int AcceptedDineInOrders,
+        int AcceptedDineInOrdersWithWifiPackage,
+        IReadOnlyList<DashboardNearExpiryRow> NearExpiryItems);
 
     public interface IDashboardInsightsStore
     {

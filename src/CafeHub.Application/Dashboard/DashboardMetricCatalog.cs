@@ -47,6 +47,18 @@ namespace CafeHub.Application.Dashboard
                     "Count of Accepted orders for each cafe-local hour of acceptance, with all 24 hours returned.",
                     new[] { "Accepted orders", "cafe-local hour of acceptance" },
                     new[] { "Pending, Rejected, and Expired orders" }),
+                new DashboardMetricDefinition(
+                    DashboardMetricKeys.WifiAttachRate,
+                    "WiFi attach rate",
+                    "Accepted dine-in orders with a WiFi package line divided by Accepted dine-in orders, rounded to four decimals; null with a reason under the Free policy or when there are no Accepted dine-in orders.",
+                    new[] { "Accepted dine-in orders", "order item WiFi package snapshots" },
+                    new[] { "Takeaway and WiFi-only orders", "the Free WiFi policy" }),
+                new DashboardMetricDefinition(
+                    DashboardMetricKeys.NearExpiryItems,
+                    "Near-expiry items",
+                    "Open NearExpiry stock alerts in the branch scope, with their item, branch, batch, and expiry date.",
+                    new[] { "Open NearExpiry stock alerts" },
+                    new[] { "Resolved alerts", "LowStock and Expired alerts" }),
             });
     }
 }

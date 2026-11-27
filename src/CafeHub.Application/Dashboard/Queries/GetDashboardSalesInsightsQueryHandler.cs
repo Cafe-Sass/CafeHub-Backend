@@ -4,11 +4,13 @@ using CafeHub.Application.CafeProfile.Contracts;
 using CafeHub.Application.Dashboard.Contracts;
 using CafeHub.Application.Dashboard.DTOs;
 using CafeHub.Application.Identity;
+using CafeHub.Application.Wifi.Contracts;
 
 namespace CafeHub.Application.Dashboard.Queries
 {
     public sealed class GetDashboardSalesInsightsQueryHandler(
         IDashboardInsightsStore store,
+        IWifiSettingsStore wifiSettingsStore,
         ICafeSettingsReader settingsReader,
         ICurrentTenantUser currentUser)
         : IQueryHandler<GetDashboardSalesInsightsQuery, DashboardSalesInsightsResponse>
@@ -47,6 +49,7 @@ namespace CafeHub.Application.Dashboard.Queries
                 return Result.Failure<DashboardSalesInsightsResponse>(range.Error!);
             }
 
+            var wifiSettings = await wifiSettingsStore.GetAsync(null, cancellationToken);
             var snapshot = await store.GetAsync(
                 new DashboardInsightsRequest(scope.Value ?? query.BranchId, range.Value.From, range.Value.To),
                 cancellationToken);
@@ -56,7 +59,26 @@ namespace CafeHub.Application.Dashboard.Queries
                 new DashboardSalesInsightsMetrics(
                     DashboardInsightsRules.RankBestSellersByQuantity(snapshot.ProductSales),
                     DashboardInsightsRules.RankBestSellersBySales(snapshot.ProductSales),
-                    DashboardInsightsRules.GroupPeakHours(snapshot.AcceptedOrderTimes, timeZone))));
+                    DashboardInsightsRules.GroupPeakHours(snapshot.AcceptedOrderTimes, timeZone),
+                    DashboardInsightsRules.ResolveWifiAttachRate(
+                        wifiSettings.Policy,
+                        snapshot.AcceptedDineInOrders,
+                        snapshot.AcceptedDineInOrdersWithWifiPackage),
+                    OrderNearExpiry(snapshot.NearExpiryItems))));
         }
+
+        private static IReadOnlyList<DashboardNearExpiryItem> OrderNearExpiry(
+            IReadOnlyList<DashboardNearExpiryRow> items) =>
+            items
+                .OrderBy(item => item.ExpiryDate)
+                .ThenBy(item => item.ItemName, StringComparer.Ordinal)
+                .ThenBy(item => item.BatchId)
+                .Select(item => new DashboardNearExpiryItem(
+                    item.ItemId,
+                    item.ItemName,
+                    item.BranchId,
+                    item.BatchId,
+                    item.ExpiryDate))
+                .ToList();
     }
 }

@@ -9,6 +9,8 @@ namespace CafeHub.Application.Dashboard
         public const string PaymentSplit = "paymentSplit";
         public const string BestSellers = "bestSellers";
         public const string PeakHours = "peakHours";
+        public const string WifiAttachRate = "wifiAttachRate";
+        public const string NearExpiryItems = "nearExpiryItems";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
             new[]
@@ -20,6 +22,8 @@ namespace CafeHub.Application.Dashboard
                 PaymentSplit,
                 BestSellers,
                 PeakHours,
+                WifiAttachRate,
+                NearExpiryItems,
             });
     }
 }
