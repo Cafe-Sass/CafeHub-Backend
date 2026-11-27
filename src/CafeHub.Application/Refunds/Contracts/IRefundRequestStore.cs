@@ -13,5 +13,15 @@ namespace CafeHub.Application.Refunds.Contracts
         Task<GuestRefundRequestStatus?> FindGuestStatusAsync(
             string publicReference,
             CancellationToken cancellationToken);
+
+        Task<RefundRequestSubmissionContext?> FindForSubmissionAsync(
+            string billReference,
+            Guid paymentId,
+            string idempotencyKey,
+            CancellationToken cancellationToken);
+
+        Task<Result<RefundRequestInsertResult>> AddAsync(
+            RefundRequest request,
+            CancellationToken cancellationToken);
     }
 }

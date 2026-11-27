@@ -1,7 +1,9 @@
+using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Refunds;
 using CafeHub.Application.Refunds.Contracts;
 using CafeHub.Application.Refunds.DTOs;
 using CafeHub.Application.Refunds.Queries;
+using CafeHub.Domain.Tenants;
 
 namespace CafeHub.UnitTests.Refunds
 {
@@ -56,6 +58,15 @@ namespace CafeHub.UnitTests.Refunds
             Assert.Equal(BillReference, store.PublicReference);
         }
 
+        [Fact]
+        public void RefundStatusProjection_HidesTheResolutionNoteUntilADecision()
+        {
+            Assert.Null(GuestRefundRequestStatus.From(BillReference, RefundRequestStatus.Open, "Internal note").ResolutionNote);
+            Assert.Null(GuestRefundRequestStatus.From(BillReference, RefundRequestStatus.InReview, "Internal note").ResolutionNote);
+            Assert.Equal("Reviewed", GuestRefundRequestStatus.From(BillReference, RefundRequestStatus.Approved, "Reviewed").ResolutionNote);
+            Assert.Equal("Reviewed", GuestRefundRequestStatus.From(BillReference, RefundRequestStatus.Rejected, "Reviewed").ResolutionNote);
+        }
+
         [Theory]
         [InlineData("short")]
         [InlineData("ZYXWVUTSRQPONMLKJIHGFE")]
@@ -102,6 +113,16 @@ namespace CafeHub.UnitTests.Refunds
                 PublicReference = publicReference;
                 return Task.FromResult(GuestStatus);
             }
+
+            public Task<RefundRequestSubmissionContext?> FindForSubmissionAsync(
+                string billReference,
+                Guid paymentId,
+                string idempotencyKey,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
+
+            public Task<Result<RefundRequestInsertResult>> AddAsync(
+                RefundRequest request,
+                CancellationToken cancellationToken) => throw new NotSupportedException();
         }
     }
 }
