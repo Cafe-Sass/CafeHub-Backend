@@ -9,14 +9,24 @@ namespace CafeHub.Application.Dashboard
             this IQueryable<Order> orders,
             DashboardRevenueRequest request)
         {
-            ArgumentNullException.ThrowIfNull(orders);
             ArgumentNullException.ThrowIfNull(request);
+
+            return orders.WhereAcceptedInRange(request.BranchId, request.From, request.To);
+        }
+
+        public static IQueryable<Order> WhereAcceptedInRange(
+            this IQueryable<Order> orders,
+            Guid? branchId,
+            DateTimeOffset from,
+            DateTimeOffset to)
+        {
+            ArgumentNullException.ThrowIfNull(orders);
 
             return orders.Where(order =>
                 order.Status == OrderStatus.Accepted
-                && order.RespondedAt >= request.From
-                && order.RespondedAt < request.To
-                && (request.BranchId == null || order.BranchId == request.BranchId));
+                && (order.RespondedAt ?? order.SubmittedAt) >= from
+                && (order.RespondedAt ?? order.SubmittedAt) < to
+                && (branchId == null || order.BranchId == branchId));
         }
 
         public static IQueryable<Payment> WhereConfirmedInRange(

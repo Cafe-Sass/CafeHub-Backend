@@ -158,6 +158,7 @@ namespace CafeHub.Infrastructure
             services.AddScoped<ICafePaymentSettingsReader, CafePaymentSettingsStore>();
             services.AddScoped<ICafePaymentSettingsWriter, CafePaymentSettingsStore>();
             services.AddScoped<IDashboardRevenueStore, DashboardRevenueStore>();
+            services.AddScoped<IDashboardInsightsStore, DashboardInsightsStore>();
             services.AddScoped<IBranchStore, BranchStore>();
             services.AddScoped<IStationStore, StationStore>();
             services.AddScoped<IMenuCategoryStore, MenuCategoryStore>();
