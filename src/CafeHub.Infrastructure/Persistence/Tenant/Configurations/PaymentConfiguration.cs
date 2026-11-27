@@ -54,6 +54,8 @@ namespace CafeHub.Infrastructure.Persistence.Tenant.Configurations
                 .IsUnique();
             builder.HasIndex(payment => payment.OrderId).HasDatabaseName("ix_payments_order_id");
             builder.HasIndex(payment => payment.ConfirmedByUserId).HasDatabaseName("ix_payments_confirmed_by_user_id");
+            builder.HasIndex(payment => new { payment.Status, payment.ConfirmedAt })
+                .HasDatabaseName("ix_payments_status_confirmed_at");
             builder.HasIndex(payment => payment.CreatedBy).HasDatabaseName("ix_payments_created_by");
             builder.HasIndex(payment => payment.UpdatedBy).HasDatabaseName("ix_payments_updated_by");
 
