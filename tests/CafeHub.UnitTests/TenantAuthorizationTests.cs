@@ -249,9 +249,23 @@ namespace CafeHub.UnitTests
                     }
                     else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestBillsController))
                     {
-                        Assert.Equal(nameof(TenantGuestBillsController.SubmitProof), action.MethodInfo.Name);
+                        var guestBillTemplates = new Dictionary<string, string>
+                        {
+                            [nameof(TenantGuestBillsController.GetConfirmedPayments)] =
+                                "t/{slug}/api/v1/guest/bills/{billReference}/payments",
+                            [nameof(TenantGuestBillsController.SubmitRefundRequest)] =
+                                "t/{slug}/api/v1/guest/bills/{billReference}/refund-requests",
+                            [nameof(TenantGuestBillsController.SubmitProof)] =
+                                "t/{slug}/api/v1/guest/bills/{billReference}/payment-proofs",
+                        };
+                        Assert.True(guestBillTemplates.TryGetValue(action.MethodInfo.Name, out var template));
+                        Assert.Equal(template, action.AttributeRouteInfo?.Template);
+                    }
+                    else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestRefundRequestsController))
+                    {
+                        Assert.Equal(nameof(TenantGuestRefundRequestsController.Get), action.MethodInfo.Name);
                         Assert.Equal(
-                            "t/{slug}/api/v1/guest/bills/{billReference}/payment-proofs",
+                            "t/{slug}/api/v1/guest/refund-requests/{publicReference}",
                             action.AttributeRouteInfo?.Template);
                     }
                     else if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestReceiptsController))
