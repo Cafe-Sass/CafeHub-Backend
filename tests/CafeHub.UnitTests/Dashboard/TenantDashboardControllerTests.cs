@@ -33,7 +33,8 @@ namespace CafeHub.UnitTests.Dashboard
                 [],
                 [],
                 new DashboardWifiAttachRate(null, DashboardInsightsRules.NoDineInOrdersReason),
-                []));
+                []),
+            new DashboardLeakageSummary(0));
 
         private static TenantDashboardController CreateController(ISender sender) =>
             new(sender, new TestCorrelationIdAccessor())
@@ -43,6 +44,13 @@ namespace CafeHub.UnitTests.Dashboard
                     HttpContext = new DefaultHttpContext { TraceIdentifier = "trace-dashboard" },
                 },
             };
+
+        private static DashboardLeakageResponse EmptyLeakage() => new(
+            DashboardLeakageRules.SignalNotice,
+            DashboardLeakageCatalog.All,
+            DashboardLeakageCatalog.All
+                .Select(definition => new DashboardLeakageSignal(definition.Key, 0, 0m, 1, false, []))
+                .ToList());
 
         private static MethodInfo Action(string name) =>
             typeof(TenantDashboardController).GetMethod(name, BindingFlags.Public | BindingFlags.Instance)
@@ -79,6 +87,65 @@ namespace CafeHub.UnitTests.Dashboard
                 Action(nameof(TenantDashboardController.GetMetric)).GetCustomAttribute<TenantAuthorizeAttribute>());
             Assert.Equal(TenantPermissions.ReportsView, authorize.Policy);
             Assert.Null(Action(nameof(TenantDashboardController.GetMetric)).GetCustomAttribute<AllowAnonymousAttribute>());
+        }
+
+        [Fact]
+        public void GetLeakage_IsAGetOnTheLeakageRouteRequiringReportsView()
+        {
+            var action = Action(nameof(TenantDashboardController.GetLeakage));
+            var httpGet = Assert.IsType<HttpGetAttribute>(action.GetCustomAttribute<HttpGetAttribute>());
+            Assert.Equal("leakage", httpGet.Template);
+            var authorize = Assert.IsType<TenantAuthorizeAttribute>(action.GetCustomAttribute<TenantAuthorizeAttribute>());
+            Assert.Equal(TenantPermissions.ReportsView, authorize.Policy);
+            Assert.Equal(TenantAuthenticationSchemes.Bearer, authorize.AuthenticationSchemes);
+            Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
+        }
+
+        [Fact]
+        public async Task GetLeakage_SendsTheRangeAndBranchAndReturnsTheSignals()
+        {
+            var response = EmptyLeakage();
+            var sender = new RecordingSender { Response = Result.Success(response) };
+            var controller = CreateController(sender);
+
+            var actionResult = await controller.GetLeakage(From, To, BranchId, CancellationToken.None);
+
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+            Assert.Same(response, okResult.Value);
+            var query = Assert.IsType<GetDashboardLeakageQuery>(sender.LastRequest);
+            Assert.Equal(From, query.From);
+            Assert.Equal(To, query.To);
+            Assert.Equal(BranchId, query.BranchId);
+            Assert.Equal(1, query.ContributorPage);
+        }
+
+        [Fact]
+        public void GetLeakage_ReturnsTheSignalNoticeAndDefinitionsAsTheResponseMetadata()
+        {
+            var response = EmptyLeakage();
+
+            Assert.Contains("not a verified loss", response.Notice, StringComparison.Ordinal);
+            Assert.Equal(DashboardLeakageKeys.All, response.Definitions.Select(definition => definition.Key));
+            Assert.Equal(DashboardLeakageKeys.All, response.Signals.Select(signal => signal.Key));
+        }
+
+        [Fact]
+        public async Task GetLeakage_MapsAValidationFailureToABadRequest()
+        {
+            var sender = new RecordingSender
+            {
+                Response = Result.Failure<DashboardLeakageResponse>(
+                    DashboardErrors.InvalidRange("The range end must be after the range start.")),
+            };
+            var controller = CreateController(sender);
+
+            var actionResult = await controller.GetLeakage(To, From, null, CancellationToken.None);
+
+            var objectResult = Assert.IsType<ObjectResult>(actionResult.Result);
+            Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
+            var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+            Assert.Equal(DashboardErrors.InvalidRangeCode, problem.Extensions["code"]);
         }
 
         [Fact]

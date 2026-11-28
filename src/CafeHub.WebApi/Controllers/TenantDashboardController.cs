@@ -44,6 +44,29 @@ namespace CafeHub.WebApi.Controllers
                 : result.ToProblemResult(HttpContext, correlationIdAccessor);
         }
 
+        [HttpGet("leakage")]
+        [TenantAuthorize(TenantPermissions.ReportsView)]
+        [ProducesResponseType<DashboardLeakageResponse>(StatusCodes.Status200OK, "application/json")]
+        public async Task<ActionResult<DashboardLeakageResponse>> GetLeakage(
+            [FromQuery] DateOnly? from,
+            [FromQuery] DateOnly? to,
+            [FromQuery] Guid? branchId,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new GetDashboardLeakageQuery
+                {
+                    From = from ?? default,
+                    To = to ?? default,
+                    BranchId = branchId,
+                },
+                cancellationToken);
+
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
         [HttpGet("{metric}")]
         [TenantAuthorize(TenantPermissions.ReportsView)]
         [ProducesResponseType<DashboardMetricResponse>(StatusCodes.Status200OK, "application/json")]
