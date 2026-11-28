@@ -146,6 +146,14 @@ namespace CafeHub.UnitTests.Menu.Queries
                     includeTotalCount));
                 return Task.FromResult(OffsetPage<GuestMenuItemResponse>.Create([], page, pageSize, null));
             }
+
+            public Task<IReadOnlyList<GuestMenuProductSummary>> ListVisibleAsync(
+                Guid branchId, CancellationToken cancellationToken) =>
+                Task.FromResult<IReadOnlyList<GuestMenuProductSummary>>([]);
+
+            public Task<IReadOnlyList<GuestMenuProductSummary>> SearchVisibleAsync(
+                Guid branchId, string search, int limit, CancellationToken cancellationToken) =>
+                Task.FromResult<IReadOnlyList<GuestMenuProductSummary>>([]);
         }
 
         private sealed record Call(

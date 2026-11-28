@@ -22,5 +22,15 @@ namespace CafeHub.Application.Menu.Contracts
             IReadOnlyList<SortTerm> sort,
             bool includeTotalCount,
             CancellationToken cancellationToken);
+
+        Task<IReadOnlyList<GuestMenuProductSummary>> ListVisibleAsync(
+            Guid branchId,
+            CancellationToken cancellationToken);
+
+        Task<IReadOnlyList<GuestMenuProductSummary>> SearchVisibleAsync(
+            Guid branchId,
+            string search,
+            int limit,
+            CancellationToken cancellationToken);
     }
 }
