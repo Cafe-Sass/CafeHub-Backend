@@ -2,6 +2,8 @@ using CafeHub.Application.Abstractions.Correlation;
 using CafeHub.Application.Abstractions.Results;
 using CafeHub.Application.Billing.DTOs;
 using CafeHub.Application.Billing.Queries;
+using CafeHub.Application.Discovery;
+using CafeHub.Application.Discovery.Queries;
 using CafeHub.Application.Menu.DTOs;
 using CafeHub.Application.Menu.Queries;
 using CafeHub.Application.Pagination;
@@ -9,10 +11,12 @@ using CafeHub.Application.Tables;
 using CafeHub.Application.Tables.DTOs;
 using CafeHub.Application.Tables.Queries;
 using CafeHub.WebApi.Errors;
+using CafeHub.WebApi.RateLimiting;
 using CafeHub.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CafeHub.WebApi.Controllers
 {
@@ -56,6 +60,37 @@ namespace CafeHub.WebApi.Controllers
             CancellationToken cancellationToken)
         {
             var result = await sender.Send(request with { Code = code }, cancellationToken);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+
+            if (result.Error!.Code == GuestQrErrors.NotFoundCode)
+            {
+                await GuestQrProblem.WriteNotFoundAsync(HttpContext, correlationIdAccessor, cancellationToken);
+                return new EmptyResult();
+            }
+
+            return result.ToProblemResult(HttpContext, correlationIdAccessor);
+        }
+
+        [HttpPost("{code}/discovery")]
+        [AllowAnonymous]
+        [TableQrEndpoint(IsGuest = true)]
+        [EnableRateLimiting(DiscoveryRateLimiting.PolicyName)]
+        [ProducesResponseType<ProductDiscoveryResult>(StatusCodes.Status200OK, "application/json")]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+        [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, "application/problem+json")]
+        public async Task<ActionResult<ProductDiscoveryResult>> Discovery(
+            [FromRoute] string slug,
+            [FromRoute] string? code,
+            [FromBody] ProductDiscoveryRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(
+                new GetProductDiscoveryQuery { Code = code, Query = request.Query },
+                cancellationToken);
             if (result.IsSuccess)
             {
                 return Ok(result.Value);

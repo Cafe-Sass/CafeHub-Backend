@@ -229,11 +229,18 @@ namespace CafeHub.UnitTests
                     if (action.ControllerTypeInfo.AsType() == typeof(TenantGuestQrController))
                     {
                         Assert.Contains(action.MethodInfo.Name,
-                            new[] { nameof(TenantGuestQrController.Resolve), nameof(TenantGuestQrController.Menu), nameof(TenantGuestQrController.PaymentOptions) });
+                            new[]
+                            {
+                                nameof(TenantGuestQrController.Resolve),
+                                nameof(TenantGuestQrController.Menu),
+                                nameof(TenantGuestQrController.Discovery),
+                                nameof(TenantGuestQrController.PaymentOptions),
+                            });
                         Assert.Contains(action.AttributeRouteInfo?.Template, new[]
                         {
                             "t/{slug}/api/v1/guest/qr/{**code}",
                             "t/{slug}/api/v1/guest/qr/{code}/menu",
+                            "t/{slug}/api/v1/guest/qr/{code}/discovery",
                             "t/{slug}/api/v1/guest/qr/{code}/payment-options",
                         });
                     }
