@@ -23,6 +23,7 @@ namespace CafeHub.Application.Identity
         public const string CafeProfileManage = "cafe-profile.manage";
         public const string GuestsMute = "guests.mute";
         public const string GuestsMuteAudit = "guests.mute.audit";
+        public const string InsightsView = "insights.view";
         public const string InventoryManage = "inventory.manage";
         public const string InventoryMove = "inventory.move";
         public const string InventoryReceive = "inventory.receive";
@@ -40,7 +41,7 @@ namespace CafeHub.Application.Identity
         public const string SubscriptionManage = "subscription.manage";
 
         public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
-            new[] { AttendanceManage, AttendanceQrManage, AttendanceView, BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RefundsManage, RefundsView, ReportsView, RolesManage, StaffManage, StaffRead, StationsManage, SubscriptionManage, TablesManage, WifiLookup, WifiManage });
+            new[] { AttendanceManage, AttendanceQrManage, AttendanceView, BillsClose, BillsView, BranchesManage, BranchesRead, CafeProfileManage, GuestsMute, GuestsMuteAudit, InsightsView, InventoryManage, InventoryMove, InventoryReceive, InventoryView, MenuAvailability, MenuManage, OrdersCaptain, OrdersDecide, MissesView, OrdersView, PaymentsCashConfirm, PaymentsOnlineReview, PaymentsSettingsManage, PrintersManage, RefundsManage, RefundsView, ReportsView, RolesManage, StaffManage, StaffRead, StationsManage, SubscriptionManage, TablesManage, WifiLookup, WifiManage });
 
         public static bool IsOwnerOnly(string? code) =>
             code is RolesManage or BranchesManage or CafeProfileManage or SubscriptionManage;
