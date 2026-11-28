@@ -2,6 +2,9 @@ namespace CafeHub.Application.Dashboard
 {
     public static class DashboardMetricCatalog
     {
+        public static DashboardMetricDefinition? Find(string? key) =>
+            All.FirstOrDefault(definition => string.Equals(definition.Key, key, StringComparison.Ordinal));
+
         public static IReadOnlyList<DashboardMetricDefinition> All { get; } = Array.AsReadOnly(
             new[]
             {
