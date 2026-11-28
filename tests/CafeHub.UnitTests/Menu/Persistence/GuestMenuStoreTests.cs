@@ -91,6 +91,53 @@ namespace CafeHub.UnitTests.Menu.Persistence
             Assert.Contains(command.Values, value => Equals(value, 11));
         }
 
+        [Fact]
+        public async Task VisibleProductsUseTheGuestMenuVisibilityRules()
+        {
+            var executed = Capture();
+            await using var context = CreateContext(executed);
+            var store = new GuestMenuStore(context);
+
+            var products = await store.ListVisibleAsync(BranchId, default);
+
+            Assert.Empty(products);
+            var command = Assert.Single(executed.Commands);
+            var sql = command.Sql.Replace("\"", string.Empty);
+            Assert.Contains("FROM products", sql);
+            Assert.Contains("status = 'Active'", sql);
+            Assert.Contains("menu_categories", sql);
+            Assert.Contains("parent_id IS NULL", sql);
+            Assert.Contains("branch_product_availability", sql);
+            Assert.Contains("is_available", sql);
+            Assert.Contains(command.Values, value => Equals(value, BranchId));
+        }
+
+        [Fact]
+        public async Task VisibleSearchEscapesWildcardsAndAppliesTheLimit()
+        {
+            var executed = Capture();
+            await using var context = CreateContext(executed);
+            var store = new GuestMenuStore(context);
+
+            await store.SearchVisibleAsync(BranchId, @"%_\", 5, default);
+
+            var command = Assert.Single(executed.Commands);
+            Assert.Contains("ILIKE", command.Sql);
+            Assert.Contains("ESCAPE", command.Sql);
+            Assert.Contains(command.Values, value => Equals(value, @"%\%\_\\%"));
+            Assert.Contains(command.Values, value => Equals(value, 5));
+        }
+
+        [Fact]
+        public async Task VisibleSearchRejectsANonPositiveLimit()
+        {
+            await using var context = CreateContext(Capture());
+            var store = new GuestMenuStore(context);
+
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+                () => store.SearchVisibleAsync(BranchId, "latte", 0, default));
+        }
+
         private static CapturedCommands Capture() => new();
 
         private static CafeHub.Infrastructure.Persistence.Tenant.TenantDbContext CreateContext(
