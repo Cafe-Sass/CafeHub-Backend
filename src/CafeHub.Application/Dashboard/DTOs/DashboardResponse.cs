@@ -16,9 +16,12 @@ namespace CafeHub.Application.Dashboard.DTOs
         DashboardWifiAttachRate WifiAttachRate,
         IReadOnlyList<DashboardNearExpiryItem> NearExpiryItems);
 
+    public sealed record DashboardLeakageSummary(int SignalCount);
+
     public sealed record DashboardResponse(
         IReadOnlyList<DashboardMetricDefinition> MetricDefinitions,
-        DashboardOverviewMetrics Metrics);
+        DashboardOverviewMetrics Metrics,
+        DashboardLeakageSummary Leakage);
 
     public sealed record DashboardMetricResponse(
         DashboardMetricDefinition Definition,

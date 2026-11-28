@@ -35,7 +35,21 @@ namespace CafeHub.UnitTests.Dashboard
                 InsightMetrics().BestSellersBySales,
                 InsightMetrics().PeakHours,
                 InsightMetrics().WifiAttachRate,
-                InsightMetrics().NearExpiryItems));
+                InsightMetrics().NearExpiryItems),
+            new DashboardLeakageSummary(0));
+
+        private static DashboardLeakageResponse LeakageResponse(params int[] signalCounts) => new(
+            DashboardLeakageRules.SignalNotice,
+            DashboardLeakageCatalog.All,
+            DashboardLeakageCatalog.All
+                .Select((definition, index) => new DashboardLeakageSignal(
+                    definition.Key,
+                    signalCounts[index],
+                    0m,
+                    1,
+                    false,
+                    []))
+                .ToList());
 
         private static StubSender OverviewSender() => new(request => request switch
         {
@@ -45,6 +59,7 @@ namespace CafeHub.UnitTests.Dashboard
             GetDashboardSalesInsightsQuery => Result.Success(new DashboardSalesInsightsResponse(
                 DashboardMetricCatalog.All,
                 InsightMetrics())),
+            GetDashboardLeakageQuery => Result.Success(LeakageResponse(0, 3, 0, 1)),
             _ => throw new InvalidOperationException($"Unexpected request {request.GetType().Name}."),
         });
 
@@ -68,6 +83,7 @@ namespace CafeHub.UnitTests.Dashboard
             Assert.Equal(0.5m, metrics.WifiAttachRate.Rate);
             Assert.Equal("Milk", Assert.Single(metrics.NearExpiryItems).ItemName);
             Assert.Equal(DashboardMetricCatalog.All, result.Value.MetricDefinitions);
+            Assert.Equal(new DashboardLeakageSummary(2), result.Value.Leakage);
         }
 
         [Fact]
@@ -79,15 +95,21 @@ namespace CafeHub.UnitTests.Dashboard
                 new GetDashboardQuery { From = From, To = To, BranchId = OtherBranchId },
                 CancellationToken.None);
 
-            Assert.Equal(2, sender.Requests.Count);
+            Assert.Equal(3, sender.Requests.Count);
             var revenue = Assert.IsType<GetDashboardRevenueQuery>(sender.Requests[0]);
             var insights = Assert.IsType<GetDashboardSalesInsightsQuery>(sender.Requests[1]);
-            Assert.Equal(From, revenue.From);
-            Assert.Equal(To, revenue.To);
-            Assert.Equal(OtherBranchId, revenue.BranchId);
-            Assert.Equal(From, insights.From);
-            Assert.Equal(To, insights.To);
-            Assert.Equal(OtherBranchId, insights.BranchId);
+            var leakage = Assert.IsType<GetDashboardLeakageQuery>(sender.Requests[2]);
+            foreach (var range in new (DateOnly From, DateOnly To, Guid? BranchId)[]
+            {
+                (revenue.From, revenue.To, revenue.BranchId),
+                (insights.From, insights.To, insights.BranchId),
+                (leakage.From, leakage.To, leakage.BranchId),
+            })
+            {
+                Assert.Equal(From, range.From);
+                Assert.Equal(To, range.To);
+                Assert.Equal(OtherBranchId, range.BranchId);
+            }
         }
 
         [Fact]
@@ -194,7 +216,8 @@ namespace CafeHub.UnitTests.Dashboard
                     [],
                     [],
                     new DashboardWifiAttachRate(null, DashboardInsightsRules.NoDineInOrdersReason),
-                    []));
+                    []),
+                new DashboardLeakageSummary(0));
 
             var result = await MetricHandler(dashboard).Handle(
                 MetricQuery(DashboardMetricKeys.AverageOrderValue),
@@ -234,7 +257,9 @@ namespace CafeHub.UnitTests.Dashboard
         }
 
         private static GetDashboardMetricQueryHandler MetricHandler(DashboardResponse dashboard) =>
-            new(new StubSender(_ => Result.Success(dashboard)));
+            new(new StubSender(request => request is GetDashboardLeakageQuery
+                ? Result.Success(LeakageResponse(0, 0, 0, 0))
+                : Result.Success(dashboard)));
 
         private static GetDashboardMetricQuery MetricQuery(string metric) => new()
         {

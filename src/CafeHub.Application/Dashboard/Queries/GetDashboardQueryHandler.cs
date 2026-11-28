@@ -40,6 +40,19 @@ namespace CafeHub.Application.Dashboard.Queries
                 return Result.Failure<DashboardResponse>(insights.Error!);
             }
 
+            var leakage = await sender.Send(
+                new GetDashboardLeakageQuery
+                {
+                    From = query.From,
+                    To = query.To,
+                    BranchId = query.BranchId,
+                },
+                cancellationToken);
+            if (leakage.IsFailure)
+            {
+                return Result.Failure<DashboardResponse>(leakage.Error!);
+            }
+
             var revenueMetrics = revenue.Value.Metrics;
             var insightMetrics = insights.Value.Metrics;
 
@@ -55,7 +68,9 @@ namespace CafeHub.Application.Dashboard.Queries
                     insightMetrics.BestSellersBySales,
                     insightMetrics.PeakHours,
                     insightMetrics.WifiAttachRate,
-                    insightMetrics.NearExpiryItems)));
+                    insightMetrics.NearExpiryItems),
+                new DashboardLeakageSummary(
+                    leakage.Value.Signals.Count(signal => signal.Count > 0))));
         }
     }
 }

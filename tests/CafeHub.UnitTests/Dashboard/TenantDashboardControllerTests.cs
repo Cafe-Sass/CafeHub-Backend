@@ -33,7 +33,8 @@ namespace CafeHub.UnitTests.Dashboard
                 [],
                 [],
                 new DashboardWifiAttachRate(null, DashboardInsightsRules.NoDineInOrdersReason),
-                []));
+                []),
+            new DashboardLeakageSummary(0));
 
         private static TenantDashboardController CreateController(ISender sender) =>
             new(sender, new TestCorrelationIdAccessor())
