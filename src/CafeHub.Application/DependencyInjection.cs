@@ -1,5 +1,6 @@
 using CafeHub.Application.Abstractions.Behaviors;
 using CafeHub.Application.Abstractions.Persistence;
+using CafeHub.Application.Insights;
 using CafeHub.Application.Inventory.Alerts;
 using CafeHub.Application.Orders;
 using CafeHub.Application.Pagination;
@@ -22,6 +23,7 @@ namespace CafeHub.Application
             services.AddSingleton(OrdersOptionsBinder.Bind(configuration));
             services.AddSingleton(SubscriptionOptionsBinder.Bind(configuration));
             services.AddScoped<InventoryAlertNotifier>();
+            services.AddScoped<BusinessInsightGenerator>();
 
             var applicationAssembly = typeof(DependencyInjection).Assembly;
 
