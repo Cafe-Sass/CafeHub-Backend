@@ -274,6 +274,7 @@ Tenant policies read current grants from the tenant database. The grant query ve
 | `Transport:ForwardedHeaders` | `KnownNetworks` | Known networks | `[]` | No |
 | `Transport:ForwardedHeaders` | `ForwardLimit` | Forward limit | `1` | No |
 | `Orders` | `ResponseWindowSeconds` | Seconds a guest order stays open for staff decision (30 to 3600) | `300` | No |
+| `Ai:Insights` | `Provider` | Business insight provider. Only `None` is accepted, which uses the deterministic rule-based fallback; startup validates the value and fails on any other provider until the AI service is published (TBD-22). | `None` | No |
 | `Subscription` | `GraceDays` | Days after a period ends before an Active subscription becomes Suspended (Proposed, pending owner confirmation; TBD-04) | `3` | No |
 | `Subscription` | `SuspendedRetentionDays` | Days a Suspended subscription is retained before it becomes Expired (Proposed, pending owner confirmation; TBD-04) | `90` | No |
 | `Subscription` | `RenewalRequestLifetimeDays` | Days an owner-approval renewal request stays Pending before it can be marked Expired (Proposed, pending owner confirmation; TBD-04) | `7` | No |
