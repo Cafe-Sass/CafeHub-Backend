@@ -25,12 +25,7 @@ namespace CafeHub.Infrastructure.Menu
         {
             ArgumentNullException.ThrowIfNull(sort);
 
-            var query = context.Products.AsNoTracking()
-                .Where(product => product.Status == ProductStatus.Active)
-                .Where(product => context.MenuCategories.EffectivelyVisible()
-                    .Any(category => category.Id == product.CategoryId))
-                .Where(product => !context.BranchProductAvailability.Any(row =>
-                    row.BranchId == branchId && row.ProductId == product.Id && !row.IsAvailable));
+            var query = VisibleInBranch(branchId);
 
             if (categoryId is { } categoryFilter)
             {
@@ -56,11 +51,7 @@ namespace CafeHub.Infrastructure.Menu
                     tagRow.Status == ProductComponentStatus.Active && tagRow.Tag == normalizedTag));
             }
 
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var pattern = $"%{EscapeLike(search.Trim())}%";
-                query = query.Where(product => EF.Functions.ILike(product.Name, pattern, @"\"));
-            }
+            query = ApplySearch(query, search);
 
             int? totalCount = includeTotalCount ? await query.CountAsync(cancellationToken) : null;
 
@@ -130,6 +121,82 @@ namespace CafeHub.Infrastructure.Menu
                 page,
                 pageSize,
                 totalCount);
+        }
+
+        public async Task<IReadOnlyList<GuestMenuProductSummary>> ListVisibleAsync(
+            Guid branchId,
+            CancellationToken cancellationToken)
+        {
+            var products = await VisibleInBranch(branchId)
+                .OrderBy(product => product.Name)
+                .ThenBy(product => product.Id)
+                .Select(product => new GuestMenuProductSummary(product.Id, product.Name, null, null))
+                .ToListAsync(cancellationToken);
+            return await WithPricesAsync(products, cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<GuestMenuProductSummary>> SearchVisibleAsync(
+            Guid branchId,
+            string search,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(search);
+            if (limit < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(limit));
+            }
+
+            var products = await ApplySearch(VisibleInBranch(branchId), search)
+                .OrderBy(product => product.Name)
+                .ThenBy(product => product.Id)
+                .Take(limit)
+                .Select(product => new GuestMenuProductSummary(product.Id, product.Name, null, null))
+                .ToListAsync(cancellationToken);
+            return await WithPricesAsync(products, cancellationToken);
+        }
+
+        private IQueryable<Product> VisibleInBranch(Guid branchId) =>
+            context.Products.AsNoTracking()
+                .Where(product => product.Status == ProductStatus.Active)
+                .Where(product => context.MenuCategories.EffectivelyVisible()
+                    .Any(category => category.Id == product.CategoryId))
+                .Where(product => !context.BranchProductAvailability.Any(row =>
+                    row.BranchId == branchId && row.ProductId == product.Id && !row.IsAvailable));
+
+        private static IQueryable<Product> ApplySearch(IQueryable<Product> query, string? search) =>
+            string.IsNullOrWhiteSpace(search)
+                ? query
+                : query.Where(product => EF.Functions.ILike(
+                    product.Name, $"%{EscapeLike(search.Trim())}%", @"\\"));
+
+        private async Task<IReadOnlyList<GuestMenuProductSummary>> WithPricesAsync(
+            IReadOnlyList<GuestMenuProductSummary> products,
+            CancellationToken cancellationToken)
+        {
+            if (products.Count == 0)
+            {
+                return Array.Empty<GuestMenuProductSummary>();
+            }
+
+            var productIds = products.Select(product => product.Id).ToArray();
+            var prices = await context.ProductSizes.AsNoTracking()
+                .Where(size => productIds.Contains(size.ProductId) && size.Status == ProductComponentStatus.Active)
+                .Select(size => new { size.ProductId, size.Price })
+                .ToListAsync(cancellationToken);
+
+            return products
+                .Select(product =>
+                {
+                    var productPrices = prices
+                        .Where(price => price.ProductId == product.Id)
+                        .Select(price => price.Price)
+                        .ToArray();
+                    return productPrices.Length == 0
+                        ? product
+                        : product with { PriceFrom = productPrices.Min(), PriceTo = productPrices.Max() };
+                })
+                .ToArray();
         }
 
         private static IOrderedQueryable<Product> ApplySort(IQueryable<Product> query, IReadOnlyList<SortTerm> sort)
