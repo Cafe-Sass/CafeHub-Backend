@@ -97,6 +97,9 @@ namespace CafeHub.WebApi
                 rateLimiterOptions.AddPolicy(
                     GlobalRateLimiting.PolicyName,
                     httpContext => GlobalRateLimitPolicy.CreatePartition(httpContext, options));
+                rateLimiterOptions.AddPolicy(
+                    DiscoveryRateLimiting.PolicyName,
+                    httpContext => DiscoveryRateLimiting.CreatePartition(httpContext, options));
                 rateLimiterOptions.OnRejected = RateLimitRejectionDispatcher.WriteAsync;
             });
 
